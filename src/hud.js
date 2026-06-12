@@ -7,6 +7,9 @@ const scoresEl=document.getElementById('scores');
 const scoreRowsEl=document.getElementById('scoreRows');
 const heartsEl=document.getElementById('hearts');
 const ammoEl=document.getElementById('ammo');
+const killEl=document.getElementById('killscreen');
+const killByEl=document.getElementById('killByName');
+const killCountEl=document.getElementById('killCount');
 
 export const scoresMap=new Map();
 let hp=3;
@@ -46,3 +49,15 @@ export function hitmark(){
   void el.offsetWidth;
   el.classList.add('pop');
 }
+
+/* the death overlay: name the slayer and seed the respawn countdown */
+export function showKillscreen(killerName, count){
+  killByEl.textContent=killerName;
+  killCountEl.textContent=count;
+  killEl.classList.add('on');
+}
+/* repaint the ticking numeral (only on change — it's called every frame) */
+export function setKillCount(n){
+  if(killCountEl.textContent!==String(n)) killCountEl.textContent=n;
+}
+export function hideKillscreen(){ killEl.classList.remove('on'); }

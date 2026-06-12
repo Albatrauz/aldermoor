@@ -6,12 +6,15 @@ import { EYE } from './core.js';
 import { addRemote, dropRemote, renameRemote, remotes } from './villagers.js';
 import { scoresMap, setHp, renderScores } from './hud.js';
 import { announce } from './zones.js';
-import { remoteShoot, handleHitFx, handleFell } from './combat.js';
+import { remoteShoot, handleHitFx, handleFell, clearDeath } from './combat.js';
 import { player, vel, keys } from './controls.js';
 
 const presenceEl=document.getElementById('presence');
 export let net=null, myId=null, myName=null;
 let netRetry=1000;
+// a stride between two 80ms snapshots is well under a metre; anything past this
+// is a respawn (or debug teleport), so we cut to it rather than glide across town
+const WARP_DIST=6;
 
 /* the player's chosen name: remembered across visits, offered to the server on
    connect, and re-sent as a rename when changed from the menu mid-session */
@@ -56,6 +59,7 @@ function connect(){
     let m; try{ m=JSON.parse(e.data); }catch{ return; }
     if(m.t==='welcome'){
       myId=m.id; myName=m.name; net=ws;
+      clearDeath();                  // a fresh session starts alive, never mid-death
       scoresMap.clear();
       scoresMap.set(myId,{name:myName, score:m.score||0});
       for(const p of m.players){ addRemote(p); scoresMap.set(p.id,{name:p.name, score:p.score||0}); }
@@ -99,7 +103,12 @@ function connect(){
         if(+id===myId) continue;
         const v=remotes.get(+id); if(!v) continue;
         const s=m.p[id];
-        v.tgt.x=s[0]; v.tgt.y=s[1]-EYE; v.tgt.z=s[2]; v.tgt.yaw=s[3]; v.tgt.m=s[4]; v.tgt.r=s[5];
+        const nx=s[0], ny=s[1]-EYE, nz=s[2];
+        const dx=nx-v.tgt.x, dy=ny-v.tgt.y, dz=nz-v.tgt.z;
+        if(dx*dx+dy*dy+dz*dz > WARP_DIST*WARP_DIST){ // a leap, not a stride → don't interpolate
+          v.cur.x=nx; v.cur.y=ny; v.cur.z=nz; v.cur.yaw=s[3];
+        }
+        v.tgt.x=nx; v.tgt.y=ny; v.tgt.z=nz; v.tgt.yaw=s[3]; v.tgt.m=s[4]; v.tgt.r=s[5];
       }
     }
   };

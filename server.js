@@ -33,6 +33,12 @@ const TRADE = ['the Cooper', 'the Miller', 'the Weaver', 'the Smith', 'the Baker
   'the Tanner', 'the Carter', 'the Brewer', 'the Mason', 'the Shepherd', 'the Chandler'];
 const COLORS = [0x7a3b2e, 0x3f5d43, 0x3c4668, 0x8a6d2f, 0x6b3a5c, 0x4a6b6e, 0x935b25, 0x5c5340];
 
+// The felled lie dead this long on the client (its killscreen countdown), then
+// rise with a brief grace. Hits inside the whole window are ignored, so a corpse
+// can't be re-felled — that would hand out a phantom kill and reset the count.
+const RESPAWN_MS = 4000;
+const SPAWN_GRACE_MS = 1500;
+
 let nextId = 1;
 const players = new Map();
 
@@ -132,7 +138,7 @@ function attachGame(httpServer) {
         p.hitUsed = true;
         const q = players.get(msg.target | 0);
         if (!q || q === p) return;
-        if (now - q.lastFell < 1500) return;              // mercy after a respawn
+        if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) return;  // dead, or freshly risen
         const dx = p.x - q.x, dz = p.z - q.z;
         if (dx * dx + dz * dz > 75 * 75) return;          // out of range, impossible shot
         q.hp -= 1;

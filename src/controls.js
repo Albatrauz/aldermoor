@@ -18,7 +18,7 @@ export let walkPhase=0;
 addEventListener('keydown',e=>{
   if(['Space','ArrowUp','ArrowDown'].includes(e.code)) e.preventDefault();
   keys.add(e.code);
-  if(e.code==='Space' && player.grounded && !introVisible){ player.vy=5.2; player.grounded=false; }
+  if(e.code==='Space' && player.grounded && !introVisible && !dead){ player.vy=5.2; player.grounded=false; }
 });
 addEventListener('keyup',e=>keys.delete(e.code));
 
@@ -26,6 +26,10 @@ const intro=document.getElementById('intro');
 export let introVisible=true;
 // exported as live bindings so the gun can tell whether the player has control
 export let locked=false, dragLook=false;
+// `dead` freezes the player where they fell while the killscreen counts down;
+// combat owns the timer and flips it back on respawn
+export let dead=false;
+export function setDead(v){ dead=v; }
 // blur the name field on entry — a focused (invisible) input would swallow
 // every gameplay key via its stopPropagation handler below
 export function hideIntro(){ intro.classList.add('hidden'); introVisible=false; nameInput.blur(); }
@@ -64,7 +68,7 @@ let dragging=false;
 addEventListener('mousedown',()=>dragging=true);
 addEventListener('mouseup',()=>dragging=false);
 addEventListener('mousemove',e=>{
-  if(introVisible) return;
+  if(introVisible || dead) return;
   if(locked || (dragLook&&dragging)){
     player.yaw   -= e.movementX*0.0023;
     player.pitch -= e.movementY*0.0023;
@@ -90,6 +94,8 @@ export function respawn(){
   player.z=s.z+Math.random()*2-1;
   player.yaw=s.yaw; player.pitch=0;
   vel.x=vel.z=0;
+  walkPhase=0;                          // a fresh stride, not the one we died mid-step of
+  camera.fov=70; camera.updateProjectionMatrix();  // drop any run-zoom held from death
   snapDown();
 }
 
@@ -136,6 +142,12 @@ function collide(){
 
 /* per-frame: walk the player and drive the camera, or drift gently behind the menu */
 export function update(dt, time){
+  if(dead){
+    // hold the view exactly where we fell — no bob, no input — until we rise
+    camera.position.set(player.x, player.y, player.z);
+    camera.rotation.set(player.pitch, player.yaw, 0);
+    return;
+  }
   if(!introVisible){
     const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
     const speed=run?7.4:4.2;
