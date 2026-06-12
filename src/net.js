@@ -51,7 +51,10 @@ function updatePresence(){
 function connect(){
   if(location.protocol==='file:'){ presenceEl.textContent='⚜ offline — wandering alone'; return; }
   let ws;
-  try{ ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'); }
+  // hand the remembered name to the server up front so a returning player keeps
+  // their name from the first frame, rather than flashing a server-picked one
+  try{ ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'
+    +(desiredName?'?name='+encodeURIComponent(desiredName):'')); }
   catch{ presenceEl.textContent='⚜ offline — wandering alone'; return; }
   ws.onopen=()=>{ netRetry=1000; };
   ws.onmessage=e=>{
@@ -64,7 +67,18 @@ function connect(){
       setHp(3); renderScores();
       updatePresence();
       announce(`Welcome, ${myName}`);
+      // a name typed before the socket finished opening → apply it now as a rename
+      if(desiredName && desiredName!==myName) sendNet({t:'name', name:desiredName});
       if(m.over) handleOver(m.over);   // a round was already decided — show the overview
+    }else if(m.t==='rename'){
+      // the server's authoritative (deduped) name for someone — us included. Keep
+      // myName, the live tally and the floating nametag all in lockstep with it.
+      const s=scoresMap.get(m.id);
+      if(s) s.name=m.name;
+      if(m.id===myId) myName=m.name;
+      renameRemote(m.id, m.name);
+      renderScores();
+      updatePresence();
     }else if(m.t==='join'){
       addRemote(m);
       scoresMap.set(m.id,{name:m.name, score:0});
