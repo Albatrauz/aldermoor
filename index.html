@@ -1,44 +1,100 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Aldermoor — a medieval town at dusk</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
-<canvas id="scene"></canvas>
-<div id="frame"></div>
-<div id="vignette"></div>
-<div id="crosshair"></div>
-<div id="toast"><span class="orn">❦</span><span id="toastText"></span><span class="orn">❦</span></div>
-<div id="hud">W&thinsp;A&thinsp;S&thinsp;D wander &nbsp;·&nbsp; click fire &nbsp;·&nbsp; shift run &nbsp;·&nbsp; space hop &nbsp;·&nbsp; esc menu</div>
-<div id="presence"></div>
-<div id="scores"><div class="sc-title">⚔ The Tally</div><div id="scoreRows"></div></div>
-<div id="hearts"></div>
-<div id="hitmark">✕</div>
-<div id="hurt"></div>
-<div id="intro">
-  <div class="intro-inner">
-    <div class="over-title">Anno Domini 1347</div>
-    <h1>Aldermoor</h1>
-    <div class="rule">✦ ⚜ ✦</div>
-    <p class="sub">A market town of the Wealdmark at dusk. The torches are lit,
-      the chimneys are smoking, and you may not be the only soul on the road.</p>
-    <button id="enter">Enter the Gates</button>
-    <div class="controls">
-      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk</span>
-      <span><kbd>Click</kbd> fire the handgonne</span>
-      <span><kbd>Shift</kbd> run</span>
-      <span><kbd>Space</kbd> hop</span>
-      <span><kbd>Esc</kbd> menu</span>
-    </div>
-  </div>
-</div>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Fable-Strike — de_dust2</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Sekuya&family=Lora:wght@200..700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <canvas id="scene"></canvas>
+        <div id="frame"></div>
+        <div id="vignette"></div>
+        <div id="crosshair"></div>
+        <div id="toast">
+            <span class="orn">❦</span><span id="toastText"></span
+            ><span class="orn">❦</span>
+        </div>
+        <div id="hud">
+            W&thinsp;A&thinsp;S&thinsp;D wander &nbsp;·&nbsp; click fire
+            &nbsp;·&nbsp; R reload &nbsp;·&nbsp; shift run &nbsp;·&nbsp; space
+            hop &nbsp;·&nbsp; esc menu
+        </div>
+        <div id="presence"></div>
+        <div id="scores">
+            <div class="sc-title">⚔ The Tally</div>
+            <div id="scoreRows"></div>
+        </div>
+        <div id="hearts"></div>
+        <div id="ammo"></div>
+        <div id="hitmark">✕</div>
+        <div id="hurt"></div>
+        <div id="killscreen">
+            <div class="ks-inner">
+                <div class="ks-kicker">Slain upon the sand</div>
+                <h2 class="ks-title">You Were Felled</h2>
+                <div class="ks-rule">✦ ⚜ ✦</div>
+                <div class="ks-by">
+                    by the hand of <span id="killByName">a stranger</span>
+                </div>
+                <div class="ks-count"><span id="killCount">4</span></div>
+                <div class="ks-rise">you rise again…</div>
+            </div>
+        </div>
+        <div id="overview">
+            <div class="ov-inner">
+                <div class="over-title">The Contest is Decided</div>
+                <h2 id="ovWinner"></h2>
+                <div class="ov-claim">
+                    victorious — first to <span id="ovCap">15</span> felled
+                </div>
+                <div class="rule">✦ ⚜ ✦</div>
+                <div class="ov-tally">
+                    <div class="sc-title">⚔ Final Tally</div>
+                    <div id="ovRows"></div>
+                </div>
+                <div id="ovCount" class="ov-count"></div>
+            </div>
+        </div>
+        <div id="intro">
+            <div class="intro-inner">
+                <div class="over-title">de_dust2 · Anno Domini 1347</div>
+                <h1>Fable Strike</h1>
+                <div class="rule">✦ ⚜ ✦</div>
+                <p class="sub">
+                    A sun-bleached desert stronghold of long lanes and dark
+                    tunnels. Take Long, hold Mid, rush B — and you will not be
+                    the only soul on the sand.
+                </p>
+                <input
+                    id="nameInput"
+                    maxlength="20"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="Name yourself, stranger…"
+                />
+                <button id="enter">Take the Field</button>
+                <div class="controls">
+                    <span
+                        ><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd
+                        ><kbd>D</kbd> walk</span
+                    >
+                    <span><kbd>Click</kbd> fire the handgonne</span>
+                    <span><kbd>R</kbd> reload</span>
+                    <span><kbd>Shift</kbd> run</span>
+                    <span><kbd>Space</kbd> hop</span>
+                    <span><kbd>Esc</kbd> menu</span>
+                </div>
+            </div>
+        </div>
 
-<script type="module" src="/src/main.js"></script>
-</body>
+
+        <script type="module" src="/src/main.js"></script>
+    </body>
 </html>

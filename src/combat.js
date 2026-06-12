@@ -2,16 +2,17 @@
 // The first-person handgonne: its viewmodel, firing (ray test → tracer, flash,
 // boom, and a network shot/hit), and reactions to incoming shots and kills.
 import * as THREE from 'three';
-import { scene, camera, EYE, mesh } from './core.js';
+import { scene, camera, mesh } from './core.js';
 import { matPlank, matIron, matGoldTrim } from './materials.js';
 import { colliders } from './world.js';
 import { remotes } from './villagers.js';
 import { myId, sendNet } from './net.js';
 import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects.js';
-import { boom, ding, thudSnd } from './audio.js';
-import { scoresMap, setHp, renderScores, hurtFlash, hitmark } from './hud.js';
-import { announce } from './zones.js';
-import { introVisible, locked, dragLook, player, vel, walkPhase } from './controls.js';
+import { boom, ding, thudSnd, clack } from './audio.js';
+import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
+  showKillscreen, hideKillscreen, setKillCount } from './hud.js';
+import { announce, syncZone } from './zones.js';
+import { introVisible, locked, dragLook, walkPhase, respawn, setDead } from './controls.js';
 
 scene.add(camera); // the viewmodel rides on the camera
 const gun=new THREE.Group();
@@ -29,12 +30,22 @@ const gunMuzzle=new THREE.Object3D();
   camera.add(gun);
 }
 
-const FIRE_CD=.9, RANGE=70;
-let fireCd=0, gunKick=0;
+const FIRE_CD=.9, RANGE=70, MAG=5, RELOAD_T=2.2, DEATH_T=4;
+let fireCd=0, gunKick=0, ammo=MAG, reloadT=0, deathT=0;
 const crosshairEl=document.getElementById('crosshair');
+setAmmo(ammo, MAG, false);
+
+export function startReload(){
+  if(reloadT>0||ammo===MAG||introVisible||deathT>0) return;
+  reloadT=RELOAD_T;
+  setAmmo(ammo, MAG, true);
+  clack();
+}
 
 export function fire(){
-  if(fireCd>0||introVisible) return;
+  if(fireCd>0||reloadT>0||introVisible||deathT>0) return;
+  if(ammo<=0){ startReload(); return; }
+  ammo-=1; setAmmo(ammo, MAG, false);
   fireCd=FIRE_CD; gunKick=1;
   crosshairEl.classList.add('cool');
   camera.updateMatrixWorld(true);
@@ -57,9 +68,13 @@ export function fire(){
     d:[+d.x.toFixed(3),+d.y.toFixed(3),+d.z.toFixed(3)],
     l:+end.toFixed(1)});
   if(hitId!==null) sendNet({t:'hit', target:hitId});
+  if(ammo===0) startReload();                              // ram the next charge
 }
 addEventListener('mousedown',e=>{
-  if(e.button===0 && !introVisible && (locked||dragLook)) fire();
+  if(e.button===0 && !introVisible && !frozen && (locked||dragLook)) fire();
+});
+addEventListener('keydown',e=>{
+  if(e.code==='KeyR' && !introVisible) startReload();
 });
 
 export function remoteShoot(m){
@@ -90,11 +105,12 @@ export function handleFell(m){
   if(s) s.score=m.score;
   renderScores();
   if(m.target===myId){
-    setHp(3); hurtFlash(); thudSnd();
-    player.x=Math.random()*4-2; player.z=38.5; player.y=EYE;
-    player.vy=0; player.grounded=true; player.yaw=0; player.pitch=0;
-    vel.x=vel.z=0;
-    announce(`Felled by ${m.sname}! Back to the gates`);
+    if(deathT>0) return;                  // already lying dead — ignore a stray second blow
+    setHp(0); hurtFlash(); thudSnd();
+    setDead(true);                        // freeze where we fell; respawn happens on the count
+    deathT=DEATH_T;
+    crosshairEl.classList.remove('cool');
+    showKillscreen(m.sname, Math.ceil(DEATH_T));
   }else if(m.shooter===myId){
     announce(`You felled ${m.tname}!`);
     ding();
@@ -103,12 +119,39 @@ export function handleFell(m){
   }
 }
 
-/* per-frame: cooldown, recoil decay, and walk sway of the viewmodel */
+/* end a death: fresh spawn, restored gonne, control handed back to the player */
+function rise(){
+  deathT=0;
+  respawn();                                         // pick a fresh spawn and snap there
+  syncZone();                                        // adopt the new locale without a toast
+  setHp(3);
+  ammo=MAG; reloadT=0; fireCd=0; gunKick=0; setAmmo(ammo, MAG, false);
+  crosshairEl.classList.remove('cool');
+  hideKillscreen();
+  setDead(false);
+}
+/* abort a death screen outright — net calls this when the socket (re)connects
+   mid-count, so a dropped link can't strand us frozen behind the overlay */
+export function clearDeath(){ if(deathT>0) rise(); }
+
+/* per-frame: cooldown, reload, recoil decay, and walk sway of the viewmodel */
 export function update(dt){
-  gun.visible=!introVisible;
+  gun.visible=!introVisible && deathT<=0;
+  if(deathT>0){
+    deathT-=dt;
+    setKillCount(Math.max(1, Math.ceil(deathT)));    // 4 → 3 → 2 → 1, then rise
+    if(deathT<=0) rise();                            // the count is up — back to the fight
+    return;                                          // no gun sway or reload progress while dead
+  }
   if(fireCd>0){ fireCd-=dt; if(fireCd<=0) crosshairEl.classList.remove('cool'); }
+  if(reloadT>0){
+    reloadT-=dt;
+    if(reloadT<=0){ reloadT=0; ammo=MAG; setAmmo(ammo, MAG, false); ding(); }
+  }
   gunKick=Math.max(0, gunKick-dt*5);
-  gun.position.set(.34, -.3+Math.sin(walkPhase)*.006, -.5+gunKick*.09);
-  gun.rotation.x=gunKick*.22;
-  gun.rotation.z=Math.sin(walkPhase*.5)*.012;
+  // during a reload the gonne dips down and swings back up
+  const dip=reloadT>0 ? Math.sin((1-reloadT/RELOAD_T)*Math.PI) : 0;
+  gun.position.set(.34, -.3+Math.sin(walkPhase)*.006-dip*.16, -.5+gunKick*.09);
+  gun.rotation.x=gunKick*.22-dip*.7;
+  gun.rotation.z=Math.sin(walkPhase*.5)*.012+dip*.25;
 }
