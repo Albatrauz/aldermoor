@@ -15,7 +15,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 
 export const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x584a63, 0.0105);
+scene.fog = new THREE.FogExp2(0xcdbb94, 0.0025);
 
 export const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 700);
 camera.rotation.order = 'YXZ';

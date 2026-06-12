@@ -1,21 +1,18 @@
-/* ============================ the town of Aldermoor ============================ */
-// Builds the entire static scene — sky, lighting, ground, every building, wall,
-// prop, torch and particle system — as a one-time side effect on import.
+/* ============================ de_aldermoor — Dust2 ============================ */
+// A pragmatic, recognizable reproduction of Counter-Strike's Dust2, built from
+// the same primitive idiom as the old town. Orientation: T spawn west (−X),
+// CT spawn east (+X), Bombsite A north (+Z, raised), Bombsite B south (−Z,
+// reached through covered tunnels). 1 unit ≈ 1 metre.
 //
-// IMPORTANT: the order of construction below must not change. Layout is driven by
-// the seeded RNG (`rand`/`R`/`pick` from core), so reordering any build step
-// reshuffles the whole town. `updateAmbient` drives the per-frame flicker/sway.
+// Colliders carry a vertical span (base..top) and may be ramps whose top
+// interpolates along one axis — controls.js and effects.js consume this.
 import * as THREE from 'three';
-import { scene, rand, R, pick, mesh, prismGeo, uvBox } from './core.js';
+import { scene, mesh, uvBox } from './core.js';
 import {
-  matCobble, matGrass, matDirt, matStone, matStone2, matPlank, matDarkWood,
-  matIron, matLitWin, matLitWin2, matDarkWin, matFoliage, matFoliage2,
-  matGoldTrim, wallMats, roofMats, stripeMats,
+  matSand, matSandPath, matSandstone, matSandstoneDark, matConcrete,
+  matCrate, matIron, matContainerBlue, matCarRed, matSandbag, matMetalDoor,
 } from './materials.js';
-import {
-  clonedTex, stoneTex, plankTex, thatchTex, parchTex, signTex,
-  glowTex, flameTex, smokeTex, moonTex, archWinTex, roseTex,
-} from './textures.js';
+import { glowTex } from './textures.js';
 
 /* ============================ sky & light ============================ */
 const sky = new THREE.Mesh(
@@ -23,9 +20,9 @@ const sky = new THREE.Mesh(
   new THREE.ShaderMaterial({
     side:THREE.BackSide, depthWrite:false, fog:false,
     uniforms:{
-      top:{value:new THREE.Color(0x1b2244)},
-      mid:{value:new THREE.Color(0x73465e)},
-      low:{value:new THREE.Color(0xd98a4e)},
+      top:{value:new THREE.Color(0x4a78b8)},
+      mid:{value:new THREE.Color(0x9fc0e0)},
+      low:{value:new THREE.Color(0xe8d9b0)},
     },
     vertexShader:'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader:`varying vec3 vP; uniform vec3 top; uniform vec3 mid; uniform vec3 low;
@@ -39,542 +36,344 @@ const sky = new THREE.Mesh(
 sky.renderOrder=-3; sky.frustumCulled=false;
 scene.add(sky);
 
-{ // stars
-  const n=650, pos=new Float32Array(n*3);
-  for(let i=0;i<n;i++){
-    const y=R(.2,.97), th=R(0,Math.PI*2), r=Math.sqrt(1-y*y);
-    pos[i*3]=Math.cos(th)*r*540; pos[i*3+1]=y*540; pos[i*3+2]=Math.sin(th)*r*540;
-  }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  const stars=new THREE.Points(g, new THREE.PointsMaterial({
-    color:0xcdd6ff, size:1.7, sizeAttenuation:false, transparent:true, opacity:.8,
-    fog:false, depthWrite:false}));
-  stars.renderOrder=-2;
-  scene.add(stars);
-}
-const sunDir = new THREE.Vector3(-55, 24, 30).normalize();
-{ // setting-sun glow + moon
+const sunDir = new THREE.Vector3(0.4, 0.85, 0.3).normalize();
+{ // high desert sun glow
   const glow=new THREE.Sprite(new THREE.SpriteMaterial({
-    map:glowTex, color:0xff9a4a, transparent:true, opacity:.8,
+    map:glowTex, color:0xfff4dc, transparent:true, opacity:.85,
     blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
-  glow.position.copy(sunDir).multiplyScalar(530); glow.scale.setScalar(240); glow.renderOrder=-2;
+  glow.position.copy(sunDir).multiplyScalar(520); glow.scale.setScalar(150); glow.renderOrder=-2;
   scene.add(glow);
-  const core=new THREE.Sprite(glow.material.clone());
-  core.material.color.set(0xffe3b0); core.material.opacity=.9;
-  core.position.copy(sunDir).multiplyScalar(528); core.scale.setScalar(80); core.renderOrder=-2;
-  scene.add(core);
-  const moon=new THREE.Sprite(new THREE.SpriteMaterial({
-    map:moonTex, transparent:true, opacity:.95, depthWrite:false, fog:false}));
-  moon.position.set(230, 260, -300); moon.scale.setScalar(38); moon.renderOrder=-2;
-  scene.add(moon);
 }
 
-scene.add(new THREE.HemisphereLight(0x65689e, 0x46342a, 0.55));
-const sun = new THREE.DirectionalLight(0xff9750, 2.4);
-sun.position.copy(sunDir).multiplyScalar(90);
+scene.add(new THREE.HemisphereLight(0x9fc0e0, 0x8a7350, 0.9));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
+sun.position.copy(sunDir).multiplyScalar(160);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048,2048);
-sun.shadow.camera.left=-65; sun.shadow.camera.right=65;
-sun.shadow.camera.top=65; sun.shadow.camera.bottom=-65;
-sun.shadow.camera.near=10; sun.shadow.camera.far=220;
+sun.shadow.mapSize.set(4096,4096);
+sun.shadow.camera.left=-140; sun.shadow.camera.right=140;
+sun.shadow.camera.top=140; sun.shadow.camera.bottom=-140;
+sun.shadow.camera.near=10; sun.shadow.camera.far=420;
 sun.shadow.bias=-0.0006; sun.shadow.normalBias=0.02;
 scene.add(sun);
-const fill = new THREE.DirectionalLight(0x33406e, 0.55);
-fill.position.set(45, 35, -50);
+const fill = new THREE.DirectionalLight(0xb9c9de, 0.4);
+fill.position.set(-60, 40, -45);
 scene.add(fill);
 
-/* ============================ ground ============================ */
+/* ============================ ground & worn paths ============================ */
 {
-  const grass = mesh(new THREE.PlaneGeometry(440,440), matGrass, 0,0,0, {rx:-Math.PI/2, cast:false});
-  scene.add(grass);
-  const cobbles = mesh(new THREE.PlaneGeometry(86,86), matCobble, 0,0.02,0, {rx:-Math.PI/2, cast:false});
-  scene.add(cobbles);
-  const road = mesh(new THREE.PlaneGeometry(7,62), matDirt, 0,0.03,73, {rx:-Math.PI/2, cast:false});
-  scene.add(road);
+  const sand = mesh(new THREE.PlaneGeometry(320,260), matSand, 0,0,0, {rx:-Math.PI/2, cast:false});
+  scene.add(sand);
+  // lighter worn paths down the three lanes
+  const path=(x,z,w,l,ry=0)=>{
+    const p=mesh(new THREE.PlaneGeometry(w,l), matSandPath, x,0.02,z, {rx:-Math.PI/2, cast:false});
+    p.rotation.z=ry; scene.add(p);
+  };
+  path(-12,0, 6,130, Math.PI/2);    // mid: T upper → CT
+  path(-36,40.5, 6,68, Math.PI/2);  // long
+  path(-70,12, 6,40, Math.PI/2);    // T upper approach
+  path(-57,-21.5, 5,42, Math.PI/2); // upper tunnels
+  path(-29,-34, 5,40, Math.PI/2);   // lower tunnels
+  path(-105,0, 10,36);              // T spawn
+  path(95,0, 12,40);                // CT spawn
+  path(2,-34, 14,22);               // B plateau
 }
 
-/* ============================ colliders & registries ============================ */
+/* ============================ colliders & helpers ============================ */
 export const colliders = [];
-const addCollider=(x,z,hx,hz,h=5)=>colliders.push({x,z,hx,hz,h});
-const torches=[], swaySigns=[], flutterFlags=[], smokeEmitters=[];
-
-/* ============================ torch ============================ */
-function addTorch(x,z){
-  const g=new THREE.Group();
-  g.add(mesh(new THREE.CylinderGeometry(.06,.08,2.3,7), matDarkWood, 0,1.15,0));
-  g.add(mesh(new THREE.CylinderGeometry(.13,.10,.26,7), matIron, 0,2.36,0));
-  const flame=new THREE.Sprite(new THREE.SpriteMaterial({
-    map:flameTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
-  flame.scale.set(.6,.95,1); flame.position.set(0,2.75,0);
-  g.add(flame);
-  const light=new THREE.PointLight(0xff9038, 16, 17, 2);
-  light.position.set(0,2.7,0);
-  g.add(light);
-  g.position.set(x,0,z);
-  scene.add(g);
-  torches.push({light, flame, phase:R(0,9), base:16});
-  addCollider(x,z,.25,.25,2.4);
+const addCollider=(x,z,hx,hz,top=5,base=0)=>
+  colliders.push({x,z,hx,hz,base,top,h:top,kind:'box'});
+// sloped surface: top interpolates loTop→hiTop along +axis
+const addRamp=(x,z,hx,hz,loTop,hiTop,axis='x')=>
+  colliders.push({x,z,hx,hz,base:0,loTop,hiTop,axis,
+                  top:Math.max(loTop,hiTop), h:Math.max(loTop,hiTop), kind:'ramp'});
+// height of a collider's top surface at world point (px,pz)
+export function colliderTopAt(c,px,pz){
+  if(c.kind!=='ramp') return c.top;
+  const a = c.axis==='x' ? (px-(c.x-c.hx))/(2*c.hx) : (pz-(c.z-c.hz))/(2*c.hz);
+  const t = Math.max(0, Math.min(1, a));
+  return c.loTop + (c.hiTop-c.loTop)*t;
 }
 
-/* ============================ houses ============================ */
-function addWindow(parent, x,y,z, ry, lit){
-  const w=new THREE.Group();
-  const glass = mesh(new THREE.PlaneGeometry(.6,.78),
-    lit ? (rand()<.5?matLitWin:matLitWin2) : matDarkWin, 0,0,0, {cast:false});
-  w.add(glass);
-  w.add(mesh(new THREE.PlaneGeometry(.26,.8), matDarkWood, -.47,0,.005, {cast:false}));
-  w.add(mesh(new THREE.PlaneGeometry(.26,.8), matDarkWood,  .47,0,.005, {cast:false}));
-  w.add(mesh(new THREE.BoxGeometry(.86,.07,.1), matDarkWood, 0,-.45,.03));
-  w.position.set(x,y,z); w.rotation.y=ry;
-  parent.add(w);
+const WH=5;          // default wall height
+const WT=0.8;        // default wall thickness
+
+// a textured box whose *base* sits at y=`base` (no collider)
+function block(cx,cz,sx,sy,sz,mat=matSandstone,base=0,uv=.22){
+  const m=mesh(uvBox(new THREE.BoxGeometry(sx,sy,sz),uv), mat, cx, base+sy/2, cz);
+  scene.add(m);
+  return m;
 }
-function buildHouse(x,z,rotY,opt={}){
-  const g=new THREE.Group();
-  const w=opt.tavern?6.4:R(4.6,6.2), d=opt.tavern?5.8:R(4.4,5.6);
-  const twoStory = opt.tavern || rand()>0.28;
-  const h1=R(2.5,2.9), h2=twoStory?R(2.2,2.6):0;
-  const wallMat=pick(wallMats), roofMat=pick(roofMats);
-  const jet = twoStory? .7 : 0;
-
-  g.add(mesh(new THREE.BoxGeometry(w,h1,d), wallMat, 0,h1/2,0));
-  if(twoStory) g.add(mesh(new THREE.BoxGeometry(w+jet,h2,d+jet*.8), pick(wallMats), 0,h1+h2/2,0));
-  const roofH=R(2.1,3.0)*(w/5.6);
-  g.add(mesh(prismGeo(w+1.3, roofH, d+1.1), roofMat, 0,h1+h2,0));
-
-  // door + step
-  const doorX = R(-w/4,w/4);
-  g.add(mesh(new THREE.PlaneGeometry(1.05,1.95), matPlank, doorX,0.98,d/2+0.02, {cast:false}));
-  g.add(mesh(new THREE.BoxGeometry(1.35,.16,.12), matDarkWood, doorX,2.02,d/2+0.05));
-  g.add(mesh(new THREE.BoxGeometry(1.3,.13,.55), matStone, doorX,.065,d/2+.25));
-
-  // windows
-  addWindow(g, -Math.sign(doorX||1)*w/4, 1.55, d/2+0.02, 0, rand()<.5);
-  if(twoStory){
-    addWindow(g, -w/4, h1+h2/2, (d+jet*.8)/2+0.02, 0, rand()<.6);
-    addWindow(g,  w/4, h1+h2/2, (d+jet*.8)/2+0.02, 0, rand()<.6);
-    if(rand()<.6) addWindow(g, (w+jet)/2+0.02, h1+h2/2, 0, Math.PI/2, rand()<.5);
-    if(rand()<.6) addWindow(g, -(w+jet)/2-0.02, h1+h2/2, 0, -Math.PI/2, rand()<.5);
-  }
-
-  // chimney
-  if(rand()<0.62 || opt.tavern){
-    const cx=w*0.27*(rand()<.5?-1:1);
-    const cm=mesh(new THREE.BoxGeometry(.55,1.5,.55), matStone2, cx, h1+h2+roofH*.55, 0);
-    g.add(cm);
-    if(smokeEmitters.length<6) smokeEmitters.push({obj:cm, off:1.0, sprites:[], phase:R(0,9)});
-  }
-
-  if(opt.tavern){
-    const arm=mesh(new THREE.BoxGeometry(.09,.09,1.25), matIron, doorX+1.5, h1+0.55, d/2+0.6);
-    g.add(arm);
-    const pivot=new THREE.Group();
-    pivot.position.set(doorX+1.5, h1+0.5, d/2+1.1);
-    const board=mesh(new THREE.PlaneGeometry(1.25,.95),
-      new THREE.MeshStandardMaterial({map:signTex('Ye Gilded Boar'), roughness:.85, side:THREE.DoubleSide}),
-      0,-.62,0);
-    pivot.add(board);
-    g.add(pivot);
-    swaySigns.push({pivot, phase:R(0,9)});
-  }
-
-  g.position.set(x,0,z);
-  g.rotation.y = rotY + R(-0.035,0.035);
-  scene.add(g);
-
-  const s=Math.abs(Math.sin(rotY));
-  const pad=.55+jet/2;
-  const hh=h1+h2+roofH;
-  if(s<0.3)      addCollider(x,z, w/2+pad, d/2+pad, hh);
-  else if(s>0.7 && Math.abs(Math.cos(rotY))<0.3) addCollider(x,z, d/2+pad, w/2+pad, hh);
-  else { const m=Math.max(w,d)/2+pad; addCollider(x,z,m,m,hh); }
-  return g;
+// box + matching collider
+function solid(cx,cz,sx,sy,sz,mat=matSandstone,base=0){
+  block(cx,cz,sx,sy,sz,mat,base);
+  addCollider(cx,cz,sx/2,sz/2, base+sy, base);
+}
+// split [a,b] by sorted gap intervals
+function spans(a,b,gaps){
+  const gs=[...gaps].sort((p,q)=>p[0]-q[0]);
+  const out=[]; let cur=a;
+  for(const [g1,g2] of gs){ if(g1>cur+.01) out.push([cur,g1]); cur=Math.max(cur,g2); }
+  if(cur<b-.01) out.push([cur,b]);
+  return out;
+}
+// wall running along X at fixed z / along Z at fixed x, with optional gaps
+function wallX(z,x1,x2,{h=WH,t=WT,gaps=[],mat=matSandstone,base=0}={}){
+  for(const [a,b] of spans(x1,x2,gaps)) solid((a+b)/2, z, b-a, h-base, t, mat, base);
+}
+function wallZ(x,z1,z2,{h=WH,t=WT,gaps=[],mat=matSandstone,base=0}={}){
+  for(const [a,b] of spans(z1,z2,gaps)) solid(x, (a+b)/2, t, h-base, b-a, mat, base);
+}
+// overhead beam across a doorway: passable below `under`, blocks shots above
+function lintel(cx,cz,sx,sz,under=3.0,top=WH,mat=matSandstone){
+  block(cx,cz,sx,top-under,sz,mat,under);
+  addCollider(cx,cz,sx/2,sz/2,top,under);
 }
 
-const houseSpots = [
-  // main street, south of square
-  [-8.5,14, Math.PI/2],[-8.5,21, Math.PI/2],[-8.5,28, Math.PI/2],
-  [ 8.5,14,-Math.PI/2],[ 8.5,21,-Math.PI/2],[ 8.5,28,-Math.PI/2],
-  // main street, north of square
-  [-8.5,-12, Math.PI/2],[ 8.5,-12,-Math.PI/2],
-  // cross street, north side (faces +z)
-  [-12,-8,0],[-20,-8,0],[-28,-8,0],[20,-8,0],[28,-8,0],
-  // cross street, south side (faces -z)
-  [-12,8,Math.PI],[-20,8,Math.PI],[-28,8,Math.PI],[12,8,Math.PI],[20,8,Math.PI],[28,8,Math.PI],
-];
-for(const [hx,hz,ry] of houseSpots) buildHouse(hx,hz,ry);
-buildHouse(12,-8,0,{tavern:true});
-for(const [hx,hz] of [[17,17],[-17,17],[-17,-17],[17,-17]]){
-  buildHouse(hx,hz, Math.atan2(-hx,-hz));
-}
-
-/* ============================ church ============================ */
-{
-  const g=new THREE.Group();
-  const naveGeo=uvBox(new THREE.BoxGeometry(9,6,14), 0.22);
-  g.add(mesh(naveGeo, matStone2, 0,3,0));
-  g.add(mesh(prismGeo(10.4,3.8,15.4,0.3), roofMats[1], 0,6,0));
-  // tower
-  const towerGeo=uvBox(new THREE.BoxGeometry(3.8,13,3.8), 0.22);
-  g.add(mesh(towerGeo, matStone2, -6.4,6.5,5));
-  const spire=mesh(new THREE.ConeGeometry(2.9,4.8,4), roofMats[1], -6.4,15.4,5, {ry:Math.PI/4});
-  g.add(spire);
-  g.add(mesh(new THREE.BoxGeometry(.1,1.5,.1), matGoldTrim, -6.4,18.4,5));
-  g.add(mesh(new THREE.BoxGeometry(.7,.1,.1), matGoldTrim, -6.4,18.55,5));
-  // belfry openings
-  for(const ry of [0,Math.PI/2]){
-    const b=mesh(new THREE.PlaneGeometry(1,1.5), matDarkWin, 0,0,0,{cast:false});
-    const holder=new THREE.Group(); holder.add(b);
-    holder.position.set(-6.4,11.5,5); holder.rotation.y=ry;
-    b.position.z=1.93;
-    scene.add(holder); g.add(holder);
-  }
-  // glowing gothic windows
-  const winMat=new THREE.MeshBasicMaterial({map:archWinTex, transparent:true});
-  for(let i=0;i<3;i++){
-    for(const sgn of [1,-1]){
-      const wm=mesh(new THREE.PlaneGeometry(1.15,2.3), winMat, sgn*4.52, 3.4, -4+i*4, {ry:sgn*Math.PI/2, cast:false});
-      g.add(wm);
-    }
-  }
-  // rose window + door (front faces +z toward town)
-  const rose=mesh(new THREE.CircleGeometry(.95,24),
-    new THREE.MeshBasicMaterial({map:roseTex, transparent:true}), 0,4.7,7.02, {cast:false});
-  g.add(rose);
-  g.add(mesh(new THREE.PlaneGeometry(1.7,2.6), matPlank, 0,1.3,7.02, {cast:false}));
-  g.add(mesh(new THREE.BoxGeometry(2.2,.2,.2), matStone, 0,2.7,7.06));
-  g.add(mesh(new THREE.BoxGeometry(2.4,.18,1.1), matStone, 0,.09,7.4));
-  g.position.set(0,0,-26);
-  scene.add(g);
-  addCollider(0,-26, 5.1, 7.6, 9);
-  addCollider(-6.4,-21, 2.5, 2.5, 17);
-
-  // graveyard
-  for(const [gx,gz] of [[6.5,-27.5],[7.8,-29.4],[9,-26.8],[9.8,-29],[7,-31],[10.6,-31.4]]){
-    const slab=mesh(new THREE.BoxGeometry(.5,R(.55,.85),.12), matStone, gx,R(.22,.34),gz,
-      {ry:R(-.3,.3), rz:R(-.12,.12)});
-    scene.add(slab);
-  }
-}
-
-/* ============================ town walls & gate ============================ */
-{
-  const WALL=42, WH=5, WT=1.4;
-  const segs=[
-    {x:0, z:-WALL, w:WALL*2+WT, d:WT},
-    {x:-WALL, z:0, w:WT, d:WALL*2+WT},
-    {x: WALL, z:0, w:WT, d:WALL*2+WT},
-    {x:-(3.6+WALL)/2-0, z:WALL, w:WALL-3.6, d:WT, gx:-(WALL+3.6)/2},
-    {x: (3.6+WALL)/2+0, z:WALL, w:WALL-3.6, d:WT, gx: (WALL+3.6)/2},
+// right-triangle wedge rising from y=0 at −x to y=h at +x
+// (triangles wound counter-clockwise seen from outside — front faces out)
+function wedgeGeo(w,h,d,uvScale=.25){
+  const hw=w/2, hd=d/2;
+  const v=[
+    -hw,0,-hd,  hw,0,-hd,  hw,0,hd,   -hw,0,-hd,  hw,0,hd, -hw,0,hd,   // bottom
+    -hw,0,-hd,  hw,h,hd,   hw,h,-hd,  -hw,0,-hd, -hw,0,hd,  hw,h,hd,   // slope
+     hw,0,-hd,  hw,h,hd,   hw,0,hd,    hw,0,-hd,  hw,h,-hd, hw,h,hd,   // back
+    -hw,0,-hd,  hw,h,-hd,  hw,0,-hd,                                   // side −z
+    -hw,0,hd,   hw,0,hd,   hw,h,hd,                                    // side +z
   ];
-  for(const s of segs){
-    const cx = s.gx!==undefined ? s.gx : s.x;
-    const wallGeo=uvBox(new THREE.BoxGeometry(s.w,WH,s.d), 0.2);
-    scene.add(mesh(wallGeo, matStone, cx, WH/2, s.z));
-    addCollider(cx, s.z, s.w/2, s.d/2, WH+.9);
-  }
-  // crenellations
-  const merlonGeo=new THREE.BoxGeometry(1.0,.9,WT*.7);
-  const positions=[];
-  for(let x=-WALL+1.5;x<=WALL-1.5;x+=2.6){
-    positions.push([x,-WALL,0]);
-    if(Math.abs(x)>5) positions.push([x,WALL,0]);
-  }
-  for(let z=-WALL+1.5;z<=WALL-1.5;z+=2.6){
-    positions.push([-WALL,z,Math.PI/2]);
-    positions.push([ WALL,z,Math.PI/2]);
-  }
-  const inst=new THREE.InstancedMesh(merlonGeo, matStone, positions.length);
-  const dummy=new THREE.Object3D();
-  positions.forEach(([px,pz,ry],i)=>{
-    dummy.position.set(px, WH+.45, pz);
-    dummy.rotation.set(0,ry,0);
-    dummy.updateMatrix();
-    inst.setMatrixAt(i,dummy.matrix);
-  });
-  inst.castShadow=true; inst.receiveShadow=true;
-  scene.add(inst);
-
-  // corner towers
-  for(const [tx,tz] of [[-WALL,-WALL],[WALL,-WALL],[-WALL,WALL],[WALL,WALL]]){
-    const towerTex=clonedTex(stoneTex,4,3);
-    scene.add(mesh(new THREE.CylinderGeometry(3,3.3,8.5,12),
-      new THREE.MeshStandardMaterial({map:towerTex,roughness:.95}), tx,4.25,tz));
-    scene.add(mesh(new THREE.ConeGeometry(3.7,3.2,12), roofMats[1], tx,10.1,tz));
-    scene.add(mesh(new THREE.CylinderGeometry(.04,.04,2.4,5), matIron, tx,12.8,tz));
-    const flag=mesh(new THREE.PlaneGeometry(1.7,.85),
-      new THREE.MeshBasicMaterial({color:0x6e2a24, side:THREE.DoubleSide}),
-      tx+.85,13.4,tz, {cast:false});
-    scene.add(flag);
-    flutterFlags.push({m:flag, phase:R(0,9), ax:'z'});
-    addCollider(tx,tz,3.4,3.4,11);
-  }
-
-  // gatehouse
-  for(const sgn of [-1,1]){
-    const gt=mesh(uvBox(new THREE.BoxGeometry(3.4,9,3.4),0.2), matStone, sgn*4.2,4.5,WALL);
-    scene.add(gt);
-    scene.add(mesh(new THREE.ConeGeometry(2.6,2.6,4), roofMats[1], sgn*4.2,10.3,WALL,{ry:Math.PI/4}));
-    addCollider(sgn*4.2, WALL, 1.95, 1.95, 9.2);
-  }
-  const lintel=mesh(uvBox(new THREE.BoxGeometry(12,2.4,3.4),0.2), matStone, 0,7,WALL);
-  scene.add(lintel);
-  // raised portcullis teeth
-  const port=mesh(new THREE.PlaneGeometry(5.4,1.6),
-    new THREE.MeshStandardMaterial({color:0x1f1b17, roughness:.6, metalness:.6, side:THREE.DoubleSide}),
-    0,5.1,WALL, {cast:false});
-  scene.add(port);
-  // heraldic banner draped on the outer face, above the arch
-  const ban=mesh(new THREE.PlaneGeometry(1.9,2.5),
-    new THREE.MeshBasicMaterial({color:0x55211c, side:THREE.DoubleSide}),
-    0,6.6,WALL+1.78, {cast:false});
-  scene.add(ban);
-  flutterFlags.push({m:ban, phase:3, ax:'x'});
-  scene.add(mesh(new THREE.CircleGeometry(.48,16),
-    new THREE.MeshBasicMaterial({color:0x9a7d38}),
-    0,6.7,WALL+1.82, {cast:false}));
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v,3));
+  g.computeVertexNormals();
+  return uvBox(g, uvScale);
+}
+// walkable ramp: `facing` is the direction of ascent ('+x','-x','+z','-z')
+function ramp(cx,cz,sx,sz,h,facing,mat=matConcrete){
+  const along=(facing==='+x'||facing==='-x');
+  const g=wedgeGeo(along?sx:sz, h, along?sz:sx);
+  const ry = facing==='+x'?0 : facing==='-x'?Math.PI : facing==='+z'?-Math.PI/2 : Math.PI/2;
+  scene.add(mesh(g, mat, cx,0,cz, {ry}));
+  if(facing==='+x')      addRamp(cx,cz,sx/2,sz/2,0,h,'x');
+  else if(facing==='-x') addRamp(cx,cz,sx/2,sz/2,h,0,'x');
+  else if(facing==='+z') addRamp(cx,cz,sx/2,sz/2,0,h,'z');
+  else                   addRamp(cx,cz,sx/2,sz/2,h,0,'z');
 }
 
-/* ============================ market square ============================ */
-export const WELL={x:3, z:1.5};
+/* ============================ outer boundary ============================ */
+wallX( 94,-122,122,{h:7,t:2,mat:matSandstoneDark});
+wallX(-94,-122,122,{h:7,t:2,mat:matSandstoneDark});
+wallZ(-120,-94,94,{h:7,t:2,mat:matSandstoneDark});
+wallZ( 120,-94,94,{h:7,t:2,mat:matSandstoneDark});
+
+/* ============================ T spawn (west plaza) ============================ */
+// open pad around (−105,0); N exit → long/mid, S exit → tunnels.
+wallX( 20,-120,-88);                                  // plaza north
+wallX(-20,-120,-88);                                  // plaza south
+wallZ(-88,-26,20,{t:2,gaps:[[-18,-8],[8,18]]});       // east wall + split block between exits
+// a little cover on the pad
+solid(-110, 8, 1.8,.8,1.8, matCrate);
+solid(-112,-6, 1.8,1.6,1.8, matCrate);
+solid(-103,-12, .9,1.0,.9, matCarRed);                // barrel-ish drum
+solid(-101.8,-11.2, .9,1.0,.9, matIron);
+
+/* ============================ T upper (N exit → long & mid) ============================ */
+// corridor x∈[−88,−52], z∈[5,18]
+wallX(18,-88,-52,{gaps:[[-78,-60]]});                 // north, opens to outside-long
+wallZ(-52,5,18);                                      // east end cap
+// outside long courtyard x∈[−78,−60], z∈[18,30] → long doors at z=30
+wallZ(-78,18,36);
+wallZ(-60,18,36);
+wallX(30,-78,-60,{gaps:[[-67.25,-64.75]]});           // LONG DOORS (2.5 gap)
+lintel(-66,30, 2.5, WT, 3.0, 5);
+{ // open door leaves
+  const leaf=(x,z,ry)=>{ const m=mesh(new THREE.BoxGeometry(1.2,2.8,.08), matMetalDoor, x,1.4,z,{ry}); scene.add(m); };
+  leaf(-67.7,30.5,  .8);
+  leaf(-64.3,30.5, -.8);
+}
+solid(-76,21, 1.8,.8,1.8, matCrate);                  // courtyard crate
+
+/* ============================ Long A ============================ */
+// corridor x∈[−70,−2], z∈[36,45]; vestibule behind the doors feeds its west end
+wallX(36,-78,-2,{gaps:[[-70,-60]]});                  // long south (open over vestibule)
+wallX(45,-70,-2);                                     // long north
+wallZ(-70,36,45);                                     // long west cap
+// blue container against the north wall, climbable via the crates beside it
+solid(-58,43.2, 6,2.6,2.4, matContainerBlue);
+solid(-63.7,43.2, 1.8,.8,1.8, matCrate);   // flush risers — gaps would wedge the player
+solid(-61.9,43.2, 1.8,1.6,1.8, matCrate);
+// barrels mid-corridor
+solid(-45,43.6, .9,1.0,.9, matIron);
+solid(-44,42.7, .9,1.0,.9, matCarRed);
+{ // the red car, near the foot of A ramp
+  const cx=-14, cz=41;
+  block(cx,cz, 4.4,1.0,1.9, matCarRed, .25);
+  block(cx-.4,cz, 2.2,.8,1.7, matCarRed, 1.0);
+  for(const [wx,wz] of [[-1.5,-.95],[1.5,-.95],[-1.5,.95],[1.5,.95]]){
+    const w=mesh(new THREE.CylinderGeometry(.34,.34,.22,10), matIron, cx+wx,.34,cz+wz,{rx:Math.PI/2});
+    scene.add(w);
+  }
+  addCollider(cx,cz, 2.2,.95, 1.6);
+}
+// ramp up from long to the raised A site
+ramp(-6,40.5, 8,9, 1.2, '+x', matSandstone);
+
+/* ============================ Bombsite A (raised +1.2) ============================ */
+// platform x∈[−2,28], z∈[31,57]
+block(13,44, 30,1.2,26, matConcrete);
+addCollider(13,44, 15,13, 1.2);
+wallX(57,-2,28);                                      // site north
+wallZ(-2,31,57,{gaps:[[36,45]]});                     // site west (open at long ramp)
+wallZ(28,31,57,{gaps:[[31,39]]});                     // site east (open to CT ramp)
+wallX(31,-2,28,{gaps:[[0,8]]});                       // site south (open to catwalk)
+// A crates (jumpable risers from the 1.2 floor) + the "goose" sandbags
+solid(8,48,  1.8,.8,1.8, matCrate, 1.2);
+solid(9.8,48, 1.8,1.6,1.8, matCrate, 1.2);
+solid(8,49.8, 1.8,1.6,1.8, matCrate, 1.2);
+solid(2,38, 4,1.1,2, matSandbag, 1.2);
+
+/* ============================ Catwalk / Short A ============================ */
+// corridor x∈[0,8], z∈[5,31]; ledge floor 1.4 from z=15 to the site
+wallZ(0,5,31);
+wallZ(8,5,31);
+ramp(4,12, 7.2,6, 1.4, '+z', matConcrete);
+block(4,23, 7.2,1.4,16, matConcrete);
+addCollider(4,23, 3.6,8, 1.4);
+
+/* ============================ Mid ============================ */
+// lane z∈[−5,5] from T upper (x=−57) all the way to CT spawn (x=80)
+wallX( 5,-88,80,{gaps:[[-57,-52],[0,8]]});            // north (T-upper entrance, catwalk)
+wallX(-5,-57,80,{gaps:[[5,11]]});                     // south (mid→B passage)
+wallZ(-57,-5,5);                                      // mid west cap (under T upper ledge wall)
+// MID DOORS at x=−2
+wallZ(-2,-5,5,{gaps:[[-1.25,1.25]]});
+lintel(-2,0, WT, 2.5, 3.0, 5);
 {
-  const g=new THREE.Group();
-  const wellTex=clonedTex(stoneTex,3,1);
-  g.add(mesh(new THREE.CylinderGeometry(1.2,1.3,1.1,12),
-    new THREE.MeshStandardMaterial({map:wellTex,roughness:.95}), 0,.55,0));
-  g.add(mesh(new THREE.CircleGeometry(.95,12),
-    new THREE.MeshStandardMaterial({color:0x06080c, roughness:.2}), 0,1.11,0, {rx:-Math.PI/2, cast:false}));
-  for(const sgn of [-1,1])
-    g.add(mesh(new THREE.CylinderGeometry(.07,.07,2.1,6), matDarkWood, sgn*1.05,1.6,0));
-  g.add(mesh(prismGeo(3.3,1.0,2.3,0.6), roofMats[3], 0,2.6,0));
-  g.add(mesh(new THREE.CylinderGeometry(.045,.045,2.0,6), matDarkWood, 0,2.45,0, {rz:Math.PI/2}));
-  g.add(mesh(new THREE.CylinderGeometry(.015,.015,.8,4), matIron, 0,2.0,0));
-  g.add(mesh(new THREE.CylinderGeometry(.16,.13,.24,8), matPlank, 0,1.58,0));
-  g.position.set(WELL.x,0,WELL.z);
-  scene.add(g);
-  addCollider(WELL.x,WELL.z,1.55,1.55,1.3);
+  const leaf=(x,z,ry)=>{ const m=mesh(new THREE.BoxGeometry(.08,2.8,1.2), matMetalDoor, x,1.4,z,{ry}); scene.add(m); };
+  leaf(-2.5, 1.7,  .8);
+  leaf(-2.5,-1.7, -.8);
 }
-function addStall(x,z,ry,mat){
-  const g=new THREE.Group();
-  g.add(mesh(new THREE.BoxGeometry(2.6,.9,1.5), matPlank, 0,.45,0));
-  for(const [px,pz] of [[-1.2,-.65],[1.2,-.65],[-1.2,.65],[1.2,.65]])
-    g.add(mesh(new THREE.CylinderGeometry(.05,.05,2.4,6), matDarkWood, px,1.2,pz));
-  const canopy=mesh(new THREE.PlaneGeometry(3.1,2.3), mat, 0,2.5,.1, {rx:-Math.PI/2+0.32, cast:true});
-  g.add(canopy);
-  // wares
-  for(let i=0;i<7;i++){
-    const c=pick([0xb5402e,0xd07b2a,0x8a9a3a,0xc8b44a]);
-    g.add(mesh(new THREE.SphereGeometry(.1,8,6),
-      new THREE.MeshStandardMaterial({color:c, roughness:.7}), R(-1,1),.97,R(-.5,.5)));
-  }
-  g.add(mesh(new THREE.BoxGeometry(.6,.35,.45), matPlank, R(-.9,.9),1.08,R(-.3,.3), {ry:R(0,1)}));
-  g.position.set(x,0,z); g.rotation.y=ry;
-  scene.add(g);
-  addCollider(x,z,1.8,1.8,2.3);
-}
-addStall(-6.5,-2.5, 1.15, stripeMats[0]);
-addStall( 6.5,-5.0,-0.95, stripeMats[1]);
-addStall(-5.0, 6.5, 2.65, stripeMats[2]);
+// xbox crate (T side of doors) + step-up crate
+solid(-8,0, 3,1.5,3, matCrate);
+solid(-10.8,1.2, 1.5,.7,1.5, matCrate);
+// CT-mid choke: sandbag pinch at x≈14
+solid(14, 3.4, 3,1.2,2.4, matSandbag);
+solid(14,-3.4, 3,1.2,2.4, matSandbag);
 
-/* ============================ trees & props ============================ */
-function addTree(x,z,s=1,cypress=false){
-  const g=new THREE.Group();
-  g.add(mesh(new THREE.CylinderGeometry(.16*s,.24*s,1.6*s,7), matDarkWood, 0,.8*s,0));
-  if(cypress){
-    g.add(mesh(new THREE.ConeGeometry(.85*s,3.6*s,8), matFoliage2, 0,3.0*s,0));
-  }else{
-    g.add(mesh(new THREE.SphereGeometry(1.5*s,9,7), matFoliage, 0,2.5*s,0));
-    g.add(mesh(new THREE.SphereGeometry(1.05*s,8,6), matFoliage2, .9*s,2.1*s,.3*s));
-    g.add(mesh(new THREE.SphereGeometry(.95*s,8,6), matFoliage, -.8*s,2.2*s,-.4*s));
-  }
-  g.position.set(x,0,z); g.rotation.y=R(0,6);
-  scene.add(g);
-  addCollider(x,z,.5,.5,3.4);
-}
-const treeSpots=[[22,23],[-23,22],[23,-22],[-22,-23],[34,-13],[-34,12],[13,33],[-14,34],
-  [30,30],[-31,-29],[32,-31],[-33,30],[-26,-14,1.2],[27,14,.9]];
-for(const [tx,tz,ts] of treeSpots) addTree(tx,tz,ts||R(.85,1.25));
-addTree(11,-31,.9,true); addTree(4.5,-33,.8,true);          // churchyard cypress
-addTree(7,52,1.1); addTree(-8,59,1.3); addTree(9,74,1.2); addTree(-7,84,1.0); // along the road
+/* ============================ Mid → B passage ============================ */
+// drops south from mid at x∈[5,11] into the B-doors corridor
+wallZ(5,-22,-5);
+wallZ(11,-14,-5);
 
-function addBarrel(x,z,y=0){
-  const b=mesh(new THREE.CylinderGeometry(.4,.34,.85,10),
-    new THREE.MeshStandardMaterial({map:clonedTex(plankTex,2,1),roughness:.9}), x,.43+y,z);
-  scene.add(b);
-  if(y===0) addCollider(x,z,.5,.5,.95);
-}
-addBarrel(14.8,-5.4); addBarrel(15.6,-4.7); addBarrel(15.2,-5.1,.86);
-addBarrel(5.6,40.4); addBarrel(-7.7,-0.6);
-function addCrate(x,z,ry){
-  scene.add(mesh(new THREE.BoxGeometry(.72,.72,.72), matPlank, x,.36,z,{ry}));
-  addCollider(x,z,.5,.5,.8);
-}
-addCrate(14,-4.5,.4); addCrate(-7.4,5.9,.9); addCrate(6.2,39.3,.2);
+/* ============================ Tunnels (T → B) ============================ */
+// S-exit pocket x∈[−88,−75], z∈[−26,−8] → upper tunnel → dogleg → lower tunnel → B
+wallX(-8,-88,-75);                                    // pocket north
+wallZ(-75,-17,-8);                                    // pocket east (tunnel mouth below)
+wallX(-26,-88,-47);                                   // pocket/upper south
+wallX(-17,-75,-39);                                   // upper north
+wallZ(-39,-30,-17);                                   // dogleg east (above lower opening)
+wallZ(-47,-38,-26);                                   // dogleg west
+wallX(-30,-39,-12);                                   // lower north
+wallX(-38,-47,-12);                                   // lower south
+// crates inside (low — headroom under the ceiling)
+solid(-60,-19, 1.6,.8,1.6, matCrate);
+solid(-30,-32, 1.6,.8,1.6, matCrate);
+solid(-43,-35.8, .9,1.0,.9, matIron);
+// ceilings (base 3.8 keeps jumps clear; blocks shots over the top)
+const ceil=(cx,cz,sx,sz)=>{
+  block(cx,cz,sx,.7,sz, matSandstoneDark, 3.8);
+  addCollider(cx,cz,sx/2,sz/2, 4.5, 3.8);
+};
+ceil(-57,-21.5, 36,9);                                // upper
+ceil(-43,-27.5, 8,21);                                // dogleg
+ceil(-29.5,-34, 35,8);                                // lower
 
-{ // hay cart
-  const g=new THREE.Group();
-  g.add(mesh(new THREE.BoxGeometry(2.5,.5,1.5), matPlank, 0,.85,0));
-  for(const sgn of [-1,1]){
-    g.add(mesh(new THREE.CylinderGeometry(.55,.55,.12,12), matDarkWood, 0,.55,sgn*.82,{rx:Math.PI/2}));
-    g.add(mesh(new THREE.CylinderGeometry(.1,.1,.2,8), matIron, 0,.55,sgn*.9,{rx:Math.PI/2}));
-    g.add(mesh(new THREE.BoxGeometry(1.4,.09,.09), matDarkWood, -1.8,.7,sgn*.5,{rz:.12}));
-  }
-  const hay=mesh(new THREE.SphereGeometry(1,10,7),
-    new THREE.MeshStandardMaterial({map:thatchTex,roughness:1}), 0,1.35,0);
-  hay.scale.set(1.25,.6,.78);
-  g.add(hay);
-  g.position.set(-6.8,0,17); g.rotation.y=.35;
-  scene.add(g);
-  addCollider(-6.8,17,1.9,1.5,1.8);
-}
+/* ============================ Bombsite B ============================ */
+// plateau x∈[−12,16], z∈[−47,−22]
+wallX(-47,-12,16);                                    // south
+wallZ(-12,-47,-22,{gaps:[[-38,-30]]});                // west (tunnel doorway)
+lintel(-12,-34, WT, 8, 3.0, 5);
+wallZ(16,-47,-22,{gaps:[[-31,-25]]});                 // east, with the B WINDOW
+solid(16,-28, WT,1.2,6, matSandstone);                // window sill (hoppable)
+block(16,-28, WT,2.6,6, matSandstone, 2.4);           // window head
+addCollider(16,-28, WT/2,3, 5, 2.4);
+// back plat (raised 1.6) + ramp
+block(11,-43, 10,1.6,8, matConcrete);
+addCollider(11,-43, 5,4, 1.6);
+ramp(11,-36.6, 8,4.8, 1.6, '-z', matConcrete);
+// B crates & sandbags
+solid(-2,-40, 1.8,.8,1.8, matCrate);
+solid(-.2,-40, 1.8,1.6,1.8, matCrate);
+solid(-2,-38.2, 1.8,1.6,1.8, matCrate);
+solid(-6,-24.5, 4,1.2,2, matSandbag);
 
-{ // notice board near gate
-  const g=new THREE.Group();
-  for(const sgn of [-1,1]) g.add(mesh(new THREE.CylinderGeometry(.07,.07,2.1,6), matDarkWood, sgn*.8,1.05,0));
-  g.add(mesh(new THREE.BoxGeometry(1.8,1.1,.08), matPlank, 0,1.55,0));
-  g.add(mesh(prismGeo(2.0,.4,.3,1), roofMats[0], 0,2.12,0));
-  const pm=new THREE.MeshStandardMaterial({map:parchTex,roughness:1});
-  g.add(mesh(new THREE.PlaneGeometry(.5,.66), pm, -.4,1.55,.05,{ry:0,cast:false}));
-  g.add(mesh(new THREE.PlaneGeometry(.44,.56), pm, .35,1.5,.05,{ry:0,cast:false}));
-  g.position.set(4.2,0,37.5); g.rotation.y=-.4;
-  scene.add(g);
-  addCollider(4.2,37.5,1.0,.45,2.3);
-}
+/* ============================ B doors corridor (CT → B) ============================ */
+// z∈[−22,−14] from the mid→B passage (x=5) east to CT spawn (x=80)
+wallX(-14,5,80,{gaps:[[5,11]]});                      // north (mid→B drops in)
+wallX(-22,-12,120,{gaps:[[8,16],[30,38]]});           // south: B doors + window-yard entry
+lintel(12,-22, 8, WT, 3.0, 5);                        // B doors arch
+// window yard x∈[16,40], z∈[−32,−22] (looks into B through the window)
+wallX(-32,16,40);
+wallZ(40,-32,-22);
+solid(24,-28, 1.8,.8,1.8, matCrate);
 
-function addBench(x,z,ry){
-  const g=new THREE.Group();
-  g.add(mesh(new THREE.BoxGeometry(1.7,.09,.45), matPlank, 0,.48,0));
-  for(const sgn of [-1,1]) g.add(mesh(new THREE.BoxGeometry(.12,.48,.4), matDarkWood, sgn*.7,.24,0));
-  g.position.set(x,0,z); g.rotation.y=ry;
-  scene.add(g);
-  addCollider(x,z,.9,.4,.55);
-}
-addBench(3,4.0,0.2); addBench(13.9,-4.8,Math.PI);
+/* ============================ CT → A connector ============================ */
+// CT spawn → north leg → west corridor → ramp up to A site east edge
+wallX(39,28,92);                                      // corridor north
+wallX(31,28,84);                                      // corridor south
+wallZ(84,22,31);                                      // leg west
+wallZ(92,22,39);                                      // leg east
+ramp(32,35, 8,8, 1.2, '-x', matSandstone);            // CT ramp up to A
+solid(50,37.6, 1.8,.8,1.8, matCrate);
+solid(60,32.4, .9,1.0,.9, matIron);
 
-{ // signpost outside the gate
-  const g=new THREE.Group();
-  g.add(mesh(new THREE.CylinderGeometry(.08,.1,2.6,7), matDarkWood, 0,1.3,0));
-  const bm=new THREE.MeshStandardMaterial({map:signTex('Aldermoor ½ fur.'), roughness:.85});
-  g.add(mesh(new THREE.BoxGeometry(1.5,.42,.06), bm, .5,2.2,0,{ry:-.5}));
-  g.position.set(4,0,52);
-  scene.add(g);
-  addCollider(4,52,.3,.3,2.5);
-}
+/* ============================ CT spawn (east) ============================ */
+wallX( 22,80,120,{gaps:[[84,92]]});                   // north (gate to A connector)
+wallZ(80,-22,22,{gaps:[[-22,-14],[-5,5]]});           // west (B corridor, mid)
+// concrete cover blocks
+solid(95,10, 3,1,3, matConcrete);
+solid(98,-8, 3,1,3, matConcrete);
+solid(108,2, 2,.8,2, matConcrete);
 
-/* ============================ street bunting ============================ */
+/* ============================ skyline decoration (no colliders) ============================ */
 {
-  const cols=[0x6e2a24,0x9a7d38,0x323a52,0x39523c];
-  const flagMats=cols.map(c=>new THREE.MeshBasicMaterial({color:c, side:THREE.DoubleSide}));
-  function strand(x1,x2,z,y,sag){
-    const pts=[];
-    for(let i=0;i<=24;i++){
-      const t=i/24;
-      pts.push(new THREE.Vector3(x1+(x2-x1)*t, y-Math.sin(t*Math.PI)*sag, z));
-    }
-    scene.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({color:0x14100a})));
-    const nf=9;
-    for(let i=0;i<nf;i++){
-      const t=(i+.5)/nf;
-      const fx=x1+(x2-x1)*t, fy=y-Math.sin(t*Math.PI)*sag;
-      const tri=new THREE.BufferGeometry();
-      tri.setAttribute('position', new THREE.Float32BufferAttribute(
-        [-.16,0,0,  .16,0,0,  0,-.44,0], 3));
-      tri.computeVertexNormals();
-      const f=new THREE.Mesh(tri, flagMats[i%4]);
-      f.position.set(fx,fy,z);
-      scene.add(f);
-      flutterFlags.push({m:f, phase:i*.7+z, ax:'x'});
+  const spots=[
+    [-100, 104, 26,12,16],[ -40,102, 18,16,14],[ 30,106, 30,10,20],[ 90,103, 22,14,15],
+    [-100,-104, 24,14,15],[ -30,-103, 20,11,16],[ 45,-106, 28,15,18],[100,-102, 18,10,14],
+    [ 128, 50, 16,13,22],[ 128,-40, 18,16,20],[-128, 55, 18,12,18],[-128,-50, 16,15,20],
+  ];
+  for(const [x,z,w,h,d] of spots){
+    block(x,z,w,h,d, matSandstoneDark);
+    if(h>13){ // a dome on the taller blocks
+      const dome=mesh(new THREE.SphereGeometry(Math.min(w,d)*.38, 14, 9, 0, Math.PI*2, 0, Math.PI/2),
+        matConcrete, x,h,z);
+      scene.add(dome);
     }
   }
-  strand(-5.6,5.6,16,4.5,.8);
-  strand(-5.6,5.6,25,4.4,.7);
-}
-
-/* ============================ torch placement ============================ */
-addTorch(-5.5,-5.5); addTorch(5.5,-5.5); addTorch(-5.5,5.5); addTorch(5.5,5.5);
-addTorch(-3.8,40.2); addTorch(3.8,40.2);
-addTorch(-3.4,45.5); addTorch(3.4,45.5);
-addTorch(-3,-17.6); addTorch(3,-17.6);
-addTorch(10.4,-4.4);
-addTorch(-4.5,22); addTorch(4.5,22);
-
-/* ============================ fireflies ============================ */
-let fireflyGeo, fireflyBase, fireflyPhase;
-{
-  const n=90;
-  fireflyBase=new Float32Array(n*3); fireflyPhase=new Float32Array(n);
-  const pos=new Float32Array(n*3);
-  for(let i=0;i<n;i++){
-    const a=R(0,Math.PI*2), r=R(13,37);
-    fireflyBase[i*3]=Math.cos(a)*r;
-    fireflyBase[i*3+1]=R(.5,2.6);
-    fireflyBase[i*3+2]=Math.sin(a)*r;
-    fireflyPhase[i]=R(0,9);
-  }
-  fireflyGeo=new THREE.BufferGeometry();
-  fireflyGeo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  const pts=new THREE.Points(fireflyGeo, new THREE.PointsMaterial({
-    map:glowTex, color:0xd4e06e, size:.3, sizeAttenuation:true, transparent:true,
-    opacity:.75, blending:THREE.AdditiveBlending, depthWrite:false}));
-  pts.frustumCulled=false;
-  scene.add(pts);
-}
-
-/* ============================ chimney smoke ============================ */
-const smokeWorld=new THREE.Vector3();
-for(const em of smokeEmitters){
-  em.obj.updateMatrixWorld(true);
-  em.pos=em.obj.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.8,0));
-  for(let i=0;i<6;i++){
-    const sp=new THREE.Sprite(new THREE.SpriteMaterial({
-      map:smokeTex, transparent:true, opacity:0, depthWrite:false}));
-    sp.scale.setScalar(.8);
-    scene.add(sp);
-    em.sprites.push({sp, t0:i/6});
+  // a couple of minarets
+  for(const [x,z] of [[-115,108],[70,-112],[132,8]]){
+    scene.add(mesh(new THREE.CylinderGeometry(1.6,2.2,26,10), matSandstone, x,13,z));
+    scene.add(mesh(new THREE.ConeGeometry(2.4,5,10), matSandstoneDark, x,28.5,z));
   }
 }
+
+/* ============================ spawn points ============================ */
+// Curated open-floor spots across the whole map. yaw faces into play
+// (forward = (−sin yaw, −cos yaw)). controls.js snaps feet to the surface.
+export const SPAWNS=[
+  {x:-105, z:0,    yaw:-Math.PI/2},  // T spawn → east
+  {x:-70,  z:11.5, yaw:-Math.PI/2},  // T upper → east
+  {x:-69,  z:24,   yaw: Math.PI},    // outside long → north to the doors
+  {x:-40,  z:40.5, yaw:-Math.PI/2},  // long A → east
+  {x: 13,  z:44,   yaw: Math.PI/2},  // bombsite A plat → west
+  {x:  4,  z:7,    yaw: Math.PI},    // catwalk foot → north
+  {x:-20,  z:0,    yaw:-Math.PI/2},  // mid → east
+  {x: 22,  z:0,    yaw: Math.PI/2},  // CT mid → west
+  {x:-57,  z:-21.5,yaw:-Math.PI/2},  // upper tunnels → east
+  {x:-29,  z:-34,  yaw:-Math.PI/2},  // lower tunnels → east
+  {x:  2,  z:-33,  yaw:-Math.PI/2},  // bombsite B → east
+  {x: 30,  z:-18,  yaw: Math.PI/2},  // B doors corridor → west
+  {x: 55,  z:35,   yaw: Math.PI/2},  // CT→A connector → west
+  {x: 95,  z:2,    yaw: Math.PI/2},  // CT spawn → west
+];
 
 /* ============================ per-frame ambient animation ============================ */
-// torch flicker, sign sway, flag flutter, drifting fireflies and chimney smoke.
-export function updateAmbient(time){
-  // torch flicker
-  for(const t of torches){
-    const n=Math.sin(time*11+t.phase)*.5 + Math.sin(time*23+t.phase*2.7)*.3 + Math.sin(time*7+t.phase*5)*.2;
-    t.light.intensity=t.base*(.82+.18*n);
-    t.flame.scale.set(.6+.08*n, .95+.13*n, 1);
-    t.flame.position.y=2.75+.03*n;
-  }
-  // sign sway & flag flutter
-  for(const s of swaySigns){
-    s.pivot.rotation.z=Math.sin(time*.9+s.phase)*.07+Math.sin(time*1.7+s.phase)*.03;
-  }
-  for(const f of flutterFlags){
-    const v=Math.sin(time*2.2+f.phase)*.16+Math.sin(time*3.7+f.phase*2)*.06;
-    if(f.ax==='x') f.m.rotation.x=v; else f.m.rotation.z=v*.8;
-  }
-  // fireflies
-  {
-    const pos=fireflyGeo.attributes.position.array;
-    for(let i=0;i<fireflyPhase.length;i++){
-      const p=fireflyPhase[i];
-      pos[i*3]  =fireflyBase[i*3]  +Math.sin(time*.6+p)*1.3;
-      pos[i*3+1]=fireflyBase[i*3+1]+Math.sin(time*.9+p*2)*.5;
-      pos[i*3+2]=fireflyBase[i*3+2]+Math.cos(time*.5+p)*1.3;
-    }
-    fireflyGeo.attributes.position.needsUpdate=true;
-  }
-  // chimney smoke
-  for(const em of smokeEmitters){
-    for(const s of em.sprites){
-      const t=((time*.11)+s.t0)%1;
-      s.sp.position.set(
-        em.pos.x + Math.sin(t*5+em.phase)*.35 + t*2.2,
-        em.pos.y + t*6,
-        em.pos.z + Math.cos(t*4+em.phase)*.25);
-      s.sp.scale.setScalar(.7+t*2.8);
-      s.sp.material.opacity = Math.min(t*6,1)*(1-t)*.26;
-    }
-  }
-}
+// High noon in the desert: nothing flickers. Kept because main.js calls it.
+export function updateAmbient(){}

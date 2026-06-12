@@ -35,3 +35,4 @@ function tone(freq,dur,vol,type='triangle'){
 }
 export const ding=()=>tone(1318,.14,.15);
 export const thudSnd=()=>tone(98,.22,.4,'sine');
+export const clack=()=>tone(190,.09,.22,'square'); // ramrod tap on reload

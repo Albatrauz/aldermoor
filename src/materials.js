@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   clonedTex, cobbleTex, grassTex, dirtTex, stoneTex, stoneTex2, plankTex,
   wallStyles, roofTexes, stripeTex,
+  sandTex, sandPathTex, sandstoneTex, sandstoneTex2, concreteTex, crateTex,
 } from './textures.js';
 
 export const matCobble = new THREE.MeshStandardMaterial({map:clonedTex(cobbleTex,22,22), roughness:1});
@@ -24,3 +25,15 @@ export const matGoldTrim=new THREE.MeshStandardMaterial({color:0xcaa64e, roughne
 export const wallMats  = wallStyles.map(t=>new THREE.MeshStandardMaterial({map:t, roughness:.95}));
 export const roofMats  = roofTexes.map(t=>new THREE.MeshStandardMaterial({map:t, roughness:.95}));
 export const stripeMats= ['#8d3b32','#3f5d43','#3c4668'].map(c=>new THREE.MeshStandardMaterial({map:stripeTex(c), roughness:.9, side:THREE.DoubleSide}));
+
+/* --- desert (Dust2) palette --- */
+export const matSand          = new THREE.MeshStandardMaterial({map:clonedTex(sandTex,40,34), roughness:1});
+export const matSandPath      = new THREE.MeshStandardMaterial({map:clonedTex(sandPathTex,3,18), roughness:1});
+export const matSandstone     = new THREE.MeshStandardMaterial({map:sandstoneTex,  roughness:.95});
+export const matSandstoneDark = new THREE.MeshStandardMaterial({map:sandstoneTex2, roughness:.95});
+export const matConcrete      = new THREE.MeshStandardMaterial({map:concreteTex, roughness:.9});
+export const matCrate         = new THREE.MeshStandardMaterial({map:crateTex, roughness:.85});
+export const matContainerBlue = new THREE.MeshStandardMaterial({color:0x2f6fb0, roughness:.55, metalness:.35});
+export const matCarRed        = new THREE.MeshStandardMaterial({color:0xb5402e, roughness:.5,  metalness:.25});
+export const matSandbag       = new THREE.MeshStandardMaterial({color:0xb8a878, roughness:1});
+export const matMetalDoor     = new THREE.MeshStandardMaterial({color:0x5a6b3a, roughness:.55, metalness:.5});
