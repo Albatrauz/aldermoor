@@ -315,63 +315,222 @@ canvas#scene {
     opacity: 1;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-#intro{position:fixed;inset:0;z-index:10;display:grid;place-items:center;
-  background:radial-gradient(ellipse at center, rgba(18,13,8,.72) 0%, rgba(6,4,3,.93) 100%);
-  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
-  transition:opacity .7s ease;opacity:1}
-#intro.hidden{opacity:0;pointer-events:none}
-.intro-inner{text-align:center;padding:0 24px;animation:rise 1.1s ease both}
-@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
-.over-title{font-family:"IM Fell English",serif;font-size:13px;letter-spacing:.45em;
-  text-transform:uppercase;color:var(--gold-dim);margin-bottom:18px}
-#intro h1{font-family:"UnifrakturMaguntia",serif;font-weight:400;
-  font-size:clamp(64px,11vw,118px);line-height:1;color:var(--gold);
-  text-shadow:0 0 50px rgba(216,169,72,.35), 0 4px 14px rgba(0,0,0,.9)}
-.rule{margin:22px 0;color:var(--gold-dim);letter-spacing:1.1em;text-indent:1.1em;font-size:14px}
-.sub{font-family:"IM Fell English",serif;font-style:italic;font-size:17px;line-height:1.75;
-  color:#cdbb92;max-width:46ch;margin:0 auto}
-#enter{margin-top:36px;background:transparent;border:1px solid var(--gold);color:var(--parchment);
-  font-family:"IM Fell English",serif;font-size:17px;letter-spacing:.24em;text-indent:.24em;
-  text-transform:uppercase;padding:15px 46px;cursor:pointer;transition:all .25s ease}
-#enter:hover{background:var(--gold);color:var(--ink);box-shadow:0 0 34px rgba(216,169,72,.35)}
-.controls{margin-top:40px;display:flex;justify-content:center;flex-wrap:wrap;gap:10px 26px;
-  font-family:"IM Fell English",serif;font-size:13px;color:#8d7b58}
-kbd{display:inline-block;border:1px solid #5c4d33;border-radius:3px;padding:1px 7px;margin-right:5px;
-  background:rgba(216,169,72,.07);font-family:inherit;font-size:12px;color:#c5b288}
+#intro {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(
+        ellipse at center,
+        rgba(18, 13, 8, 0.72) 0%,
+        rgba(6, 4, 3, 0.93) 100%
+    );
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    transition: opacity 0.7s ease;
+    opacity: 1;
+}
+#intro.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+.intro-inner {
+    text-align: center;
+    padding: 0 24px;
+    animation: rise 1.1s ease both;
+}
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.over-title {
+    font-family: 'IM Fell English', serif;
+    font-size: 13px;
+    letter-spacing: 0.45em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 18px;
+}
+#intro h1 {
+    font-family: 'UnifrakturMaguntia', serif;
+    font-weight: 400;
+    font-size: clamp(64px, 11vw, 118px);
+    line-height: 1;
+    color: var(--gold);
+    text-shadow:
+        0 0 50px rgba(216, 169, 72, 0.35),
+        0 4px 14px rgba(0, 0, 0, 0.9);
+}
+.rule {
+    margin: 22px 0;
+    color: var(--gold-dim);
+    letter-spacing: 1.1em;
+    text-indent: 1.1em;
+    font-size: 14px;
+}
+.sub {
+    font-family: 'IM Fell English', serif;
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1.75;
+    color: #cdbb92;
+    max-width: 46ch;
+    margin: 0 auto;
+}
+#enter {
+    margin-top: 36px;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--parchment);
+    font-family: 'IM Fell English', serif;
+    font-size: 17px;
+    letter-spacing: 0.24em;
+    text-indent: 0.24em;
+    text-transform: uppercase;
+    padding: 15px 46px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+#enter:hover {
+    background: var(--gold);
+    color: var(--ink);
+    box-shadow: 0 0 34px rgba(216, 169, 72, 0.35);
+}
+.controls {
+    margin-top: 40px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    font-family: 'IM Fell English', serif;
+    font-size: 13px;
+    color: #8d7b58;
+}
+kbd {
+    display: inline-block;
+    border: 1px solid #5c4d33;
+    border-radius: 3px;
+    padding: 1px 7px;
+    margin-right: 5px;
+    background: rgba(216, 169, 72, 0.07);
+    font-family: inherit;
+    font-size: 12px;
+    color: #c5b288;
+}
 
 /* end-of-round overview — final tally + countdown to the next contest */
-#overview{position:fixed;inset:0;z-index:11;display:none;place-items:center;
-  background:radial-gradient(ellipse at center, rgba(18,13,8,.82) 0%, rgba(6,4,3,.96) 100%);
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#overview.show{display:grid}
-.ov-inner{text-align:center;padding:24px;animation:rise 1s ease both;
-  font-family:"IM Fell English",serif;color:var(--parchment)}
-#ovWinner{font-family:"UnifrakturMaguntia",serif;font-weight:400;
-  font-size:clamp(48px,8vw,92px);line-height:1.05;color:var(--gold);
-  text-shadow:0 0 48px rgba(216,169,72,.4), 0 4px 14px rgba(0,0,0,.9)}
-.ov-claim{font-style:italic;font-size:17px;color:#cdbb92;margin-top:8px}
-.ov-tally{display:inline-block;min-width:288px;text-align:left;
-  background:rgba(10,7,4,.5);border:1px solid rgba(216,169,72,.25);padding:12px 18px 14px}
-.ov-tally .sc-title{margin-bottom:10px}
-.ov-row{display:flex;align-items:baseline;gap:14px;font-style:italic;font-size:16px;
-  line-height:1.85;opacity:.85}
-.ov-row .ov-rank{width:1.5em;text-align:center;font-style:normal;font-size:14px;color:var(--gold-dim)}
-.ov-row .ov-name{flex:1}
-.ov-row .ov-score{color:var(--gold-dim);font-variant-numeric:tabular-nums}
-.ov-row.win{opacity:1;color:var(--gold)}
-.ov-row.win .ov-rank,.ov-row.win .ov-score{color:var(--gold)}
-.ov-row.me .ov-name{text-decoration:underline;text-decoration-color:rgba(216,169,72,.45);text-underline-offset:3px}
-.ov-count{margin-top:26px;font-style:italic;font-size:18px;letter-spacing:.04em;
-  color:var(--gold);text-shadow:0 0 22px rgba(216,169,72,.35)}
+#overview {
+    position: fixed;
+    inset: 0;
+    z-index: 11;
+    display: none;
+    place-items: center;
+    background: radial-gradient(
+        ellipse at center,
+        rgba(18, 13, 8, 0.82) 0%,
+        rgba(6, 4, 3, 0.96) 100%
+    );
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+#overview.show {
+    display: grid;
+}
+.ov-inner {
+    text-align: center;
+    padding: 24px;
+    animation: rise 1s ease both;
+    font-family: 'IM Fell English', serif;
+    color: var(--parchment);
+}
+#ovWinner {
+    font-family: 'UnifrakturMaguntia', serif;
+    font-weight: 400;
+    font-size: clamp(48px, 8vw, 92px);
+    line-height: 1.05;
+    color: var(--gold);
+    text-shadow:
+        0 0 48px rgba(216, 169, 72, 0.4),
+        0 4px 14px rgba(0, 0, 0, 0.9);
+}
+.ov-claim {
+    font-style: italic;
+    font-size: 17px;
+    color: #cdbb92;
+    margin-top: 8px;
+}
+.ov-tally {
+    display: inline-block;
+    min-width: 288px;
+    text-align: left;
+    background: rgba(10, 7, 4, 0.5);
+    border: 1px solid rgba(216, 169, 72, 0.25);
+    padding: 12px 18px 14px;
+}
+.ov-tally .sc-title {
+    margin-bottom: 10px;
+}
+.ov-row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    font-style: italic;
+    font-size: 16px;
+    line-height: 1.85;
+    opacity: 0.85;
+}
+.ov-row .ov-rank {
+    width: 1.5em;
+    text-align: center;
+    font-style: normal;
+    font-size: 14px;
+    color: var(--gold-dim);
+}
+.ov-row .ov-name {
+    flex: 1;
+}
+.ov-row .ov-score {
+    color: var(--gold-dim);
+    font-variant-numeric: tabular-nums;
+}
+.ov-row.win {
+    opacity: 1;
+    color: var(--gold);
+}
+.ov-row.win .ov-rank,
+.ov-row.win .ov-score {
+    color: var(--gold);
+}
+.ov-row.me .ov-name {
+    text-decoration: underline;
+    text-decoration-color: rgba(216, 169, 72, 0.45);
+    text-underline-offset: 3px;
+}
+.ov-count {
+    margin-top: 26px;
+    font-style: italic;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+    text-shadow: 0 0 22px rgba(216, 169, 72, 0.35);
+}
 /* keep the tally from overflowing very narrow viewports (desktop is unaffected) */
-@media (max-width:380px){
-  .ov-inner{padding:16px}
-  .ov-tally{min-width:0;width:100%}
-=======
-=======
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
+@media (max-width: 380px) {
+    .ov-inner {
+        padding: 16px;
+    }
+    .ov-tally {
+        min-width: 0;
+        width: 100%;
+    }
+}
 #hud {
     position: fixed;
     bottom: 26px;
@@ -534,8 +693,4 @@ kbd {
     font-family: inherit;
     font-size: 12px;
     color: #c5b288;
-<<<<<<< HEAD
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
-=======
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
 }

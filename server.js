@@ -27,15 +27,18 @@ function serveStatic(req, res) {
   });
 }
 
-const FIRST = ['Wat', 'Aldous', 'Mabel', 'Cedric', 'Rowena', 'Godfrey', 'Hilda', 'Osric',
-  'Edith', 'Bran', 'Ysolt', 'Piers', 'Agnes', 'Dunstan', 'Maud', 'Leofric'];
+const FIRST = ['Calvin', 'Desmond', 'Kenan', 'Youri', 'Michael', 'Bart', 'Jordy', 'David',
+  'Vicky', 'Rick', 'Kishan', 'Mart', 'Sjoerd', 'Mike', 'Maud', 'Leofric'];
 const TRADE = ['the Cooper', 'the Miller', 'the Weaver', 'the Smith', 'the Baker', 'the Fletcher',
   'the Tanner', 'the Carter', 'the Brewer', 'the Mason', 'the Shepherd', 'the Chandler'];
 const COLORS = [0x7a3b2e, 0x3f5d43, 0x3c4668, 0x8a6d2f, 0x6b3a5c, 0x4a6b6e, 0x935b25, 0x5c5340];
 
-const KILL_CAP = 15;          // first to this many kills wins the round
+const KILL_CAP = 1;          // first to this many kills wins the round
 const RESTART_DELAY = 20000;  // overview screen lingers this long, then a fresh round
 const SPAWN = { x: 0, y: 1.65, z: 38.5, yaw: 0 };
+// The felled lie dead this long on the client (its killscreen countdown), then
+// rise with a brief grace. Hits inside the whole window are ignored, so a corpse
+// can't be re-felled — that would hand out a phantom kill and reset the count.
 const RESPAWN_MS = 4000;
 const SPAWN_GRACE_MS = 1500;
 

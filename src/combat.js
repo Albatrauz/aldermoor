@@ -76,6 +76,9 @@ addEventListener('mousedown',e=>{
 addEventListener('keydown',e=>{
   if(e.code==='KeyR' && !introVisible) startReload();
 });
+addEventListener('keydown',e=>{
+  if(e.code==='KeyR' && !introVisible) startReload();
+});
 
 export function remoteShoot(m){
   const v=remotes.get(m.id);

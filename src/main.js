@@ -41,19 +41,10 @@ addEventListener('resize',()=>{
 window.__town={
   hideIntro: controls.hideIntro,
   fire: combat.fire,
-<<<<<<< HEAD
-<<<<<<< HEAD
   over: combat.handleOver,        // e.g. over({winnerName:'Wat the Cooper', cap:15, restartIn:20, standings:[...]})
   restart: combat.handleRestart,
-  teleport(x,z,yaw=0,pitch=0){ controls.player.x=x; controls.player.z=z; controls.player.yaw=yaw; controls.player.pitch=pitch; },
-=======
   teleport(x,z,yaw=0,pitch=0){ controls.player.x=x; controls.player.z=z; controls.player.yaw=yaw; controls.player.pitch=pitch; controls.snapDown(); },
   respawn: controls.respawn,
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
-=======
-  teleport(x,z,yaw=0,pitch=0){ controls.player.x=x; controls.player.z=z; controls.player.yaw=yaw; controls.player.pitch=pitch; controls.snapDown(); },
-  respawn: controls.respawn,
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
   get pos(){ return [controls.player.x, controls.player.z]; },
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly

@@ -26,11 +26,9 @@ const intro=document.getElementById('intro');
 export let introVisible=true;
 // exported as live bindings so the gun can tell whether the player has control
 export let locked=false, dragLook=false;
-<<<<<<< HEAD
 // frozen while the end-of-round overview screen is up: no walking, looking or firing
 export let frozen=false;
 export function setFrozen(v){ frozen=v; }
-export function hideIntro(){ intro.classList.add('hidden'); introVisible=false; }
 // `dead` freezes the player where they fell while the killscreen counts down;
 // combat owns the timer and flips it back on respawn
 export let dead=false;
@@ -75,9 +73,7 @@ let dragging=false;
 addEventListener('mousedown',()=>dragging=true);
 addEventListener('mouseup',()=>dragging=false);
 addEventListener('mousemove',e=>{
-  if(introVisible||frozen) return;
-  if(introVisible || dead) return;
-  if(introVisible || dead) return;
+  if(introVisible || frozen || dead) return;
   if(locked || (dragLook&&dragging)){
     player.yaw   -= e.movementX*0.0023;
     player.pitch -= e.movementY*0.0023;
@@ -151,16 +147,13 @@ function collide(){
 
 /* per-frame: walk the player and drive the camera, or drift gently behind the menu */
 export function update(dt, time){
-<<<<<<< HEAD
-  if(!introVisible && !frozen){
   if(dead){
     // hold the view exactly where we fell — no bob, no input — until we rise
     camera.position.set(player.x, player.y, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
     return;
   }
-  if(!introVisible){
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
+  if(!introVisible && !frozen){
     const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
     const speed=run?7.4:4.2;
     let ix=0,iz=0;
@@ -203,10 +196,6 @@ export function update(dt, time){
     const targetFov=run&&moving?75:70;
     camera.fov += (targetFov-camera.fov)*Math.min(1,dt*5);
     camera.updateProjectionMatrix();
-  }else if(introVisible){
-    // gentle establishing drift behind the menu
-  }else{
-    // gentle establishing drift behind the menu — drifting high over mid
   }else{
     // gentle establishing drift behind the menu — drifting high over mid
     const a=time*.04;

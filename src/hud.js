@@ -50,8 +50,6 @@ export function hitmark(){
   el.classList.add('pop');
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 /* ---- end-of-round overview screen + restart countdown ---- */
 const overviewEl=document.getElementById('overview');
 const ovWinnerEl=document.getElementById('ovWinner');
@@ -87,9 +85,6 @@ export function hideOverview(){
   clearInterval(countTimer); countTimer=null;
   overviewEl.classList.remove('show');
 }
-=======
-=======
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
 /* the death overlay: name the slayer and seed the respawn countdown */
 export function showKillscreen(killerName, count){
   killByEl.textContent=killerName;
@@ -101,7 +96,3 @@ export function setKillCount(n){
   if(killCountEl.textContent!==String(n)) killCountEl.textContent=n;
 }
 export function hideKillscreen(){ killEl.classList.remove('on'); }
-<<<<<<< HEAD
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
-=======
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1

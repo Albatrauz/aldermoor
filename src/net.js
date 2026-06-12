@@ -6,15 +6,9 @@ import { EYE } from './core.js';
 import { addRemote, dropRemote, renameRemote, remotes } from './villagers.js';
 import { scoresMap, setHp, renderScores } from './hud.js';
 import { announce } from './zones.js';
-<<<<<<< HEAD
-<<<<<<< HEAD
-import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart } from './combat.js';
-=======
-import { remoteShoot, handleHitFx, handleFell, clearDeath } from './combat.js';
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
-=======
-import { remoteShoot, handleHitFx, handleFell, clearDeath } from './combat.js';
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
+
+import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath } from './combat.js';
+
 import { player, vel, keys } from './controls.js';
 
 const presenceEl=document.getElementById('presence');
@@ -74,12 +68,7 @@ function connect(){
       setHp(3); renderScores();
       updatePresence();
       announce(`Welcome, ${myName}`);
-<<<<<<< HEAD
-<<<<<<< HEAD
       if(m.over) handleOver(m.over);   // a round was already decided — show the overview
-=======
-=======
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
       // tell everyone where we actually spawned, ahead of the 80ms ticker
       sendNet({t:'state', x:+player.x.toFixed(2), y:+player.y.toFixed(2),
         z:+player.z.toFixed(2), yaw:+player.yaw.toFixed(3), m:0, r:0});
@@ -92,10 +81,6 @@ function connect(){
       renameRemote(m.id, m.name);
       renderScores();
       updatePresence();
-<<<<<<< HEAD
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
-=======
->>>>>>> 61e87b91a2588df8d608c7ca7cf2c3db5ff930c1
     }else if(m.t==='join'){
       addRemote(m);
       scoresMap.set(m.id,{name:m.name, score:0});
