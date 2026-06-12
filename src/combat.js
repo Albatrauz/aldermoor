@@ -9,9 +9,9 @@ import { remotes } from './villagers.js';
 import { myId, sendNet } from './net.js';
 import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects.js';
 import { boom, ding, thudSnd } from './audio.js';
-import { scoresMap, setHp, renderScores, hurtFlash, hitmark } from './hud.js';
+import { scoresMap, setHp, renderScores, hurtFlash, hitmark, showOverview, hideOverview } from './hud.js';
 import { announce } from './zones.js';
-import { introVisible, locked, dragLook, player, vel, walkPhase } from './controls.js';
+import { introVisible, locked, dragLook, player, vel, walkPhase, frozen, setFrozen } from './controls.js';
 
 scene.add(camera); // the viewmodel rides on the camera
 const gun=new THREE.Group();
@@ -34,7 +34,7 @@ let fireCd=0, gunKick=0;
 const crosshairEl=document.getElementById('crosshair');
 
 export function fire(){
-  if(fireCd>0||introVisible) return;
+  if(fireCd>0||introVisible||frozen) return;
   fireCd=FIRE_CD; gunKick=1;
   crosshairEl.classList.add('cool');
   camera.updateMatrixWorld(true);
@@ -59,7 +59,7 @@ export function fire(){
   if(hitId!==null) sendNet({t:'hit', target:hitId});
 }
 addEventListener('mousedown',e=>{
-  if(e.button===0 && !introVisible && (locked||dragLook)) fire();
+  if(e.button===0 && !introVisible && !frozen && (locked||dragLook)) fire();
 });
 
 export function remoteShoot(m){
@@ -101,6 +101,27 @@ export function handleFell(m){
   }else{
     announce(`${m.sname} felled ${m.tname}`);
   }
+}
+
+/* the cap was reached: freeze the town and raise the overview with final stats */
+export function handleOver(m){
+  if(m.winnerId!=null && scoresMap.has(m.winnerId)){
+    const s=scoresMap.get(m.winnerId); s.score=m.cap; // make sure the tally agrees
+  }
+  setFrozen(true);
+  renderScores();
+  showOverview(m);
+}
+/* the 20s countdown elapsed: a fresh contest — wipe scores and return to the gates */
+export function handleRestart(){
+  hideOverview();
+  setFrozen(false);
+  for(const s of scoresMap.values()) s.score=0;
+  setHp(3); renderScores();
+  player.x=0; player.z=38.5; player.y=EYE;
+  player.vy=0; player.grounded=true; player.yaw=0; player.pitch=0;
+  vel.x=vel.z=0;
+  announce('A new contest begins!');
 }
 
 /* per-frame: cooldown, recoil decay, and walk sway of the viewmodel */

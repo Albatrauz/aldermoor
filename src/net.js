@@ -6,7 +6,7 @@ import { EYE } from './core.js';
 import { addRemote, dropRemote, remotes } from './villagers.js';
 import { scoresMap, setHp, renderScores } from './hud.js';
 import { announce } from './zones.js';
-import { remoteShoot, handleHitFx, handleFell } from './combat.js';
+import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart } from './combat.js';
 import { player, vel, keys } from './controls.js';
 
 const presenceEl=document.getElementById('presence');
@@ -41,6 +41,7 @@ function connect(){
       setHp(3); renderScores();
       updatePresence();
       announce(`Welcome, ${myName}`);
+      if(m.over) handleOver(m.over);   // a round was already decided — show the overview
     }else if(m.t==='join'){
       addRemote(m);
       scoresMap.set(m.id,{name:m.name, score:0});
@@ -59,6 +60,10 @@ function connect(){
       handleHitFx(m);
     }else if(m.t==='fell'){
       handleFell(m);
+    }else if(m.t==='over'){
+      handleOver(m);
+    }else if(m.t==='restart'){
+      handleRestart(m);
     }else if(m.t==='snap'){
       for(const id of Object.keys(m.p)){
         if(+id===myId) continue;

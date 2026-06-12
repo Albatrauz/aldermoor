@@ -35,3 +35,39 @@ export function hitmark(){
   void el.offsetWidth;
   el.classList.add('pop');
 }
+
+/* ---- end-of-round overview screen + restart countdown ---- */
+const overviewEl=document.getElementById('overview');
+const ovWinnerEl=document.getElementById('ovWinner');
+const ovCapEl=document.getElementById('ovCap');
+const ovRowsEl=document.getElementById('ovRows');
+const ovCountEl=document.getElementById('ovCount');
+let countTimer=null;
+
+function paintCount(s){
+  ovCountEl.textContent = s>0 ? `The next contest begins in ${s}…` : 'Returning to the town…';
+}
+/* raise the overview with the final tally; m: {winnerId, winnerName, cap, restartIn, standings} */
+export function showOverview(m){
+  ovWinnerEl.textContent=m.winnerName||'Nobody';
+  ovCapEl.textContent=m.cap;
+  ovRowsEl.innerHTML=(m.standings||[]).map((s,i)=>{
+    const cls=(s.id===m.winnerId?' win':'')+(s.id===myId?' me':'');
+    const rank=s.id===m.winnerId?'♛':i+1;
+    return `<div class="ov-row${cls}"><span class="ov-rank">${rank}</span>`+
+      `<span class="ov-name">${s.name}</span><span class="ov-score">${s.score}</span></div>`;
+  }).join('');
+  let secs=Math.max(0, Math.round(m.restartIn ?? 20));
+  paintCount(secs);
+  clearInterval(countTimer);
+  countTimer=setInterval(()=>{
+    secs=Math.max(0, secs-1);
+    paintCount(secs);
+    if(secs<=0) clearInterval(countTimer);
+  }, 1000);
+  overviewEl.classList.add('show');
+}
+export function hideOverview(){
+  clearInterval(countTimer); countTimer=null;
+  overviewEl.classList.remove('show');
+}

@@ -41,6 +41,8 @@ addEventListener('resize',()=>{
 window.__town={
   hideIntro: controls.hideIntro,
   fire: combat.fire,
+  over: combat.handleOver,        // e.g. over({winnerName:'Wat the Cooper', cap:15, restartIn:20, standings:[...]})
+  restart: combat.handleRestart,
   teleport(x,z,yaw=0,pitch=0){ controls.player.x=x; controls.player.z=z; controls.player.yaw=yaw; controls.player.pitch=pitch; },
   get pos(){ return [controls.player.x, controls.player.z]; },
   get me(){ return {id:net.myId, name:net.myName, connected:!!net.net}; },

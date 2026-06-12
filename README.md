@@ -65,4 +65,14 @@ dependency flow runs roughly top-to-bottom:
 ## Debug hook
 
 The client exposes `window.__town` for automated checks: `hideIntro()`,
-`fire()`, `teleport(x, z, yaw, pitch)`, and getters `pos`, `me`, `remotes`.
+`fire()`, `teleport(x, z, yaw, pitch)`, `over(stats)` / `restart()` (raise and
+clear the end-of-round overview), and getters `pos`, `me`, `remotes`.
+
+## Rounds
+
+A contest runs to **15 kills** (`KILL_CAP` in `server.js`). The first player to
+reach it wins: the server freezes scoring, broadcasts the final tally, and every
+client raises the overview screen with a **20-second** countdown
+(`RESTART_DELAY`). When it elapses the server wipes all scores, sends everyone
+back to the gates, and a fresh contest begins. Players who join mid-overview are
+shown it too, with the countdown's remaining time.

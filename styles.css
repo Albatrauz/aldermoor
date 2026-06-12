@@ -82,3 +82,33 @@ canvas#scene{position:fixed;inset:0;display:block}
   font-family:"IM Fell English",serif;font-size:13px;color:#8d7b58}
 kbd{display:inline-block;border:1px solid #5c4d33;border-radius:3px;padding:1px 7px;margin-right:5px;
   background:rgba(216,169,72,.07);font-family:inherit;font-size:12px;color:#c5b288}
+
+/* end-of-round overview — final tally + countdown to the next contest */
+#overview{position:fixed;inset:0;z-index:11;display:none;place-items:center;
+  background:radial-gradient(ellipse at center, rgba(18,13,8,.82) 0%, rgba(6,4,3,.96) 100%);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#overview.show{display:grid}
+.ov-inner{text-align:center;padding:24px;animation:rise 1s ease both;
+  font-family:"IM Fell English",serif;color:var(--parchment)}
+#ovWinner{font-family:"UnifrakturMaguntia",serif;font-weight:400;
+  font-size:clamp(48px,8vw,92px);line-height:1.05;color:var(--gold);
+  text-shadow:0 0 48px rgba(216,169,72,.4), 0 4px 14px rgba(0,0,0,.9)}
+.ov-claim{font-style:italic;font-size:17px;color:#cdbb92;margin-top:8px}
+.ov-tally{display:inline-block;min-width:288px;text-align:left;
+  background:rgba(10,7,4,.5);border:1px solid rgba(216,169,72,.25);padding:12px 18px 14px}
+.ov-tally .sc-title{margin-bottom:10px}
+.ov-row{display:flex;align-items:baseline;gap:14px;font-style:italic;font-size:16px;
+  line-height:1.85;opacity:.85}
+.ov-row .ov-rank{width:1.5em;text-align:center;font-style:normal;font-size:14px;color:var(--gold-dim)}
+.ov-row .ov-name{flex:1}
+.ov-row .ov-score{color:var(--gold-dim);font-variant-numeric:tabular-nums}
+.ov-row.win{opacity:1;color:var(--gold)}
+.ov-row.win .ov-rank,.ov-row.win .ov-score{color:var(--gold)}
+.ov-row.me .ov-name{text-decoration:underline;text-decoration-color:rgba(216,169,72,.45);text-underline-offset:3px}
+.ov-count{margin-top:26px;font-style:italic;font-size:18px;letter-spacing:.04em;
+  color:var(--gold);text-shadow:0 0 22px rgba(216,169,72,.35)}
+/* keep the tally from overflowing very narrow viewports (desktop is unaffected) */
+@media (max-width:380px){
+  .ov-inner{padding:16px}
+  .ov-tally{min-width:0;width:100%}
+}

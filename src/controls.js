@@ -15,7 +15,7 @@ export let walkPhase=0;
 addEventListener('keydown',e=>{
   if(['Space','ArrowUp','ArrowDown'].includes(e.code)) e.preventDefault();
   keys.add(e.code);
-  if(e.code==='Space' && player.grounded && !introVisible){ player.vy=4.6; player.grounded=false; }
+  if(e.code==='Space' && player.grounded && !introVisible && !frozen){ player.vy=4.6; player.grounded=false; }
 });
 addEventListener('keyup',e=>keys.delete(e.code));
 
@@ -23,6 +23,9 @@ const intro=document.getElementById('intro');
 export let introVisible=true;
 // exported as live bindings so the gun can tell whether the player has control
 export let locked=false, dragLook=false;
+// frozen while the end-of-round overview screen is up: no walking, looking or firing
+export let frozen=false;
+export function setFrozen(v){ frozen=v; }
 export function hideIntro(){ intro.classList.add('hidden'); introVisible=false; }
 function showIntro(){ intro.classList.remove('hidden'); introVisible=true; }
 
@@ -35,21 +38,23 @@ document.getElementById('enter').addEventListener('click',()=>{
 });
 document.addEventListener('pointerlockchange',()=>{
   locked = document.pointerLockElement===canvas;
-  if(!locked && !dragLook) showIntro();
+  // Don't fall back to the menu while the overview holds the screen (e.g. the
+  // browser drops the lock on Escape) — the round restart will hand control back.
+  if(!locked && !dragLook && !frozen) showIntro();
 });
 document.addEventListener('pointerlockerror',()=>{ dragLook=true; });
 canvas.addEventListener('click',()=>{
   if(!introVisible && !locked && !dragLook) canvas.requestPointerLock?.();
 });
 addEventListener('keydown',e=>{
-  if(e.code==='Escape' && dragLook){ introVisible ? hideIntro() : showIntro(); }
+  if(e.code==='Escape' && dragLook && !frozen){ introVisible ? hideIntro() : showIntro(); }
 });
 
 let dragging=false;
 addEventListener('mousedown',()=>dragging=true);
 addEventListener('mouseup',()=>dragging=false);
 addEventListener('mousemove',e=>{
-  if(introVisible) return;
+  if(introVisible||frozen) return;
   if(locked || (dragLook&&dragging)){
     player.yaw   -= e.movementX*0.0023;
     player.pitch -= e.movementY*0.0023;
@@ -83,7 +88,7 @@ function collide(){
 
 /* per-frame: walk the player and drive the camera, or drift gently behind the menu */
 export function update(dt, time){
-  if(!introVisible){
+  if(!introVisible && !frozen){
     const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
     const speed=run?7.4:4.2;
     let ix=0,iz=0;
@@ -121,7 +126,7 @@ export function update(dt, time){
     const targetFov=run&&moving?75:70;
     camera.fov += (targetFov-camera.fov)*Math.min(1,dt*5);
     camera.updateProjectionMatrix();
-  }else{
+  }else if(introVisible){
     // gentle establishing drift behind the menu
     const a=time*.04;
     camera.position.set(Math.sin(a)*2, EYE+1.2, 38+Math.cos(a*1.3));
