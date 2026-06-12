@@ -12,7 +12,7 @@ import { boom, ding, thudSnd, clack } from './audio.js';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
   showKillscreen, hideKillscreen, setKillCount } from './hud.js';
 import { announce, syncZone } from './zones.js';
-import { introVisible, locked, dragLook, walkPhase, respawn, setDead } from './controls.js';
+import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen } from './controls.js';
 
 scene.add(camera); // the viewmodel rides on the camera
 const gun=new THREE.Group();
@@ -120,6 +120,25 @@ export function handleFell(m){
   }else{
     announce(`${m.sname} felled ${m.tname}`);
   }
+}
+export function handleOver(m){
+  if(m.winnerId!=null && scoresMap.has(m.winnerId)){
+    const s=scoresMap.get(m.winnerId); s.score=m.cap; // make sure the tally agrees
+  }
+  setFrozen(true);
+  renderScores();
+  showOverview(m);
+}
+
+export function handleRestart(){
+  hideOverview();
+  setFrozen(false);
+  for(const s of scoresMap.values()) s.score=0;
+  setHp(3); renderScores();
+  player.x=0; player.z=38.5; player.y=EYE;
+  player.vy=0; player.grounded=true; player.yaw=0; player.pitch=0;
+  vel.x=vel.z=0;
+  announce('A new contest begins!');
 }
 
 /* end a death: fresh spawn, restored gonne, control handed back to the player */
