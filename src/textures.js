@@ -246,5 +246,77 @@ export function signTex(text){
   });
 }
 
+/* ============================ desert (Dust2) textures ============================ */
+export const sandTex = makeTex(512,(g,s)=>{
+  g.fillStyle='#c9a76e'; g.fillRect(0,0,s,s);
+  for(let i=0;i<3000;i++){
+    const v=mr(0,1);
+    g.fillStyle=`rgba(${190+v*40|0},${158+v*34|0},${104+v*26|0},${mr(.12,.4)})`;
+    g.fillRect(mr(0,s),mr(0,s),mr(2,5),mr(2,5));
+  }
+  g.strokeStyle='rgba(120,95,55,.15)'; g.lineWidth=3;   // wind ripples
+  for(let i=0;i<22;i++){
+    const y=mr(0,s);
+    g.beginPath(); g.moveTo(0,y);
+    for(let x=0;x<=s;x+=32) g.lineTo(x, y+Math.sin(x*.05+i)*6);
+    g.stroke();
+  }
+  speckle(g,s,1500,.07);
+});
+export const sandPathTex = makeTex(256,(g,s)=>{
+  g.fillStyle='#d8ba81'; g.fillRect(0,0,s,s);
+  for(let i=0;i<900;i++){
+    const v=mr(0,1);
+    g.fillStyle=`rgba(${200+v*30|0},${172+v*26|0},${118+v*20|0},${mr(.15,.4)})`;
+    g.fillRect(mr(0,s),mr(0,s),mr(2,4),mr(2,4));
+  }
+  speckle(g,s,900,.08);
+});
+function sandstoneMaker(base, courseH){
+  return makeTex(256,(g,s)=>{
+    g.fillStyle='#7a6342'; g.fillRect(0,0,s,s);
+    const rows=Math.round(s/courseH);
+    for(let y=0;y<rows;y++){
+      let x=(y%2)*-20;
+      while(x<s){
+        const w=mr(40,72), v=base+mr(-12,12);
+        g.fillStyle=`rgb(${v+26|0},${v|0},${v-34|0})`;
+        g.fillRect(x+2, y*courseH+2, Math.min(w,s-x)-3, courseH-4);
+        x+=w;
+      }
+    }
+    speckle(g,s,1600,.10);
+  });
+}
+export const sandstoneTex  = sandstoneMaker(168, 30);
+export const sandstoneTex2 = sandstoneMaker(138, 40);
+export const concreteTex = makeTex(256,(g,s)=>{
+  g.fillStyle='#9a9489'; g.fillRect(0,0,s,s);
+  for(let i=0;i<70;i++){
+    g.fillStyle=`rgba(${mr(70,95)|0},${mr(66,90)|0},${mr(60,82)|0},${mr(.04,.09)})`;
+    g.beginPath(); g.ellipse(mr(0,s),mr(0,s),mr(6,18),mr(4,13),mr(0,3),0,7); g.fill();
+  }
+  speckle(g,s,2400,.10);
+});
+// pale, sun-bleached crate planks (the medieval plankTex is far too dark for dust)
+export const crateTex = makeTex(256,(g,s)=>{
+  g.fillStyle='#ab8d5c'; g.fillRect(0,0,s,s);
+  for(let i=0;i<6;i++){
+    const x=i*s/6, v=mr(-14,14);
+    g.fillStyle=`rgb(${176+v|0},${148+v|0},${102+v|0})`;
+    g.fillRect(x+1,0,s/6-2,s);
+    g.strokeStyle='rgba(70,52,28,.55)'; g.lineWidth=2;
+    g.beginPath(); g.moveTo(x,0); g.lineTo(x,s); g.stroke();
+  }
+  g.strokeStyle='rgba(60,45,24,.7)'; g.lineWidth=5;   // edge battens
+  g.strokeRect(4,4,s-8,s-8);
+  for(let i=0;i<46;i++){
+    g.strokeStyle=`rgba(${mr(90,120)|0},${mr(72,98)|0},${mr(44,66)|0},.4)`;
+    g.lineWidth=1;
+    const x=mr(0,s), y=mr(0,s);
+    g.beginPath(); g.moveTo(x,y); g.lineTo(x+mr(-3,3), y+mr(10,40)); g.stroke();
+  }
+});
+
 /* clone a texture with its own repeat — used by materials and the town builder */
 export function clonedTex(t, rx, ry){ const c=t.clone(); c.needsUpdate=true; c.repeat.set(rx,ry); return c; }

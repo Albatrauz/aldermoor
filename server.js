@@ -33,6 +33,12 @@ const TRADE = ['the Cooper', 'the Miller', 'the Weaver', 'the Smith', 'the Baker
   'the Tanner', 'the Carter', 'the Brewer', 'the Mason', 'the Shepherd', 'the Chandler'];
 const COLORS = [0x7a3b2e, 0x3f5d43, 0x3c4668, 0x8a6d2f, 0x6b3a5c, 0x4a6b6e, 0x935b25, 0x5c5340];
 
+// The felled lie dead this long on the client (its killscreen countdown), then
+// rise with a brief grace. Hits inside the whole window are ignored, so a corpse
+// can't be re-felled — that would hand out a phantom kill and reset the count.
+const RESPAWN_MS = 4000;
+const SPAWN_GRACE_MS = 1500;
+
 let nextId = 1;
 const players = new Map();
 
@@ -43,6 +49,18 @@ function pickName() {
     if (![...players.values()].some(p => p.name === n)) return n;
   }
   return 'Stranger nº' + nextId;
+}
+
+// player-chosen names: letters/digits/spaces and a little punctuation, ≤20 chars
+function cleanName(v) {
+  if (typeof v !== 'string') return '';
+  return v.replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
+}
+function uniqueName(n, selfId) {
+  let name = n;
+  for (let i = 2; [...players.entries()].some(([pid, p]) => pid !== selfId && p.name === name); i++)
+    name = `${n} ${i}`;
+  return name;
 }
 
 function broadcast(msg, exceptId) {
@@ -66,11 +84,12 @@ function attachGame(httpServer) {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     const id = nextId++;
-    const p = { ws, name: pickName(), color: COLORS[id % COLORS.length],
-      x: 0, y: 1.65, z: 38.5, yaw: 0, m: 0, r: 0, alive: true,
-      hp: 3, score: 0, lastShot: 0, hitUsed: true, lastFell: 0 };
+    const wanted = cleanName(new URLSearchParams((req?.url || '').split('?')[1] || '').get('name') || '');
+    const p = { ws, name: wanted ? uniqueName(wanted, id) : pickName(), color: COLORS[id % COLORS.length],
+      x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
+      hp: 3, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0 };
     players.set(id, p);
 
     ws.send(JSON.stringify({
@@ -101,13 +120,25 @@ function attachGame(httpServer) {
           o: msg.o.slice(0, 3).map(v => num(v, -200, 200, 0)),
           d: msg.d.slice(0, 3).map(v => num(v, -1, 1, 0)),
           l: num(msg.l, 0, 120, 70) }, id);
+      } else if (msg.t === 'name') {
+        const now = Date.now();
+        if (now - p.lastRename < 1000) return;             // no rename spam
+        const clean = cleanName(msg.name);
+        if (!clean) return;
+        const next = uniqueName(clean, id);                // dedupe BEFORE the no-op check,
+        if (next === p.name) return;                       // or we rebroadcast "X is now X"
+        p.lastRename = now;
+        const old = p.name;
+        p.name = next;
+        broadcast({ t: 'rename', id, name: p.name });      // everyone, sender included
+        console.log(`✎ ${old} is now ${p.name}`);
       } else if (msg.t === 'hit') {
         const now = Date.now();
         if (p.hitUsed || now - p.lastShot > 400) return;  // one hit per shot, right after it
         p.hitUsed = true;
         const q = players.get(msg.target | 0);
         if (!q || q === p) return;
-        if (now - q.lastFell < 1500) return;              // mercy after a respawn
+        if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) return;  // dead, or freshly risen
         const dx = p.x - q.x, dz = p.z - q.z;
         if (dx * dx + dz * dz > 75 * 75) return;          // out of range, impossible shot
         q.hp -= 1;

@@ -49,7 +49,8 @@ function buildVillager(name, color){
   g.add(mesh(new THREE.SphereGeometry(.17,10,8), skin, 0,1.52,0));
   g.add(mesh(new THREE.ConeGeometry(.21,.34,9), clothDark, 0,1.75,0));   // hood
   g.add(mesh(new THREE.ConeGeometry(.34,.28,9), clothDark, 0,1.32,0));   // mantle
-  g.add(makeNameTag(name));
+  const tag=makeNameTag(name);
+  g.add(tag);
   // hand lantern, swinging with the right arm
   const lant=new THREE.Group();
   lant.position.set(0,-.56,.06);
@@ -72,7 +73,7 @@ function buildVillager(name, color){
   muzzle.position.set(0,.02,.5);
   gonne.add(muzzle);
   armL.add(gonne);
-  return {group:g, legL, legR, armL, armR, muzzle, hasLamp:!!hasLamp};
+  return {group:g, legL, legR, armL, armR, muzzle, tag, hasLamp:!!hasLamp};
 }
 
 export function addRemote(d){
@@ -89,6 +90,17 @@ export function addRemote(d){
 export function dropRemote(id){
   const v=remotes.get(id);
   if(v){ scene.remove(v.group); remotes.delete(id); }
+}
+/* swap the floating nametag when a traveller takes a new name */
+export function renameRemote(id, name){
+  const v=remotes.get(id);
+  if(!v || v.name===name) return;
+  v.name=name;
+  v.group.remove(v.tag);
+  v.tag.material.map.dispose();
+  v.tag.material.dispose();
+  v.tag=makeNameTag(name);
+  v.group.add(v.tag);
 }
 
 export function updateRemotes(dt){

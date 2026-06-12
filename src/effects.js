@@ -51,7 +51,7 @@ export function updateFx(dt){
 /* --- ray tests: slab AABB for the town, vertical capsule for travellers --- */
 export function rayAABB(o,d,c){
   let tmin=0, tmax=Infinity;
-  const lo=[c.x-c.hx, 0, c.z-c.hz], hi=[c.x+c.hx, c.h??5, c.z+c.hz];
+  const lo=[c.x-c.hx, c.base??0, c.z-c.hz], hi=[c.x+c.hx, c.h??c.top??5, c.z+c.hz];
   const oo=[o.x,o.y,o.z], dd=[d.x,d.y,d.z];
   for(let i=0;i<3;i++){
     if(Math.abs(dd[i])<1e-9){ if(oo[i]<lo[i]||oo[i]>hi[i]) return Infinity; continue; }
