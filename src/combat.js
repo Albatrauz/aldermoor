@@ -10,7 +10,7 @@ import { myId, sendNet } from './net.js';
 import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects.js';
 import { boom, ding, thudSnd, clack } from './audio.js';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
-  showKillscreen, hideKillscreen, setKillCount } from './hud.js';
+  showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview } from './hud.js';
 import { announce, syncZone } from './zones.js';
 import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen } from './controls.js';
 
