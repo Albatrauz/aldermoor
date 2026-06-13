@@ -105,22 +105,50 @@ canvas#scene {
     opacity: 1;
 }
 
-#hearts {
+#health {
     position: fixed;
-    bottom: 52px;
-    left: 0;
-    right: 0;
-    text-align: center;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(300px, 42vw);
+    height: 15px;
     z-index: 7;
     pointer-events: none;
-    font-size: 17px;
-    color: #c0452f;
-    letter-spacing: 0.3em;
-    text-indent: 0.3em;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    padding: 2px;
+    border: 1px solid rgba(216, 169, 72, 0.5);
+    border-radius: 3px;
+    background: rgba(12, 8, 5, 0.72);
+    box-shadow:
+        0 1px 5px rgba(0, 0, 0, 0.8),
+        inset 0 0 6px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
 }
-#hearts .lost {
-    color: rgba(120, 80, 60, 0.3);
+#healthFill {
+    height: 100%;
+    width: 100%;
+    border-radius: 2px;
+    background: hsl(42, 68%, 52%);
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.18);
+    transition:
+        width 0.25s ease,
+        background 0.25s ease;
+}
+/* a low bar throbs crimson at the edge */
+#health.low {
+    animation: hp-pulse 1s ease-in-out infinite;
+}
+@keyframes hp-pulse {
+    0%,
+    100% {
+        box-shadow:
+            0 1px 5px rgba(0, 0, 0, 0.8),
+            inset 0 0 6px rgba(0, 0, 0, 0.7);
+    }
+    50% {
+        box-shadow:
+            0 0 11px rgba(192, 40, 24, 0.75),
+            inset 0 0 6px rgba(0, 0, 0, 0.7);
+    }
 }
 
 #ammo {
@@ -286,6 +314,69 @@ canvas#scene {
     font-size: 14px;
     letter-spacing: 0.12em;
     color: var(--gold-dim);
+}
+
+/* the life's-end wound summary: who chipped you down, and by how much */
+.ks-damage {
+    margin: 26px auto 0;
+    width: min(380px, 84vw);
+    text-align: left;
+}
+.ks-damage:empty {
+    display: none;
+}
+.dmg-title {
+    margin-bottom: 12px;
+    text-align: center;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    color: var(--gold-dim);
+}
+.dmg-title .dmg-head {
+    color: #d8493a;
+    font-style: normal;
+}
+.dmg-row {
+    display: grid;
+    grid-template-columns: 1fr 92px auto;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+    font-family: 'Lora', serif;
+    font-size: 14px;
+    color: var(--parchment);
+}
+.dmg-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dmg-bar {
+    height: 7px;
+    border-radius: 3px;
+    background: rgba(120, 80, 60, 0.28);
+    overflow: hidden;
+}
+.dmg-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #8a2a1c, #d8493a);
+}
+.dmg-val {
+    min-width: 30px;
+    text-align: right;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+.dmg-row.killer .dmg-name {
+    color: #f0b3aa;
+    font-style: italic;
+}
+.dmg-row.killer .dmg-val {
+    color: #ff6b5a;
 }
 
 #toast {

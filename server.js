@@ -35,6 +35,11 @@ const COLORS = [0x7a3b2e, 0x3f5d43, 0x3c4668, 0x8a6d2f, 0x6b3a5c, 0x4a6b6e, 0x93
 
 const KILL_CAP = 10;          // first to this many kills wins the round
 const RESTART_DELAY = 20000;  // overview screen lingers this long, then a fresh round
+const MAX_HP = 100;           // a full health bar
+const BODY_DMG = 25;          // a ball to the body bites this much — several fell a foe
+const REGEN_DELAY = 5000;     // unharmed this long and the bar begins to refill
+const REGEN_TICK_MS = 500;    // …topped up this often
+const REGEN_PER_TICK = 8;     // …by this much each step (≈16 hp/s, ~6s from the brink)
 const SPAWN = { x: 0, y: 1.65, z: 38.5, yaw: 0 };
 // The felled lie dead this long on the client (its killscreen countdown), then
 // rise with a brief grace. Hits inside the whole window are ignored, so a corpse
@@ -113,10 +118,11 @@ function resetRound() {
   overInfo = null;
   const now = Date.now();
   for (const [, p] of players) {
-    p.score = 0; p.hp = 3; p.alive = true;
+    p.score = 0; p.hp = MAX_HP; p.alive = true;
     p.x = SPAWN.x; p.y = SPAWN.y; p.z = SPAWN.z; p.yaw = SPAWN.yaw;
     p.m = 0; p.r = 0;                                   // clear stale walk/run anim flags
     p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // brief mercy after the reset
+    p.lastDamaged = 0; p.dmgFrom.clear();              // fresh life, no wounds tallied
   }
   broadcast({ t: 'restart', spawn: SPAWN });
   console.log(`↻ new round — ${players.size} in town`);
@@ -139,7 +145,8 @@ function attachGame(httpServer) {
     const wanted = cleanName(new URLSearchParams((req?.url || '').split('?')[1] || '').get('name') || '');
     const p = { ws, name: wanted ? uniqueName(wanted, id) : pickName(), color: COLORS[id % COLORS.length],
       x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
-      hp: 3, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0 };
+      hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
+      lastDamaged: 0, dmgFrom: new Map() };   // dmgFrom: attackerId → {name, dmg} this life
     players.set(id, p);
 
     ws.send(JSON.stringify({
@@ -199,15 +206,30 @@ function attachGame(httpServer) {
         if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) return;  // dead, or freshly risen
         const dx = p.x - q.x, dz = p.z - q.z;
         if (dx * dx + dz * dz > 75 * 75) return;          // out of range, impossible shot
-        q.hp -= 1;
+
+        const head = msg.head === true;                   // a ball to the head fells outright
+        const dealt = head ? q.hp : Math.min(BODY_DMG, q.hp);
+        q.hp -= dealt;
+        q.lastDamaged = now;                              // holds off the bar's regen
+        // tally the wound against the shooter for this life's death summary
+        const rec = q.dmgFrom.get(id) || { name: p.name, dmg: 0 };
+        rec.name = p.name; rec.dmg += dealt;              // keep the latest name on file
+        q.dmgFrom.set(id, rec);
+
         if (q.hp > 0) {
           broadcast({ t: 'hitfx', shooter: id, target: msg.target | 0, hp: q.hp });
         } else {
           p.score += 1;
-          q.hp = 3;
+          // who chipped them down, this life — best first, for the killscreen
+          const dmg = [...q.dmgFrom.entries()]
+            .map(([aid, r]) => ({ id: aid, name: r.name, dmg: r.dmg }))
+            .sort((a, b) => b.dmg - a.dmg);
+          q.hp = MAX_HP;
           q.lastFell = now;
-          broadcast({ t: 'fell', shooter: id, sname: p.name, target: msg.target | 0, tname: q.name, score: p.score });
-          console.log(`⚔ ${p.name} felled ${q.name} (${p.score})`);
+          q.dmgFrom.clear();                              // next life starts unwounded
+          broadcast({ t: 'fell', shooter: id, sname: p.name, target: msg.target | 0,
+            tname: q.name, score: p.score, head, dmg });
+          console.log(`⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''} (${p.score})`);
           if (p.score >= KILL_CAP) endRound(id);          // first to the cap wins the round
         }
       }
@@ -237,9 +259,24 @@ function attachGame(httpServer) {
     }
   }, 15000);
 
+  // Health regen: once a player has gone unharmed for REGEN_DELAY, top their bar
+  // back up in small steps. Only the player themselves needs to hear about it.
+  const regenTimer = setInterval(() => {
+    if (phase !== 'play') return;
+    const now = Date.now();
+    for (const [, p] of players) {
+      if (p.hp >= MAX_HP) continue;
+      if (now - p.lastDamaged < REGEN_DELAY) continue;   // still smarting
+      if (now - p.lastFell < RESPAWN_MS) continue;        // lying felled
+      p.hp = Math.min(MAX_HP, p.hp + REGEN_PER_TICK);
+      if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'hp', hp: p.hp }));
+    }
+  }, REGEN_TICK_MS);
+
   // Don't keep a Vite dev process alive on these timers.
   snapTimer.unref?.();
   pingTimer.unref?.();
+  regenTimer.unref?.();
 
   return wss;
 }

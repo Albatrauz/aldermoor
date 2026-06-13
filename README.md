@@ -51,7 +51,7 @@ dependency flow runs roughly top-to-bottom:
 | `world.js`      | builds the entire static town (one-time on import) + per-frame ambient animation |
 | `audio.js`      | synthesized black-powder / UI sounds (WebAudio) |
 | `effects.js`    | transient tracers / muzzle flashes / smoke + ray-cast hit tests |
-| `hud.js`        | score tally, hearts, hit/hurt flourishes |
+| `hud.js`        | score tally, health bar, hit/hurt flourishes, death summary |
 | `zones.js`      | named places and their parchment toasts |
 | `controls.js`   | player state, input, collision, first-person movement |
 | `villagers.js`  | other players: model, name tags, snapshot interpolation |

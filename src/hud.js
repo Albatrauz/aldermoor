@@ -5,25 +5,31 @@ import { myId } from './net.js';
 
 const scoresEl=document.getElementById('scores');
 const scoreRowsEl=document.getElementById('scoreRows');
-const heartsEl=document.getElementById('hearts');
+const healthFillEl=document.getElementById('healthFill');
+const healthEl=document.getElementById('health');
 const ammoEl=document.getElementById('ammo');
 const killEl=document.getElementById('killscreen');
 const killByEl=document.getElementById('killByName');
 const killCountEl=document.getElementById('killCount');
+const ksDamageEl=document.getElementById('ksDamage');
 
+export const MAX_HP=100;          // a full bar — shared with combat & net
 export const scoresMap=new Map();
-let hp=3;
+let hp=MAX_HP;
 
 /* names are player-chosen now — never let them into innerHTML raw */
 const esc=s=>String(s).replace(/[&<>"']/g,
   c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-/* set local health and repaint the hearts in one go */
-export function setHp(n){ hp=n; updateHearts(); }
-function updateHearts(){
-  heartsEl.innerHTML='❤ '.repeat(hp)+
-    (hp<3?`<span class="lost">${'❤ '.repeat(3-hp)}</span>`:'');
+/* set local health and repaint the bar — width plus a gold→crimson tint as it ebbs */
+export function setHp(n){
+  hp=Math.max(0, Math.min(MAX_HP, n));
+  const f=hp/MAX_HP;
+  healthFillEl.style.width=(f*100)+'%';
+  healthFillEl.style.background=`hsl(${42*f}, 68%, ${34+18*f}%)`;  // 42°gold→0°red
+  healthEl.classList.toggle('low', f<=.3);
 }
+setHp(MAX_HP);                     // start the bar full, even before we connect
 /* shot pips for the handgonne; an italic note while ramming a fresh charge */
 export function setAmmo(n, max, reloading){
   ammoEl.innerHTML=reloading
@@ -85,11 +91,26 @@ export function hideOverview(){
   clearInterval(countTimer); countTimer=null;
   overviewEl.classList.remove('show');
 }
-/* the death overlay: name the slayer and seed the respawn countdown */
-export function showKillscreen(killerName, count){
+/* the death overlay: name the slayer, tally the wounds, seed the respawn countdown */
+export function showKillscreen(killerName, count, dmg, head, killerId){
   killByEl.textContent=killerName;
   killCountEl.textContent=count;
+  renderDamage(dmg, head, killerId);
   killEl.classList.add('on');
+}
+/* the life's-end breakdown: who dealt how much, best first, with a share bar each */
+function renderDamage(dmg, head, killerId){
+  if(!Array.isArray(dmg) || !dmg.length){ ksDamageEl.innerHTML=''; return; }
+  const max=Math.max(...dmg.map(d=>d.dmg), 1);
+  const rows=dmg.map(d=>{
+    const pct=Math.max(4, Math.round(d.dmg/max*100));
+    const slayer=d.id===killerId ? ' killer' : '';
+    return `<div class="dmg-row${slayer}"><span class="dmg-name">${esc(d.name)}</span>`+
+      `<span class="dmg-bar"><i style="width:${pct}%"></i></span>`+
+      `<span class="dmg-val">${Math.round(d.dmg)}</span></div>`;
+  }).join('');
+  ksDamageEl.innerHTML=`<div class="dmg-title">Wounds you suffered`+
+    `${head?` · <span class="dmg-head">a ball to the head</span>`:''}</div>${rows}`;
 }
 /* repaint the ticking numeral (only on change — it's called every frame) */
 export function setKillCount(n){
