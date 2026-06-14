@@ -4,7 +4,7 @@
 // combat layers. `net`/`myId`/`myName` are exported as live bindings.
 import { EYE } from './core.js';
 import { addRemote, dropRemote, renameRemote, remotes } from './villagers.js';
-import { scoresMap, setHp, renderScores } from './hud.js';
+import { scoresMap, setHp, renderScores, MAX_HP } from './hud.js';
 import { announce } from './zones.js';
 
 import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath } from './combat.js';
@@ -64,7 +64,7 @@ function connect(){
       scoresMap.clear();
       scoresMap.set(myId,{name:myName, score:m.score||0});
       for(const p of m.players){ addRemote(p); scoresMap.set(p.id,{name:p.name, score:p.score||0}); }
-      setHp(3); renderScores();
+      setHp(MAX_HP); renderScores();
       updatePresence();
       announce(`Welcome, ${myName}`);
       // a name typed before the socket finished opening → apply it now as a rename
@@ -95,6 +95,8 @@ function connect(){
       remoteShoot(m);
     }else if(m.t==='hitfx'){
       handleHitFx(m);
+    }else if(m.t==='hp'){
+      setHp(m.hp);                       // the bar regenerating after a lull
     }else if(m.t==='fell'){
       handleFell(m);
     }else if(m.t==='over'){

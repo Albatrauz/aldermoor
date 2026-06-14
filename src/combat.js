@@ -10,7 +10,7 @@ import { myId, sendNet } from './net.js';
 import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects.js';
 import { boom, ding, thudSnd, clack } from './audio.js';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
-  showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview } from './hud.js';
+  showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud.js';
 import { announce, syncZone } from './zones.js';
 import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen } from './controls.js';
 
@@ -31,6 +31,9 @@ const gunMuzzle=new THREE.Object3D();
 }
 
 const FIRE_CD=.9, RANGE=70, MAG=5, RELOAD_T=2.2, DEATH_T=4;
+// height above a foe's feet that counts as a head — the model's skull/hood sit
+// here (body cylinder tops out ~1.35, head sphere centres ~1.52). See rayPlayer.
+const HEAD_Y=1.4;
 let fireCd=0, gunKick=0, ammo=MAG, reloadT=0, deathT=0;
 const crosshairEl=document.getElementById('crosshair');
 setAmmo(ammo, MAG, false);
@@ -67,7 +70,12 @@ export function fire(){
     o:[+o.x.toFixed(2),+o.y.toFixed(2),+o.z.toFixed(2)],
     d:[+d.x.toFixed(3),+d.y.toFixed(3),+d.z.toFixed(3)],
     l:+end.toFixed(1)});
-  if(hitId!==null) sendNet({t:'hit', target:hitId});
+  if(hitId!==null){
+    const v=remotes.get(hitId);
+    // impact height above the foe's feet decides head vs body (one-shot vs chip)
+    const head=v ? (o.y+d.y*end) - v.cur.y >= HEAD_Y : false;
+    sendNet({t:'hit', target:hitId, head});
+  }
   if(ammo===0) startReload();                              // ram the next charge
 }
 addEventListener('mousedown',e=>{
@@ -113,12 +121,12 @@ export function handleFell(m){
     setDead(true);                        // freeze where we fell; respawn happens on the count
     deathT=DEATH_T;
     crosshairEl.classList.remove('cool');
-    showKillscreen(m.sname, Math.ceil(DEATH_T));
+    showKillscreen(m.sname, Math.ceil(DEATH_T), m.dmg, m.head, m.shooter);
   }else if(m.shooter===myId){
-    announce(`You felled ${m.tname}!`);
+    announce(m.head ? `You felled ${m.tname} with a ball to the head!` : `You felled ${m.tname}!`);
     ding();
   }else{
-    announce(`${m.sname} felled ${m.tname}`);
+    announce(m.head ? `${m.sname} felled ${m.tname} with a headshot` : `${m.sname} felled ${m.tname}`);
   }
 }
 export function handleOver(m){
@@ -134,10 +142,12 @@ export function handleRestart(){
   hideOverview();
   setFrozen(false);
   for(const s of scoresMap.values()) s.score=0;
-  setHp(3); renderScores();
-  player.x=0; player.z=38.5; player.y=EYE;
-  player.vy=0; player.grounded=true; player.yaw=0; player.pitch=0;
-  vel.x=vel.z=0;
+  setHp(MAX_HP); renderScores();
+  respawn();                                         // fresh spawn + ground snap, as a rise does
+  syncZone();                                        // adopt the new locale without a toast
+  ammo=MAG; reloadT=0; fireCd=0; gunKick=0;          // a full gonne for the new contest
+  setAmmo(ammo, MAG, false);
+  crosshairEl.classList.remove('cool');
   announce('A new contest begins!');
 }
 
@@ -146,7 +156,7 @@ function rise(){
   deathT=0;
   respawn();                                         // pick a fresh spawn and snap there
   syncZone();                                        // adopt the new locale without a toast
-  setHp(3);
+  setHp(MAX_HP);
   ammo=MAG; reloadT=0; fireCd=0; gunKick=0; setAmmo(ammo, MAG, false);
   crosshairEl.classList.remove('cool');
   hideKillscreen();
