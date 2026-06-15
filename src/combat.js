@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { scene, camera, mesh } from './core.js';
 import { matPlank, matIron, matGoldTrim } from './materials.js';
 import { colliders } from './world.js';
-import { remotes } from './villagers.js';
+import { remotes, killRemote } from './villagers.js';
 import { myId, sendNet } from './net.js';
 import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects.js';
 import { boom, ding, thudSnd, clack } from './audio.js';
@@ -115,6 +115,7 @@ export function handleFell(m){
   const s=scoresMap.get(m.shooter);
   if(s) s.score=m.score;
   renderScores();
+  if(m.target!==myId) killRemote(m.target);   // topple the felled body for onlookers
   if(m.target===myId){
     if(deathT>0) return;                  // already lying dead — ignore a stray second blow
     setHp(0); hurtFlash(); thudSnd();
