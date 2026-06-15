@@ -124,8 +124,110 @@ function resetRound() {
     p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // brief mercy after the reset
     p.lastDamaged = 0; p.dmgFrom.clear();              // fresh life, no wounds tallied
   }
+  for (const [, p] of players) if (p.bot) placeBot(p); // re-scatter dummies, don't clump at SPAWN
   broadcast({ t: 'restart', spawn: SPAWN });
   console.log(`↻ new round — ${players.size} in town`);
+}
+
+/* ============================ dev-only practice dummies ============================ */
+// Standing bots so a lone developer can test the shoot mechanics, the health
+// system and the round loop without a second player. They are real `players`
+// entries (the server is authoritative for combat), so the existing client
+// renders, raycasts and scores them with no client changes. Reached only via
+// attachGame's `opts.bots` — production (`attachGame(server)`) never passes it,
+// so dummies can never appear outside `npm run dev`.
+
+// Curated open-floor spots mirroring world.js SPAWNS. `y` is eye height baked per
+// spot (the server has no colliders) so a dummy stands right even on the raised
+// bombsite-A platform (+1.2).
+const BOT_SPOTS = [
+  { x: -105, z: 0,     y: 1.65, yaw: -Math.PI / 2 }, // T spawn
+  { x: -70,  z: 11.5,  y: 1.65, yaw: -Math.PI / 2 }, // T upper
+  { x: -69,  z: 24,    y: 1.65, yaw: Math.PI },      // outside long
+  { x: -40,  z: 40.5,  y: 1.65, yaw: -Math.PI / 2 }, // long A
+  { x: 13,   z: 44,    y: 2.85, yaw: Math.PI / 2 },  // bombsite A platform (+1.2)
+  { x: -20,  z: 0,     y: 1.65, yaw: -Math.PI / 2 }, // mid
+  { x: 22,   z: 0,     y: 1.65, yaw: Math.PI / 2 },  // CT mid
+  { x: -57,  z: -21.5, y: 1.65, yaw: -Math.PI / 2 }, // upper tunnels
+  { x: -29,  z: -34,   y: 1.65, yaw: -Math.PI / 2 }, // lower tunnels
+  { x: 2,    z: -33,   y: 1.65, yaw: -Math.PI / 2 }, // bombsite B
+  { x: 30,   z: -18,   y: 1.65, yaw: Math.PI / 2 },  // B doors corridor
+  { x: 55,   z: 35,    y: 1.65, yaw: Math.PI / 2 },  // CT→A connector
+  { x: 95,   z: 2,     y: 1.65, yaw: Math.PI / 2 },  // CT spawn
+];
+const BOT_RANGE = 40;        // how far a dummy will return fire
+const BOT_HEADSHOT = 0.12;   // chance its ball finds the head (a one-shot)
+const BOT_FIRE_CD = 4000;    // base delay between a dummy's volleys (ms)
+const BOT_FIRE_JITTER = 3000;// …plus up to this much random spread → ~4–7s apart
+
+// Drop a dummy onto a random spot with a little jitter, fresh-faced for a new life.
+function placeBot(p) {
+  const s = BOT_SPOTS[Math.floor(Math.random() * BOT_SPOTS.length)];
+  p.x = s.x + Math.random() * 3 - 1.5;
+  p.z = s.z + Math.random() * 3 - 1.5;
+  p.y = s.y;
+  p.yaw = s.yaw + (Math.random() * 1.2 - 0.6);
+  p.hp = MAX_HP;
+  p.dmgFrom.clear();
+  p.lastDamaged = 0;
+  p.lastFell = Date.now();   // a breath of grace so it isn't re-felled on arrival
+}
+
+// Stand up `n` dummies and announce them. The stub socket's no-op send() lets the
+// existing broadcast/regen loops treat a bot like any other player.
+function spawnBots(n) {
+  for (let k = 1; k <= n; k++) {
+    const id = nextId++;
+    const ws = { readyState: 1, send() {} };
+    const p = { ws, name: `Dummy ${k}`, color: COLORS[id % COLORS.length],
+      x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
+      hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
+      lastDamaged: 0, dmgFrom: new Map(), bot: true, nextShot: 0 };
+    placeBot(p);
+    p.nextShot = Date.now() + Math.floor(Math.random() * BOT_FIRE_CD);  // stagger first volleys
+    players.set(id, p);
+    broadcast({ t: 'join', id, name: p.name, color: p.color, x: p.x, y: p.y, z: p.z, yaw: p.yaw });
+    console.log(`+ ${p.name} (#${id}) [bot] — ${players.size} in town`);
+  }
+}
+
+// Apply one ball's worth of damage shooter→target: the felled/range guards, the
+// wound tally, and the hitfx-or-fell broadcast. Shared by real players' `hit`
+// messages and dev bots' return fire.
+function resolveHit(shooterId, targetId, head) {
+  const p = players.get(shooterId);
+  const q = players.get(targetId);
+  if (!p || !q || q === p) return;
+  const now = Date.now();
+  if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) return;   // dead, or freshly risen
+  const dx = p.x - q.x, dz = p.z - q.z;
+  if (dx * dx + dz * dz > 75 * 75) return;                      // out of range, impossible shot
+
+  const dealt = head ? q.hp : Math.min(BODY_DMG, q.hp);         // a ball to the head fells outright
+  q.hp -= dealt;
+  q.lastDamaged = now;                                          // holds off the bar's regen
+  // tally the wound against the shooter for this life's death summary
+  const rec = q.dmgFrom.get(shooterId) || { name: p.name, dmg: 0 };
+  rec.name = p.name; rec.dmg += dealt;                          // keep the latest name on file
+  q.dmgFrom.set(shooterId, rec);
+
+  if (q.hp > 0) {
+    broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp });
+  } else {
+    p.score += 1;
+    // who chipped them down, this life — best first, for the killscreen
+    const dmg = [...q.dmgFrom.entries()]
+      .map(([aid, r]) => ({ id: aid, name: r.name, dmg: r.dmg }))
+      .sort((a, b) => b.dmg - a.dmg);
+    q.hp = MAX_HP;
+    q.lastFell = now;
+    q.dmgFrom.clear();                                          // next life starts unwounded
+    broadcast({ t: 'fell', shooter: shooterId, sname: p.name, target: targetId,
+      tname: q.name, score: p.score, head, dmg });
+    console.log(`⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''} (${p.score})`);
+    if (q.bot) placeBot(q);                                     // re-scatter the dummy for the next pass
+    if (p.score >= KILL_CAP) endRound(shooterId);              // first to the cap wins the round
+  }
 }
 
 // Mounts the multiplayer WebSocket game on an existing HTTP server. We route
@@ -133,7 +235,7 @@ function resetRound() {
 // other upgrade — notably Vite's HMR socket on `/` in dev — untouched. Using
 // `{ server, path }` instead would make ws abort non-matching upgrades with a
 // 400, which kills HMR and sends Vite into a reload loop.
-function attachGame(httpServer) {
+function attachGame(httpServer, opts = {}) {
   const wss = new WebSocketServer({ noServer: true });
   httpServer.on('upgrade', (req, socket, head) => {
     if ((req.url || '').split('?')[0] !== '/ws') return;
@@ -201,37 +303,7 @@ function attachGame(httpServer) {
         const now = Date.now();
         if (p.hitUsed || now - p.lastShot > 400) return;  // one hit per shot, right after it
         p.hitUsed = true;
-        const q = players.get(msg.target | 0);
-        if (!q || q === p) return;
-        if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) return;  // dead, or freshly risen
-        const dx = p.x - q.x, dz = p.z - q.z;
-        if (dx * dx + dz * dz > 75 * 75) return;          // out of range, impossible shot
-
-        const head = msg.head === true;                   // a ball to the head fells outright
-        const dealt = head ? q.hp : Math.min(BODY_DMG, q.hp);
-        q.hp -= dealt;
-        q.lastDamaged = now;                              // holds off the bar's regen
-        // tally the wound against the shooter for this life's death summary
-        const rec = q.dmgFrom.get(id) || { name: p.name, dmg: 0 };
-        rec.name = p.name; rec.dmg += dealt;              // keep the latest name on file
-        q.dmgFrom.set(id, rec);
-
-        if (q.hp > 0) {
-          broadcast({ t: 'hitfx', shooter: id, target: msg.target | 0, hp: q.hp });
-        } else {
-          p.score += 1;
-          // who chipped them down, this life — best first, for the killscreen
-          const dmg = [...q.dmgFrom.entries()]
-            .map(([aid, r]) => ({ id: aid, name: r.name, dmg: r.dmg }))
-            .sort((a, b) => b.dmg - a.dmg);
-          q.hp = MAX_HP;
-          q.lastFell = now;
-          q.dmgFrom.clear();                              // next life starts unwounded
-          broadcast({ t: 'fell', shooter: id, sname: p.name, target: msg.target | 0,
-            tname: q.name, score: p.score, head, dmg });
-          console.log(`⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''} (${p.score})`);
-          if (p.score >= KILL_CAP) endRound(id);          // first to the cap wins the round
-        }
+        resolveHit(id, msg.target | 0, msg.head === true);
       }
     });
     ws.on('pong', () => { p.alive = true; });
@@ -253,6 +325,7 @@ function attachGame(httpServer) {
 
   const pingTimer = setInterval(() => { // drop dead connections
     for (const [, p] of players) {
+      if (p.bot) continue;                 // dummies have no socket to keep alive
       if (!p.alive) { p.ws.terminate(); continue; }
       p.alive = false;
       try { p.ws.ping(); } catch { /* closing */ }
@@ -273,10 +346,46 @@ function attachGame(httpServer) {
     }
   }, REGEN_TICK_MS);
 
+  // Dev dummies return fire so a lone developer can test taking damage and dying.
+  // No colliders server-side, so targeting is range-gated, not true line-of-sight —
+  // acceptable for a dev harness. Only armed when bots were actually requested.
+  let botFireTimer = null;
+  if (opts.bots > 0) {
+    spawnBots(opts.bots);
+    botFireTimer = setInterval(() => {
+      if (phase !== 'play') return;
+      const now = Date.now();
+      for (const [bid, b] of players) {
+        if (!b.bot || now < b.nextShot) continue;
+        // nearest human in range, skipping the freshly felled
+        let targetId = null, target = null, best = BOT_RANGE * BOT_RANGE;
+        for (const [qid, q] of players) {
+          if (q.bot || q === b) continue;
+          if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) continue;
+          const dx = b.x - q.x, dz = b.z - q.z, d2 = dx * dx + dz * dz;
+          if (d2 < best) { best = d2; target = q; targetId = qid; }
+        }
+        if (!target) continue;
+        // aim in place (no walking) and let a ball fly
+        let dx = target.x - b.x, dy = target.y - b.y, dz = target.z - b.z;
+        const len = Math.hypot(dx, dy, dz) || 1;
+        dx /= len; dy /= len; dz /= len;
+        b.yaw = Math.atan2(-(target.x - b.x), -(target.z - b.z));   // face the target
+        broadcast({ t: 'shoot', id: bid,
+          o: [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2)],
+          d: [+dx.toFixed(3), +dy.toFixed(3), +dz.toFixed(3)],
+          l: +Math.min(len, 120).toFixed(1) });
+        resolveHit(bid, targetId, Math.random() < BOT_HEADSHOT);
+        b.nextShot = now + BOT_FIRE_CD + Math.random() * BOT_FIRE_JITTER;  // stagger the next volley
+      }
+    }, 600);
+  }
+
   // Don't keep a Vite dev process alive on these timers.
   snapTimer.unref?.();
   pingTimer.unref?.();
   regenTimer.unref?.();
+  botFireTimer?.unref?.();
 
   return wss;
 }

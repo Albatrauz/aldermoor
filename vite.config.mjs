@@ -15,7 +15,8 @@ function gameServer() {
     name: 'aldermoor-game-server',
     configureServer(server) {
       const { attachGame } = require('./server.js');
-      if (server.httpServer) attachGame(server.httpServer);
+      // Dev only: stand up practice dummies to test combat solo. DEV_BOTS=0 disables.
+      if (server.httpServer) attachGame(server.httpServer, { bots: Number(process.env.DEV_BOTS ?? 6) });
     },
   };
 }
