@@ -8,6 +8,14 @@ import { matIron, matPlank, matDarkWood } from './materials.js';
 
 export const remotes=new Map();
 
+// How long a felled traveller lies dead before rising at a fresh spawn. Kept in
+// step with combat.js DEATH_T and the server's RESPAWN_MS so the body is back on
+// its feet just as the respawned player's new position starts arriving.
+const DEAD_T=4;
+const FALL_T=.45;   // the topple itself is quick; the rest is lying still
+const TAG_Y=2.22;   // height of the floating nametag above a traveller's feet
+const _tagWorld=new THREE.Vector3();   // scratch for re-anchoring a dead body's tag
+
 const skinMats=[0xc99a72,0xb98a62,0xa87a55,0xd4a87e]
   .map(c=>new THREE.MeshStandardMaterial({color:c, roughness:.8}));
 
@@ -25,7 +33,7 @@ function makeNameTag(text){
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t, transparent:true, depthWrite:false}));
   s.scale.set(2.2,.41,1);
-  s.position.y=2.22;
+  s.position.y=TAG_Y;
   return s;
 }
 
@@ -81,7 +89,7 @@ export function addRemote(d){
   const v=buildVillager(d.name, d.color??0x7a3b2e);
   v.cur={x:d.x??0, y:(d.y??EYE)-EYE, z:d.z??38.5, yaw:d.yaw??0};
   v.tgt={...v.cur, m:0, r:0};
-  v.phase=0; v.name=d.name; v.shootT=0;
+  v.phase=0; v.name=d.name; v.shootT=0; v.deadT=0;
   v.group.position.set(v.cur.x, v.cur.y, v.cur.z);
   v.group.rotation.y=v.cur.yaw+Math.PI;
   scene.add(v.group);
@@ -90,6 +98,16 @@ export function addRemote(d){
 export function dropRemote(id){
   const v=remotes.get(id);
   if(v){ scene.remove(v.group); remotes.delete(id); }
+}
+/* fell a traveller: topple them to the ground so onlookers see the kill. They
+   lie there for DEAD_T, then rise at whatever spawn the snapshots have moved
+   them to. Re-felling a body just refreshes the count (the server won't hand
+   out a phantom kill, but a stray late `fell` shouldn't reset a near-done one). */
+export function killRemote(id){
+  const v=remotes.get(id);
+  if(!v) return;
+  v.deadT=DEAD_T;
+  v.shootT=0;                 // drop any half-raised handgonne pose
 }
 /* swap the floating nametag when a traveller takes a new name */
 export function renameRemote(id, name){
@@ -107,6 +125,38 @@ export function updateRemotes(dt){
   const k=1-Math.exp(-10*dt);
   const ease=Math.min(1,dt*12);
   for(const v of remotes.values()){
+    if(v.deadT>0){
+      v.deadT-=dt;
+      if(v.deadT<=0){
+        // back on their feet — cut straight to wherever the snapshots have moved
+        // them (their fresh spawn), so they don't slide across town as they rise
+        v.deadT=0; v.phase=0;
+        v.cur.x=v.tgt.x; v.cur.y=v.tgt.y; v.cur.z=v.tgt.z; v.cur.yaw=v.tgt.yaw;
+        v.group.rotation.x=0;
+        v.group.position.set(v.cur.x, v.cur.y, v.cur.z);
+        v.group.rotation.y=v.cur.yaw+Math.PI;
+        v.tag.position.set(0, TAG_Y, 0);             // tag rides the head again
+      }else{
+        // topple onto the ground over FALL_T, then lie still. Stay put where we
+        // fell (ignore inbound snapshots) and let the limbs go slack.
+        const f=Math.min(1,(DEAD_T-v.deadT)/FALL_T);
+        const e=f*f*(3-2*f);                          // smoothstep the fall
+        v.group.rotation.x=e*(Math.PI/2);
+        v.group.rotation.y=v.cur.yaw+Math.PI;
+        v.group.position.set(v.cur.x, v.cur.y+e*.35, v.cur.z); // rest on its side
+        // keep the nametag hovering upright over the spot they fell, not toppled
+        // to the ground with the body — counter the group's tilt/lift via its matrix
+        v.group.updateMatrixWorld();
+        _tagWorld.set(v.cur.x, v.cur.y+TAG_Y, v.cur.z);
+        v.tag.position.copy(v.group.worldToLocal(_tagWorld));
+        const slack=Math.min(1,dt*10);
+        v.legL.rotation.x+=(0 -v.legL.rotation.x)*slack;
+        v.legR.rotation.x+=(0 -v.legR.rotation.x)*slack;
+        v.armL.rotation.x+=(.2-v.armL.rotation.x)*slack;
+        v.armR.rotation.x+=(.2-v.armR.rotation.x)*slack;
+      }
+      continue;
+    }
     v.cur.x+=(v.tgt.x-v.cur.x)*k;
     v.cur.y+=(v.tgt.y-v.cur.y)*k;
     v.cur.z+=(v.tgt.z-v.cur.z)*k;

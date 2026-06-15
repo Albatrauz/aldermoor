@@ -48,7 +48,11 @@ window.__town={
   get pos(){ return [controls.player.x, controls.player.z]; },
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly
+  kill(id){ villagers.killRemote(id); },                 // topple a fellow traveller (death-anim check)
 
   get me(){ return {id:net.myId, name:net.myName, connected:!!net.net}; },
-  get remotes(){ return [...villagers.remotes.entries()].map(([id,v])=>({id, name:v.name, x:+v.cur.x.toFixed(2), y:+v.cur.y.toFixed(2), z:+v.cur.z.toFixed(2)})); },
+  get remotes(){ return [...villagers.remotes.entries()].map(([id,v])=>({id, name:v.name,
+    x:+v.cur.x.toFixed(2), y:+v.cur.y.toFixed(2), z:+v.cur.z.toFixed(2),
+    deadT:+(v.deadT||0).toFixed(2), rotX:+v.group.rotation.x.toFixed(2),
+    tagWorld:v.tag.matrixWorld.elements.slice(12,15).map(n=>+n.toFixed(2))})); },
 };

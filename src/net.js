@@ -109,6 +109,11 @@ function connect(){
         const v=remotes.get(+id); if(!v) continue;
         const s=m.p[id];
         v.tgt.x=s[0]; v.tgt.y=s[1]-EYE; v.tgt.z=s[2]; v.tgt.yaw=s[3]; v.tgt.m=s[4]; v.tgt.r=s[5];
+        // a leap this far is a respawn/teleport, not a stride — cut to it rather
+        // than glide across town (the dead lie frozen; they cut to it as they rise)
+        if(!v.deadT && Math.hypot(v.tgt.x-v.cur.x, v.tgt.z-v.cur.z)>WARP_DIST){
+          v.cur.x=v.tgt.x; v.cur.y=v.tgt.y; v.cur.z=v.tgt.z; v.cur.yaw=v.tgt.yaw;
+        }
       }
     }
   };
