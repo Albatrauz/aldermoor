@@ -519,115 +519,8 @@ canvas#scene {
     opacity: 1;
 }
 
-#intro {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-    display: grid;
-    place-items: center;
-    background: radial-gradient(
-        ellipse at center,
-        rgba(18, 13, 8, 0.72) 0%,
-        rgba(6, 4, 3, 0.93) 100%
-    );
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    transition: opacity 0.7s ease;
-    opacity: 1;
-}
-#intro.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-.intro-inner {
-    text-align: center;
-    padding: 0 24px;
-    animation: rise 1.1s ease both;
-}
-@keyframes rise {
-    from {
-        opacity: 0;
-        transform: translateY(18px);
-    }
-    to {
-        opacity: 1;
-        transform: none;
-    }
-}
-.over-title {
-    font-family: 'IM Fell English', serif;
-    font-size: 13px;
-    letter-spacing: 0.45em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 18px;
-}
-#intro h1 {
-    font-family: 'UnifrakturMaguntia', serif;
-    font-weight: 400;
-    font-size: clamp(64px, 11vw, 118px);
-    line-height: 1;
-    color: var(--gold);
-    text-shadow:
-        0 0 50px rgba(216, 169, 72, 0.35),
-        0 4px 14px rgba(0, 0, 0, 0.9);
-}
-.rule {
-    margin: 22px 0;
-    color: var(--gold-dim);
-    letter-spacing: 1.1em;
-    text-indent: 1.1em;
-    font-size: 14px;
-}
-.sub {
-    font-family: 'IM Fell English', serif;
-    font-style: italic;
-    font-size: 17px;
-    line-height: 1.75;
-    color: #cdbb92;
-    max-width: 46ch;
-    margin: 0 auto;
-}
-#enter {
-    margin-top: 36px;
-    background: transparent;
-    border: 1px solid var(--gold);
-    color: var(--parchment);
-    font-family: 'IM Fell English', serif;
-    font-size: 17px;
-    letter-spacing: 0.24em;
-    text-indent: 0.24em;
-    text-transform: uppercase;
-    padding: 15px 46px;
-    cursor: pointer;
-    transition: all 0.25s ease;
-}
-#enter:hover {
-    background: var(--gold);
-    color: var(--ink);
-    box-shadow: 0 0 34px rgba(216, 169, 72, 0.35);
-}
-.controls {
-    margin-top: 40px;
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 10px 26px;
-    font-family: 'IM Fell English', serif;
-    font-size: 13px;
-    color: #8d7b58;
-}
-kbd {
-    display: inline-block;
-    border: 1px solid #5c4d33;
-    border-radius: 3px;
-    padding: 1px 7px;
-    margin-right: 5px;
-    background: rgba(216, 169, 72, 0.07);
-    font-family: inherit;
-    font-size: 12px;
-    color: #c5b288;
-}
+/* (legacy single-column intro styles removed — the two-pane start screen
+   below is the live block; this older copy used fonts that were never loaded) */
 
 /* end-of-round overview — final tally + countdown to the next contest */
 #overview {
@@ -766,12 +659,15 @@ kbd {
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 
+/* ============================ start screen (two-pane) ============================ */
+/* Left rail = identity + sign-in; right pane = dossier + champions board. It's a
+   translucent overlay, so the blurred town still shows faintly behind it. */
 #intro {
     position: fixed;
     inset: 0;
     z-index: 10;
-    display: grid;
-    place-items: center;
+    display: flex;
+    overflow: hidden;
     background: radial-gradient(
         ellipse at center,
         rgba(18, 13, 8, 0.72) 0%,
@@ -786,11 +682,23 @@ kbd {
     opacity: 0;
     pointer-events: none;
 }
-.intro-inner {
-    text-align: center;
-    padding: 0 24px;
-    animation: rise 1.1s ease both;
+
+/* slim gilded scrollbars for the two panes */
+.fs-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(216, 169, 72, 0.22) transparent;
 }
+.fs-scroll::-webkit-scrollbar {
+    width: 9px;
+}
+.fs-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.fs-scroll::-webkit-scrollbar-thumb {
+    background: rgba(216, 169, 72, 0.22);
+    border-radius: 5px;
+}
+
 @keyframes rise {
     from {
         opacity: 0;
@@ -801,52 +709,93 @@ kbd {
         transform: none;
     }
 }
+@keyframes fsGlow {
+    0%,
+    100% {
+        text-shadow:
+            0 0 40px rgba(216, 169, 72, 0.26),
+            0 2px 0 rgba(0, 0, 0, 0.55);
+    }
+    50% {
+        text-shadow:
+            0 0 64px rgba(216, 169, 72, 0.44),
+            0 2px 0 rgba(0, 0, 0, 0.55);
+    }
+}
+
+/* ---- left rail: identity ---- */
+.fs-aside {
+    flex: 0 0 32%;
+    max-width: 560px;
+    min-width: 340px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 32px;
+    padding: clamp(28px, 4vh, 54px) clamp(26px, 3vw, 50px);
+    overflow-y: auto;
+    background: linear-gradient(
+        178deg,
+        rgba(17, 13, 7, 0.72) 0%,
+        rgba(8, 5, 2, 0.66) 100%
+    );
+    border-right: 1px solid rgba(216, 169, 72, 0.16);
+    box-shadow: 26px 0 70px rgba(0, 0, 0, 0.45);
+    animation: rise 1.1s ease both;
+}
 .over-title {
     font-family: 'Lora', serif;
-    font-size: 13px;
-    letter-spacing: 0.45em;
+    font-size: 12px;
+    letter-spacing: 0.34em;
     text-transform: uppercase;
     color: var(--gold-dim);
-    margin-bottom: 18px;
+    margin-bottom: 22px;
 }
 #intro h1 {
     font-family: 'Sekuya', serif;
     font-weight: 400;
-    font-size: clamp(64px, 11vw, 118px);
-    line-height: 1;
+    font-size: clamp(46px, 4vw, 78px);
+    line-height: 0.92;
+    letter-spacing: 0.01em;
     color: var(--gold);
     text-shadow:
-        0 0 50px rgba(216, 169, 72, 0.35),
-        0 4px 14px rgba(0, 0, 0, 0.9);
+        0 0 40px rgba(216, 169, 72, 0.26),
+        0 2px 0 rgba(0, 0, 0, 0.55);
+    animation: fsGlow 6s ease-in-out infinite;
 }
 .rule {
     margin: 22px 0;
     color: var(--gold-dim);
     letter-spacing: 1.1em;
     text-indent: 1.1em;
-    font-size: 14px;
+    font-size: 13px;
 }
 .sub {
     font-family: 'Lora', serif;
+    font-style: italic;
     font-size: 16px;
-    line-height: 1.5;
+    line-height: 1.6;
     color: #cdbb92;
-    max-width: 46ch;
-    margin: 0 auto;
+    max-width: 36ch;
+}
+
+/* ---- left rail foot: account + guest entry ---- */
+.fs-aside-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 #nameInput {
     display: block;
-    margin: 34px auto 0;
-    width: min(320px, 80vw);
+    width: 100%;
     background: rgba(216, 169, 72, 0.06);
-    border: 1px solid rgba(216, 169, 72, 0.45);
+    border: 1px solid rgba(216, 169, 72, 0.3);
     color: var(--parchment);
-    text-align: center;
     font-family: 'Lora', serif;
     font-style: italic;
     font-size: 17px;
-    letter-spacing: 0.08em;
-    padding: 12px 18px;
+    letter-spacing: 0.04em;
+    padding: 12px 14px;
     outline: none;
     transition: all 0.25s ease;
 }
@@ -856,35 +805,34 @@ kbd {
 #nameInput:focus {
     border-color: var(--gold);
     background: rgba(216, 169, 72, 0.12);
-    box-shadow: 0 0 24px rgba(216, 169, 72, 0.2);
+    box-shadow: 0 0 24px rgba(216, 169, 72, 0.18);
 }
 #enter {
-    margin-top: 18px;
+    width: 100%;
     background: transparent;
     border: 1px solid var(--gold);
-    color: var(--parchment);
+    color: var(--gold);
     font-family: 'Sekuya', serif;
-    font-size: 17px;
-    letter-spacing: 0.18em;
-    text-indent: 0.24em;
+    font-size: 15px;
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
     text-transform: uppercase;
-    padding: 15px 46px;
+    padding: 15px;
     cursor: pointer;
     transition: all 0.25s ease;
 }
 #enter:hover {
     background: var(--gold);
     color: var(--ink);
-    box-shadow: 0 0 34px rgba(216, 169, 72, 0.35);
+    box-shadow: 0 0 34px rgba(216, 169, 72, 0.3);
 }
 .controls {
-    margin-top: 40px;
+    margin-top: 6px;
     display: flex;
-    justify-content: center;
     flex-wrap: wrap;
-    gap: 10px 26px;
+    gap: 8px 18px;
     font-family: 'Lora', serif;
-    font-size: 13px;
+    font-size: 12px;
     color: #8d7b58;
 }
 kbd {
@@ -899,10 +847,38 @@ kbd {
     color: #c5b288;
 }
 
-/* ---- account panel: sign up / sign in, or play as a guest ---- */
+/* ---- right pane ---- */
+.fs-main {
+    flex: 1;
+    position: relative;
+    overflow-y: auto;
+    padding: clamp(28px, 4vh, 52px) clamp(28px, 4vw, 60px) 64px;
+    /* gold glow over a mostly-opaque base so the blurred town stays a faint
+       texture behind the dossier rather than competing with it */
+    background:
+        radial-gradient(
+            150% 85% at 50% 56%,
+            rgba(216, 169, 72, 0.12),
+            transparent 58%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(20, 15, 9, 0.82) 0%,
+            rgba(13, 10, 6, 0.9) 100%
+        );
+    animation: rise 1.3s ease both;
+}
+.fs-main > section {
+    max-width: 1080px;
+    margin-inline: auto;
+}
+.fs-board-sec {
+    margin-top: 46px;
+}
+
+/* ---- account panel: sign up / sign in, seated in the left rail ---- */
 #authPanel {
-    margin: 30px auto 0;
-    width: min(340px, 84vw);
+    width: 100%;
 }
 #authPanel[data-auth='off'] {
     display: none;
@@ -910,6 +886,14 @@ kbd {
 #authPanel[data-auth='out'] #authMe,
 #authPanel[data-auth='in'] #authForm {
     display: none;
+}
+.auth-eyebrow {
+    font-family: 'Lora', serif;
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 12px;
 }
 .auth-fields {
     display: flex;
@@ -921,14 +905,13 @@ kbd {
     display: block;
     width: 100%;
     background: rgba(216, 169, 72, 0.06);
-    border: 1px solid rgba(216, 169, 72, 0.45);
+    border: 1px solid rgba(216, 169, 72, 0.3);
     color: var(--parchment);
-    text-align: center;
     font-family: 'Lora', serif;
     font-style: italic;
-    font-size: 16px;
-    letter-spacing: 0.06em;
-    padding: 11px 16px;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    padding: 11px 14px;
     outline: none;
     transition: all 0.25s ease;
 }
@@ -940,34 +923,34 @@ kbd {
 #authPass:focus {
     border-color: var(--gold);
     background: rgba(216, 169, 72, 0.12);
-    box-shadow: 0 0 24px rgba(216, 169, 72, 0.2);
+    box-shadow: 0 0 24px rgba(216, 169, 72, 0.18);
 }
 #authSubmit {
     margin-top: 14px;
     width: 100%;
     background: transparent;
-    border: 1px solid var(--gold);
+    border: 1px solid rgba(216, 169, 72, 0.6);
     color: var(--parchment);
     font-family: 'Sekuya', serif;
-    font-size: 15px;
+    font-size: 14px;
     letter-spacing: 0.18em;
     text-indent: 0.18em;
     text-transform: uppercase;
-    padding: 12px 20px;
+    padding: 12px;
     cursor: pointer;
     transition: all 0.25s ease;
 }
 #authSubmit:hover:not(:disabled) {
     background: var(--gold);
     color: var(--ink);
-    box-shadow: 0 0 28px rgba(216, 169, 72, 0.3);
+    box-shadow: 0 0 28px rgba(216, 169, 72, 0.28);
 }
 #authSubmit:disabled {
     opacity: 0.5;
     cursor: default;
 }
 .auth-link {
-    display: inline-block;
+    align-self: flex-start;
     margin-top: 12px;
     background: none;
     border: none;
@@ -987,7 +970,7 @@ kbd {
 }
 .auth-error {
     min-height: 1.2em;
-    margin-top: 12px;
+    margin-top: 10px;
     font-family: 'Lora', serif;
     font-style: italic;
     font-size: 13px;
@@ -996,90 +979,187 @@ kbd {
 .auth-error:empty {
     min-height: 0;
 }
+.auth-me {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
 .auth-me-label {
-    display: block;
     font-family: 'Lora', serif;
-    font-size: 12px;
-    letter-spacing: 0.22em;
+    font-size: 11px;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
     color: var(--gold-dim);
 }
 .auth-me-name {
-    display: block;
-    margin-top: 6px;
+    margin-top: 8px;
     font-family: 'Sekuya', serif;
-    font-size: clamp(28px, 4vw, 40px);
-    line-height: 1;
+    font-size: clamp(28px, 3.4vw, 40px);
+    line-height: 1.04;
     color: var(--gold);
-    text-shadow: 0 0 30px rgba(216, 169, 72, 0.3);
+    text-shadow: 0 0 30px rgba(216, 169, 72, 0.28);
+}
+.auth-me-note {
+    margin-top: 6px;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: #8d7b58;
+}
+.auth-me .auth-link {
+    margin-top: 18px;
+    padding: 11px 20px;
+    border: 1px solid rgba(216, 169, 72, 0.28);
+    color: #b6a884;
+    font-style: normal;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-decoration: none;
+}
+.auth-me .auth-link:hover {
+    border-color: var(--gold);
+    color: var(--gold);
 }
 
-/* career line: K · D · K/D · wins · matches, shown when signed in */
-.career {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 8px 18px;
-    margin: 16px auto 4px;
-}
-.career:empty {
+/* ---- field dossier (right pane, shown when signed in) ---- */
+#intro:not(.signed-in) .fs-dossier {
     display: none;
 }
-.career .stat {
+#intro.signed-in .fs-sealed {
+    display: none;
+}
+.fs-doss-head {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 54px;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-bottom: 1px solid rgba(216, 169, 72, 0.16);
+    padding-bottom: 18px;
 }
-.career .stat b {
+.fs-doss-eyebrow {
     font-family: 'Lora', serif;
-    font-size: 19px;
-    font-weight: 600;
-    color: var(--parchment);
-    font-variant-numeric: tabular-nums;
-}
-.career .stat span {
-    font-family: 'Lora', serif;
-    font-size: 10px;
-    letter-spacing: 0.16em;
+    font-size: 11px;
+    letter-spacing: 0.34em;
     text-transform: uppercase;
     color: var(--gold-dim);
 }
-/* per-weapon kills/headshots, wrapped to its own row beneath the stat tiles */
-.career-arms {
-    flex-basis: 100%;
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 6px 22px;
+.fs-doss-name {
+    font-family: 'Sekuya', serif;
+    font-size: clamp(30px, 4vw, 46px);
+    line-height: 1;
+    color: var(--gold);
     margin-top: 8px;
+    text-shadow: 0 0 32px rgba(216, 169, 72, 0.22);
 }
-.career-arms .arm {
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
+.fs-doss-standing {
     font-family: 'Lora', serif;
-    font-size: 13px;
-}
-.career-arms .arm-name {
-    color: var(--gold-dim);
     font-style: italic;
+    font-size: 15px;
+    color: #b6a884;
 }
-.career-arms .arm b {
+.fs-statgrid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    margin-top: 28px;
+}
+.fs-stat {
+    padding: 4px 18px;
+}
+.fs-stat + .fs-stat {
+    border-left: 1px solid rgba(233, 216, 176, 0.08);
+}
+.fs-stat b {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: clamp(28px, 3vw, 40px);
+    line-height: 1;
+    color: var(--parchment);
+    font-variant-numeric: tabular-nums;
+}
+.fs-stat.gold b {
+    color: var(--gold);
+}
+.fs-stat span {
+    display: block;
+    margin-top: 9px;
+    font-family: 'Lora', serif;
+    font-size: 10px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+}
+.fs-arms {
+    margin-top: 30px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+.fs-arms-label {
+    font-family: 'Lora', serif;
+    font-size: 10.5px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+}
+.fs-arms-list {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+.fs-arm {
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: #b6a884;
+}
+.fs-arm b {
+    margin: 0 2px 0 6px;
+    font-style: normal;
+    font-weight: 600;
     color: var(--gold);
     font-variant-numeric: tabular-nums;
 }
-.career-arms .arm-hs {
-    font-size: 11px;
-    color: var(--gold-dim);
+.fs-arm .hs {
+    margin-left: 4px;
+    font-size: 12px;
+    font-style: normal;
+    color: #8d7b58;
+}
+
+/* ---- sealed dossier (right pane, shown when not signed in) ---- */
+.fs-sealed {
+    border: 1px solid rgba(216, 169, 72, 0.16);
+    padding: clamp(36px, 6vw, 56px);
+    text-align: center;
+    background: rgba(8, 6, 4, 0.4);
+}
+.fs-sealed-orn {
+    color: rgba(216, 169, 72, 0.5);
+    font-size: 22px;
+    letter-spacing: 0.4em;
+}
+.fs-sealed-title {
+    font-family: 'Sekuya', serif;
+    font-size: 26px;
+    color: #cdbb92;
+    margin-top: 14px;
+}
+.fs-sealed-sub {
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: #8d7b58;
+    margin-top: 8px;
 }
 
 .auth-or {
-    margin: 28px auto 0;
     font-family: 'Lora', serif;
     font-style: italic;
     font-size: 12px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     color: #8d7b58;
 }
 #intro.signed-in .auth-or,
@@ -1088,58 +1168,152 @@ kbd {
     display: none;
 }
 
-/* ---- intro leaderboard: top players by lifetime kills ---- */
+/* no accounts (Convex unconfigured): collapse to a single centred rail */
+#intro.no-accounts .fs-main {
+    display: none;
+}
+#intro.no-accounts .fs-aside {
+    flex: 1;
+    max-width: 560px;
+    margin: 0 auto;
+    justify-content: center;
+    border-right: none;
+    box-shadow: none;
+}
+
+/* (responsive overrides live at the very end of the file so they fall after
+   the base .lb-row / .fs-board-cols rules and win the cascade) */
+
+/* ---- champions board (right pane): rank · name · kills · K/D · wins · heads ---- */
 #leaderboard {
-    margin: 36px auto 0;
-    width: min(380px, 86vw);
+    width: 100%;
     text-align: left;
-    background: rgba(10, 7, 4, 0.5);
-    border: 1px solid rgba(216, 169, 72, 0.25);
-    padding: 12px 18px 14px;
 }
 #leaderboard:not(.show) {
     display: none;
 }
-#leaderboard .sc-title {
-    margin-bottom: 10px;
+.fs-board-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid rgba(216, 169, 72, 0.16);
+    padding-bottom: 14px;
+}
+.fs-board-head .sc-title {
+    margin: 0;
+    text-align: left;
+    color: var(--gold);
+}
+.fs-board-count {
+    font-family: 'Lora', serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #8d7b58;
+}
+.fs-board-cols {
+    display: grid;
+    grid-template-columns: 56px 1fr 90px 90px 80px 90px;
+    padding: 16px 14px 8px;
+    font-family: 'Lora', serif;
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+}
+.fs-board-cols .r {
+    text-align: right;
 }
 .lb-row {
     display: grid;
-    grid-template-columns: 1.6em 1fr auto;
-    align-items: baseline;
-    gap: 12px;
+    grid-template-columns: 56px 1fr 90px 90px 80px 90px;
+    align-items: center;
+    padding: 13px 14px;
+    border-top: 1px solid rgba(233, 216, 176, 0.07);
     font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 15px;
-    line-height: 1.8;
-    color: var(--parchment);
-    opacity: 0.85;
 }
 .lb-row.me {
-    color: var(--gold);
-    opacity: 1;
+    background: rgba(216, 169, 72, 0.1);
 }
-.lb-row .lb-rank {
-    font-style: normal;
-    font-size: 13px;
-    color: var(--gold-dim);
-    text-align: center;
+.lb-rank {
+    font-family: 'Sekuya', serif;
+    font-size: 15px;
+    color: rgba(216, 169, 72, 0.7);
 }
-.lb-row .lb-name {
+.lb-name {
+    font-style: italic;
+    font-size: 17px;
+    color: #d8ccb0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding-right: 8px;
 }
-.lb-row .lb-kills {
-    color: var(--gold-dim);
+.lb-row.me .lb-name {
+    color: var(--gold);
+    font-weight: 600;
+}
+.lb-kills {
+    text-align: right;
+    font-weight: 600;
+    font-size: 19px;
+    color: var(--gold);
     font-variant-numeric: tabular-nums;
 }
-.lb-row.me .lb-kills {
-    color: var(--gold);
+.lb-kd,
+.lb-wins,
+.lb-heads {
+    text-align: right;
+    font-size: 15px;
+    color: #c8bc9e;
+    font-variant-numeric: tabular-nums;
 }
 .lb-empty {
     font-family: 'Lora', serif;
     font-style: italic;
     font-size: 14px;
     color: #8d7b58;
+    padding: 18px 14px;
+}
+
+/* ============================ start-screen responsive ============================ */
+/* Placed last so these grid-template overrides fall after the base .lb-row /
+   .fs-board-cols rules above and actually win the cascade. */
+@media (max-width: 860px) {
+    #intro {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+    .fs-aside {
+        flex: none;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        border-right: none;
+        border-bottom: 1px solid rgba(216, 169, 72, 0.16);
+        box-shadow: 0 26px 70px rgba(0, 0, 0, 0.45);
+    }
+    .fs-main {
+        flex: none;
+    }
+    .fs-statgrid {
+        grid-template-columns: repeat(3, 1fr);
+        row-gap: 14px;
+    }
+    .fs-statgrid .fs-stat:nth-child(3n + 1) {
+        border-left: none;
+    }
+}
+@media (max-width: 540px) {
+    .fs-board-cols,
+    .lb-row {
+        grid-template-columns: 40px 1fr 64px 60px;
+    }
+    .fs-board-cols > :nth-child(5),
+    .fs-board-cols > :nth-child(6),
+    .lb-row > :nth-child(5),
+    .lb-row > :nth-child(6) {
+        display: none;
+    }
 }
