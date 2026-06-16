@@ -18,7 +18,10 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-const PBKDF2_ITERATIONS = 100_000;
+// OWASP-recommended floor for PBKDF2-HMAC-SHA256. NOTE: this count is baked into
+// every stored hash — changing it later won't verify existing passwords, so a
+// bump after accounts exist needs a migration (or rehash-on-successful-login).
+const PBKDF2_ITERATIONS = 600_000;
 
 /* ---- crypto helpers (Web Crypto, available in the default action runtime) ---- */
 function toHex(buf) {

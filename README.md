@@ -35,7 +35,9 @@ exactly as before — anonymous, guest-only, no stats.
 The live game still runs over the WebSocket relay in `server.js`; Convex is only
 touched to verify a player's session token on join and to flush match results at
 round end. Stats are written **server-authoritatively** (guarded by a shared
-secret), so a client can't forge them.
+secret), so a client can't forge them. Two daily Convex crons keep things tidy:
+pruning expired sessions and match history older than 90 days (see
+`convex/crons.js` / `convex/maintenance.js`).
 
 ### First-time setup
 

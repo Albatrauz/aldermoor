@@ -26,7 +26,9 @@ export default defineSchema({
     userId: v.id("users"),
     createdAt: v.number(),
     expiresAt: v.number(),
-  }).index("by_token", ["token"]),
+  })
+    .index("by_token", ["token"])
+    .index("by_expiresAt", ["expiresAt"]), // lets the cleanup cron find expired sessions cheaply
 
   // Lifetime aggregates, written server-authoritatively by server.js. K/D and
   // headshot % are derived on read, never stored, so they can't drift.
@@ -40,9 +42,11 @@ export default defineSchema({
     matchesPlayed: v.number(),
     bestRoundKills: v.number(),
     // per-weapon lifetime tallies, indexed by weapon id (0=handgonne, 1=ak47).
-    // Arrays grow as weapons are added — no schema change needed.
-    weaponKills: v.array(v.number()),
-    weaponHeadshots: v.array(v.number()),
+    // Arrays grow as weapons are added — no schema change needed. Optional so a
+    // schema push never fails against rows created before these fields existed;
+    // reads default to [] (see myStats / addArr).
+    weaponKills: v.optional(v.array(v.number())),
+    weaponHeadshots: v.optional(v.array(v.number())),
     lastSeen: v.number(),
   })
     .index("by_userId", ["userId"])
@@ -57,8 +61,8 @@ export default defineSchema({
     roundKills: v.number(),
     roundDeaths: v.number(),
     headshots: v.number(),
-    weaponKills: v.array(v.number()),
-    weaponHeadshots: v.array(v.number()),
+    weaponKills: v.optional(v.array(v.number())),
+    weaponHeadshots: v.optional(v.array(v.number())),
     won: v.boolean(),
     finishedAt: v.number(),
   })
