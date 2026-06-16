@@ -11,6 +11,7 @@ import * as combat from './combat.js';
 import * as villagers from './villagers.js';
 import { updateFx } from './effects.js';
 import * as net from './net.js';
+import './stats.js';            // reactive leaderboard + career (no-op without Convex)
 
 const clock=new THREE.Clock();
 let time=0;
