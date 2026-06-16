@@ -3,11 +3,11 @@
 // the local player and routes inbound messages to the villager, hud, zone and
 // combat layers. `net`/`myId`/`myName` are exported as live bindings.
 import { EYE } from './core.js';
-import { addRemote, dropRemote, renameRemote, remotes } from './villagers.js';
+import { addRemote, dropRemote, renameRemote, remotes, setRemoteWeapon } from './villagers.js';
 import { scoresMap, setHp, renderScores, MAX_HP } from './hud.js';
 import { announce } from './zones.js';
 
-import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath } from './combat.js';
+import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath, weaponIdx } from './combat.js';
 
 import { player, vel, keys } from './controls.js';
 
@@ -109,6 +109,7 @@ function connect(){
         const v=remotes.get(+id); if(!v) continue;
         const s=m.p[id];
         v.tgt.x=s[0]; v.tgt.y=s[1]-EYE; v.tgt.z=s[2]; v.tgt.yaw=s[3]; v.tgt.m=s[4]; v.tgt.r=s[5];
+        if(s[6]!==undefined) setRemoteWeapon(v, s[6]);
         // a leap this far is a respawn/teleport, not a stride — cut to it rather
         // than glide across town (the dead lie frozen; they cut to it as they rise)
         if(!v.deadT && Math.hypot(v.tgt.x-v.cur.x, v.tgt.z-v.cur.z)>WARP_DIST){
@@ -134,6 +135,7 @@ setInterval(()=>{
       x:+player.x.toFixed(2), y:+player.y.toFixed(2), z:+player.z.toFixed(2),
       yaw:+player.yaw.toFixed(3),
       m:Math.hypot(vel.x,vel.z)>.4?1:0,
-      r:(keys.has('ShiftLeft')||keys.has('ShiftRight'))?1:0}));
+      r:(keys.has('ShiftLeft')||keys.has('ShiftRight'))?1:0,
+      w:weaponIdx}));
   }
 }, 80);

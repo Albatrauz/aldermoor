@@ -4,7 +4,8 @@
 // latest network snapshot.
 import * as THREE from 'three';
 import { scene, mesh, EYE } from './core.js';
-import { matIron, matPlank, matDarkWood } from './materials.js';
+import { matIron, matDarkWood } from './materials.js';
+import { buildHandgonneTP, buildAK47TP } from './weapons.js';
 
 export const remotes=new Map();
 
@@ -72,16 +73,13 @@ function buildVillager(name, color){
     var hasLamp=true;
   }
   armR.add(lant);
-  // handgonne in the left hand
-  const gonne=new THREE.Group();
-  gonne.position.set(0,-.52,.1);
-  gonne.add(mesh(new THREE.BoxGeometry(.05,.06,.3), matPlank, 0,0,.08, {cast:false}));
-  gonne.add(mesh(new THREE.CylinderGeometry(.022,.027,.42,7), matIron, 0,.02,.28, {rx:Math.PI/2, cast:false}));
-  const muzzle=new THREE.Object3D();
-  muzzle.position.set(0,.02,.5);
-  gonne.add(muzzle);
-  armL.add(gonne);
-  return {group:g, legL, legR, armL, armR, muzzle, tag, hasLamp:!!hasLamp};
+  // weapon models in the left hand — handgonne (default) and AK-47 (hidden until switched)
+  const {group:gonneGroup, muzzle} = buildHandgonneTP();
+  const {group:ak47Group, muzzle:akMuzzle} = buildAK47TP();
+  ak47Group.visible=false;
+  armL.add(gonneGroup);
+  armL.add(ak47Group);
+  return {group:g, legL, legR, armL, armR, muzzle, akMuzzle, gonneGroup, ak47Group, tag, hasLamp:!!hasLamp};
 }
 
 export function addRemote(d){
@@ -89,11 +87,18 @@ export function addRemote(d){
   const v=buildVillager(d.name, d.color??0x7a3b2e);
   v.cur={x:d.x??0, y:(d.y??EYE)-EYE, z:d.z??38.5, yaw:d.yaw??0};
   v.tgt={...v.cur, m:0, r:0};
-  v.phase=0; v.name=d.name; v.shootT=0; v.deadT=0;
+  v.phase=0; v.name=d.name; v.shootT=0; v.deadT=0; v.weapon=0;
   v.group.position.set(v.cur.x, v.cur.y, v.cur.z);
   v.group.rotation.y=v.cur.yaw+Math.PI;
   scene.add(v.group);
   remotes.set(d.id, v);
+}
+export function setRemoteWeapon(v, idx){
+  const w=idx===1 ? 1 : 0;
+  if(v.weapon===w) return;
+  v.weapon=w;
+  v.gonneGroup.visible=w===0;
+  v.ak47Group.visible=w===1;
 }
 export function dropRemote(id){
   const v=remotes.get(id);

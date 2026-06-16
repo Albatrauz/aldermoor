@@ -36,7 +36,7 @@ const COLORS = [0x7a3b2e, 0x3f5d43, 0x3c4668, 0x8a6d2f, 0x6b3a5c, 0x4a6b6e, 0x93
 const KILL_CAP = 10;          // first to this many kills wins the round
 const RESTART_DELAY = 20000;  // overview screen lingers this long, then a fresh round
 const MAX_HP = 100;           // a full health bar
-const BODY_DMG = 25;          // a ball to the body bites this much — several fell a foe
+const BODY_DMG = [25, 12];    // body damage per weapon: [handgonne, ak47] — headshots always fell outright
 const REGEN_DELAY = 5000;     // unharmed this long and the bar begins to refill
 const REGEN_TICK_MS = 500;    // …topped up this often
 const REGEN_PER_TICK = 8;     // …by this much each step (≈16 hp/s, ~6s from the brink)
@@ -182,7 +182,7 @@ function spawnBots(n) {
     const p = { ws, name: `Dummy ${k}`, color: COLORS[id % COLORS.length],
       x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
-      lastDamaged: 0, dmgFrom: new Map(), bot: true, nextShot: 0 };
+      lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0 };
     placeBot(p);
     p.nextShot = Date.now() + Math.floor(Math.random() * BOT_FIRE_CD);  // stagger first volleys
     players.set(id, p);
@@ -194,7 +194,7 @@ function spawnBots(n) {
 // Apply one ball's worth of damage shooter→target: the felled/range guards, the
 // wound tally, and the hitfx-or-fell broadcast. Shared by real players' `hit`
 // messages and dev bots' return fire.
-function resolveHit(shooterId, targetId, head) {
+function resolveHit(shooterId, targetId, head, w = 0) {
   const p = players.get(shooterId);
   const q = players.get(targetId);
   if (!p || !q || q === p) return;
@@ -203,7 +203,7 @@ function resolveHit(shooterId, targetId, head) {
   const dx = p.x - q.x, dz = p.z - q.z;
   if (dx * dx + dz * dz > 75 * 75) return;                      // out of range, impossible shot
 
-  const dealt = head ? q.hp : Math.min(BODY_DMG, q.hp);         // a ball to the head fells outright
+  const dealt = head ? q.hp : Math.min(BODY_DMG[w] ?? BODY_DMG[0], q.hp); // a ball to the head fells outright
   q.hp -= dealt;
   q.lastDamaged = now;                                          // holds off the bar's regen
   // tally the wound against the shooter for this life's death summary
@@ -248,7 +248,7 @@ function attachGame(httpServer, opts = {}) {
     const p = { ws, name: wanted ? uniqueName(wanted, id) : pickName(), color: COLORS[id % COLORS.length],
       x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
-      lastDamaged: 0, dmgFrom: new Map() };   // dmgFrom: attackerId → {name, dmg} this life
+      lastDamaged: 0, dmgFrom: new Map(), weapon: 0 };   // dmgFrom: attackerId → {name, dmg} this life
     players.set(id, p);
 
     ws.send(JSON.stringify({
@@ -275,14 +275,17 @@ function attachGame(httpServer, opts = {}) {
         p.yaw = num(msg.yaw, -1e4, 1e4, p.yaw);
         p.m = msg.m ? 1 : 0;
         p.r = msg.r ? 1 : 0;
+        p.weapon = msg.w === 1 ? 1 : 0;
       } else if (msg.t === 'shoot') {
         if (phase !== 'play') return;                // the contest is decided
         const now = Date.now();
-        if (now - p.lastShot < 450) return;          // handgonnes are slow to charge
+        const sw = msg.w === 1 ? 1 : 0;
+        const minInterval = sw === 1 ? 90 : 450;    // ak47 ~10 rps, handgonne ~2 rps
+        if (now - p.lastShot < minInterval) return;
         if (!Array.isArray(msg.o) || !Array.isArray(msg.d)) return;
         p.lastShot = now;
         p.hitUsed = false;
-        broadcast({ t: 'shoot', id,
+        broadcast({ t: 'shoot', id, w: sw,
           o: msg.o.slice(0, 3).map(v => num(v, -200, 200, 0)),
           d: msg.d.slice(0, 3).map(v => num(v, -1, 1, 0)),
           l: num(msg.l, 0, 120, 70) }, id);
@@ -303,7 +306,7 @@ function attachGame(httpServer, opts = {}) {
         const now = Date.now();
         if (p.hitUsed || now - p.lastShot > 400) return;  // one hit per shot, right after it
         p.hitUsed = true;
-        resolveHit(id, msg.target | 0, msg.head === true);
+        resolveHit(id, msg.target | 0, msg.head === true, msg.w === 1 ? 1 : 0);
       }
     });
     ws.on('pong', () => { p.alive = true; });
@@ -319,7 +322,7 @@ function attachGame(httpServer, opts = {}) {
     if (!players.size) return;
     const snap = {};
     for (const [id, p] of players)
-      snap[id] = [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(3), p.m, p.r];
+      snap[id] = [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(3), p.m, p.r, p.weapon];
     broadcast({ t: 'snap', p: snap });
   }, 80);
 
