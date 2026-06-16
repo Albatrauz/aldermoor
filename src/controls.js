@@ -155,7 +155,7 @@ export function update(dt, time){
   }
   if(!introVisible && !frozen){
     const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
-    const speed=run?7.4:4.2;
+    const speed=run?7.4:4.62;   // default walk bumped 10% (4.2 → 4.62); sprint unchanged
     let ix=0,iz=0;
     if(keys.has('KeyW')||keys.has('ArrowUp')) iz-=1;
     if(keys.has('KeyS')||keys.has('ArrowDown')) iz+=1;

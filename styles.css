@@ -136,6 +136,84 @@ canvas#scene {
     opacity: 1;
 }
 
+/* the held-open Tab scoreboard: the full roll of kills & deaths */
+#scoreboard {
+    position: fixed;
+    inset: 0;
+    z-index: 8;
+    display: none;
+    place-items: center;
+    pointer-events: none;
+    background: radial-gradient(
+        ellipse at center,
+        rgba(12, 9, 5, 0.5) 0%,
+        rgba(6, 4, 3, 0.72) 100%
+    );
+}
+#scoreboard.show {
+    display: grid;
+}
+.sb-inner {
+    min-width: min(440px, 86vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    text-align: left;
+    font-family: 'Lora', serif;
+    color: var(--parchment);
+    background: rgba(10, 7, 4, 0.74);
+    border: 1px solid rgba(216, 169, 72, 0.3);
+    box-shadow: 0 12px 64px rgba(0, 0, 0, 0.6);
+    padding: 16px 22px 18px;
+    animation: rise 0.25s ease both;
+}
+.sb-title {
+    font-family: 'IM Fell English', serif;
+    font-size: 13px;
+    letter-spacing: 0.34em;
+    text-indent: 0.34em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    text-align: center;
+    margin-bottom: 12px;
+}
+.sb-head,
+.sb-row {
+    display: grid;
+    grid-template-columns: 1fr 4.5em 4.5em;
+    align-items: baseline;
+    gap: 10px;
+    line-height: 1.85;
+}
+.sb-head {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    border-bottom: 1px solid rgba(216, 169, 72, 0.22);
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+.sb-row {
+    font-size: 16px;
+    font-style: italic;
+    opacity: 0.86;
+}
+.sb-head .sb-num,
+.sb-row .sb-num {
+    text-align: right;
+    font-style: normal;
+    font-variant-numeric: tabular-nums;
+}
+.sb-row .sb-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.sb-row.me {
+    color: var(--gold);
+    opacity: 1;
+}
+
 #health {
     position: fixed;
     bottom: 48px;
