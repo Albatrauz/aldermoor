@@ -2,6 +2,7 @@
 // The on-screen tally of scores, the heart pips, and the brief hit/hurt flourishes.
 // Holds the local player's health and the shared score table.
 import { myId } from './net.js';
+import { introVisible } from './controls.js';
 
 const scoresEl=document.getElementById('scores');
 const scoreRowsEl=document.getElementById('scoreRows');
@@ -49,6 +50,7 @@ export function renderScores(){
     .sort((a,b)=>b[1].score-a[1].score || a[1].name.localeCompare(b[1].name));
   scoreRowsEl.innerHTML=rows.map(([id,s])=>
     `<div class="sc-row${id===myId?' me':''}"><span>${esc(s.name)}</span><span>${s.score}</span></div>`).join('');
+  refreshScoreboard();   // keep a held-open Tab board in step with the live tally
 }
 export function hurtFlash(){
   const el=document.getElementById('hurt');
@@ -123,3 +125,47 @@ export function setKillCount(n){
   if(killCountEl.textContent!==String(n)) killCountEl.textContent=n;
 }
 export function hideKillscreen(){ killEl.classList.remove('on'); }
+
+/* ---- the Tab scoreboard: the full roll of kills & deaths, held open while Tab is down ---- */
+const scoreboardEl=document.getElementById('scoreboard');
+const sbRowsEl=document.getElementById('sbRows');
+let scoreboardOpen=false;
+
+/* paint the board from the shared tally: kills, and the deaths we now track
+   beside them — best record first (most kills, then fewest deaths, then name) */
+function renderScoreboard(){
+  const rows=[...scoresMap.entries()].sort((a,b)=>
+    b[1].score-a[1].score || (a[1].deaths||0)-(b[1].deaths||0) || a[1].name.localeCompare(b[1].name));
+  sbRowsEl.innerHTML=rows.map(([id,s])=>
+    `<div class="sb-row${id===myId?' me':''}"><span class="sb-name">${esc(s.name)}</span>`+
+    `<span class="sb-num">${s.score||0}</span><span class="sb-num">${s.deaths||0}</span></div>`).join('');
+}
+/* called from renderScores so an open board stays live as kills/deaths land */
+function refreshScoreboard(){ if(scoreboardOpen) renderScoreboard(); }
+
+function openScoreboard(){
+  if(scoreboardOpen) return;
+  scoreboardOpen=true;
+  renderScoreboard();
+  scoreboardEl.classList.add('show');
+}
+function closeScoreboard(){
+  if(!scoreboardOpen) return;
+  scoreboardOpen=false;
+  scoreboardEl.classList.remove('show');
+}
+// hold Tab to read the room; release to dismiss it. We only claim Tab once in the
+// fight (so the menu keeps its normal focus-walk), and preventDefault stops a held
+// Tab from tabbing focus off the canvas while the board is up.
+addEventListener('keydown',e=>{
+  if(e.code!=='Tab' || myId===null || introVisible) return;
+  e.preventDefault();
+  openScoreboard();
+});
+addEventListener('keyup',e=>{
+  if(e.code!=='Tab' || !scoreboardOpen) return;
+  e.preventDefault();
+  closeScoreboard();
+});
+// alt-tabbing away never delivers the keyup — don't leave the board stranded open
+addEventListener('blur', closeScoreboard);

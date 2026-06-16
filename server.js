@@ -90,7 +90,7 @@ const num = (v, lo, hi, dflt) =>
 // The final tally, best score first, as plain rows the overview screen renders.
 function standings() {
   return [...players.entries()]
-    .map(([id, p]) => ({ id, name: p.name, color: p.color, score: p.score }))
+    .map(([id, p]) => ({ id, name: p.name, color: p.color, score: p.score, deaths: p.deaths }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
@@ -118,7 +118,7 @@ function resetRound() {
   overInfo = null;
   const now = Date.now();
   for (const [, p] of players) {
-    p.score = 0; p.hp = MAX_HP; p.alive = true;
+    p.score = 0; p.deaths = 0; p.hp = MAX_HP; p.alive = true;
     p.x = SPAWN.x; p.y = SPAWN.y; p.z = SPAWN.z; p.yaw = SPAWN.yaw;
     p.m = 0; p.r = 0;                                   // clear stale walk/run anim flags
     p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // brief mercy after the reset
@@ -181,7 +181,7 @@ function spawnBots(n) {
     const ws = { readyState: 1, send() {} };
     const p = { ws, name: `Dummy ${k}`, color: COLORS[id % COLORS.length],
       x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
-      hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
+      hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0 };
     placeBot(p);
     p.nextShot = Date.now() + Math.floor(Math.random() * BOT_FIRE_CD);  // stagger first volleys
@@ -215,6 +215,7 @@ function resolveHit(shooterId, targetId, head, w = 0) {
     broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp });
   } else {
     p.score += 1;
+    q.deaths += 1;
     // who chipped them down, this life — best first, for the killscreen
     const dmg = [...q.dmgFrom.entries()]
       .map(([aid, r]) => ({ id: aid, name: r.name, dmg: r.dmg }))
@@ -223,7 +224,7 @@ function resolveHit(shooterId, targetId, head, w = 0) {
     q.lastFell = now;
     q.dmgFrom.clear();                                          // next life starts unwounded
     broadcast({ t: 'fell', shooter: shooterId, sname: p.name, target: targetId,
-      tname: q.name, score: p.score, head, dmg });
+      tname: q.name, score: p.score, tdeaths: q.deaths, head, dmg });
     console.log(`⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''} (${p.score})`);
     if (q.bot) placeBot(q);                                     // re-scatter the dummy for the next pass
     if (p.score >= KILL_CAP) endRound(shooterId);              // first to the cap wins the round
@@ -247,15 +248,15 @@ function attachGame(httpServer, opts = {}) {
     const wanted = cleanName(new URLSearchParams((req?.url || '').split('?')[1] || '').get('name') || '');
     const p = { ws, name: wanted ? uniqueName(wanted, id) : pickName(), color: COLORS[id % COLORS.length],
       x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
-      hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
+      hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0 };   // dmgFrom: attackerId → {name, dmg} this life
     players.set(id, p);
 
     ws.send(JSON.stringify({
-      t: 'welcome', id, name: p.name, color: p.color, score: p.score,
+      t: 'welcome', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
       players: [...players.entries()]
         .filter(([pid]) => pid !== id)
-        .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
+        .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, deaths: q.deaths, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
       // Drop a late joiner straight into the overview if a round just ended.
       over: phase === 'over' && overInfo ? {
         winnerId: overInfo.winnerId, winnerName: overInfo.winnerName, cap: overInfo.cap,
