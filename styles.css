@@ -898,3 +898,248 @@ kbd {
     font-size: 12px;
     color: #c5b288;
 }
+
+/* ---- account panel: sign up / sign in, or play as a guest ---- */
+#authPanel {
+    margin: 30px auto 0;
+    width: min(340px, 84vw);
+}
+#authPanel[data-auth='off'] {
+    display: none;
+}
+#authPanel[data-auth='out'] #authMe,
+#authPanel[data-auth='in'] #authForm {
+    display: none;
+}
+.auth-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+#authUser,
+#authPass {
+    display: block;
+    width: 100%;
+    background: rgba(216, 169, 72, 0.06);
+    border: 1px solid rgba(216, 169, 72, 0.45);
+    color: var(--parchment);
+    text-align: center;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    padding: 11px 16px;
+    outline: none;
+    transition: all 0.25s ease;
+}
+#authUser::placeholder,
+#authPass::placeholder {
+    color: #8d7b58;
+}
+#authUser:focus,
+#authPass:focus {
+    border-color: var(--gold);
+    background: rgba(216, 169, 72, 0.12);
+    box-shadow: 0 0 24px rgba(216, 169, 72, 0.2);
+}
+#authSubmit {
+    margin-top: 14px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--parchment);
+    font-family: 'Sekuya', serif;
+    font-size: 15px;
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
+    text-transform: uppercase;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+#authSubmit:hover:not(:disabled) {
+    background: var(--gold);
+    color: var(--ink);
+    box-shadow: 0 0 28px rgba(216, 169, 72, 0.3);
+}
+#authSubmit:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+.auth-link {
+    display: inline-block;
+    margin-top: 12px;
+    background: none;
+    border: none;
+    color: var(--gold-dim);
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: rgba(216, 169, 72, 0.3);
+    text-underline-offset: 3px;
+    transition: color 0.2s ease;
+}
+.auth-link:hover {
+    color: var(--gold);
+}
+.auth-error {
+    min-height: 1.2em;
+    margin-top: 12px;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: #d8746a;
+}
+.auth-error:empty {
+    min-height: 0;
+}
+.auth-me-label {
+    display: block;
+    font-family: 'Lora', serif;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+}
+.auth-me-name {
+    display: block;
+    margin-top: 6px;
+    font-family: 'Sekuya', serif;
+    font-size: clamp(28px, 4vw, 40px);
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(216, 169, 72, 0.3);
+}
+
+/* career line: K · D · K/D · wins · matches, shown when signed in */
+.career {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin: 16px auto 4px;
+}
+.career:empty {
+    display: none;
+}
+.career .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 54px;
+}
+.career .stat b {
+    font-family: 'Lora', serif;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--parchment);
+    font-variant-numeric: tabular-nums;
+}
+.career .stat span {
+    font-family: 'Lora', serif;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+}
+/* per-weapon kills/headshots, wrapped to its own row beneath the stat tiles */
+.career-arms {
+    flex-basis: 100%;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    margin-top: 8px;
+}
+.career-arms .arm {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    font-family: 'Lora', serif;
+    font-size: 13px;
+}
+.career-arms .arm-name {
+    color: var(--gold-dim);
+    font-style: italic;
+}
+.career-arms .arm b {
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+.career-arms .arm-hs {
+    font-size: 11px;
+    color: var(--gold-dim);
+}
+
+.auth-or {
+    margin: 28px auto 0;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: #8d7b58;
+}
+#intro.signed-in .auth-or,
+#intro.signed-in #nameInput,
+#intro.no-accounts .auth-or {
+    display: none;
+}
+
+/* ---- intro leaderboard: top players by lifetime kills ---- */
+#leaderboard {
+    margin: 36px auto 0;
+    width: min(380px, 86vw);
+    text-align: left;
+    background: rgba(10, 7, 4, 0.5);
+    border: 1px solid rgba(216, 169, 72, 0.25);
+    padding: 12px 18px 14px;
+}
+#leaderboard:not(.show) {
+    display: none;
+}
+#leaderboard .sc-title {
+    margin-bottom: 10px;
+}
+.lb-row {
+    display: grid;
+    grid-template-columns: 1.6em 1fr auto;
+    align-items: baseline;
+    gap: 12px;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--parchment);
+    opacity: 0.85;
+}
+.lb-row.me {
+    color: var(--gold);
+    opacity: 1;
+}
+.lb-row .lb-rank {
+    font-style: normal;
+    font-size: 13px;
+    color: var(--gold-dim);
+    text-align: center;
+}
+.lb-row .lb-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lb-row .lb-kills {
+    color: var(--gold-dim);
+    font-variant-numeric: tabular-nums;
+}
+.lb-row.me .lb-kills {
+    color: var(--gold);
+}
+.lb-empty {
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: #8d7b58;
+}

@@ -4,6 +4,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# Convex deployment URL for the browser client. Public, but must be present at
+# BUILD time — Vite inlines it into the bundle. Pass via Coolify build arg.
+ARG VITE_CONVEX_URL=""
+ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
 RUN npm run build
 
 # ---- Runtime stage: prod deps + server + built assets only ----

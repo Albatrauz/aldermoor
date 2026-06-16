@@ -5,6 +5,44 @@ const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 4174;
 
+// ---- Convex persistence (optional) ----
+// The live game runs entirely over WebSocket; Convex is touched only to verify
+// a player's session token on join and to flush match results at round end.
+// Every call is fire-and-forget — if Convex is unset or unreachable, the game
+// runs guest-only and no stats are recorded.
+let convex = null;
+let convexApi = null;
+const SERVER_SECRET = process.env.SERVER_SHARED_SECRET || '';
+const ALLOW_GUESTS = process.env.ALLOW_GUESTS !== 'false';
+try {
+  if (process.env.CONVEX_URL) {
+    const { ConvexHttpClient } = require('convex/browser');
+    const { anyApi } = require('convex/server');
+    convex = new ConvexHttpClient(process.env.CONVEX_URL);
+    convexApi = anyApi;
+    if (!SERVER_SECRET) console.warn('⚠ CONVEX_URL set but SERVER_SHARED_SECRET is empty — stat writes will be rejected.');
+    console.log('✦ Convex enabled — accounts & stats on');
+  } else {
+    console.log('· CONVEX_URL not set — guest-only, no stats');
+  }
+} catch (e) {
+  console.warn('· Convex client unavailable — guest-only:', e.message);
+}
+
+// Trade a session token for a trusted { userId, username }, or null.
+async function identify(token) {
+  if (!convex || !token) return null;
+  try { return await convex.query(convexApi.auth.userByToken, { token }); }
+  catch (e) { console.warn('token verify failed:', e.message); return null; }
+}
+
+// Persist a round's tally for every signed-in participant. Never throws.
+function flushResults(results) {
+  if (!convex || !SERVER_SECRET || !results.length) return;
+  convex.mutation(convexApi.stats.recordMatch, { secret: SERVER_SECRET, results })
+    .catch((e) => console.warn('recordMatch failed:', e.message));
+}
+
 // In production we serve Vite's build output; if it hasn't been built yet we
 // fall back to the project root so the server still boots (with a hint).
 const DIST = path.join(__dirname, 'dist');
@@ -107,6 +145,19 @@ function endRound(winnerId) {
   broadcast({ t: 'over', winnerId: overInfo.winnerId, winnerName: overInfo.winnerName,
     cap: KILL_CAP, restartIn: RESTART_DELAY / 1000, standings: overInfo.standings });
   console.log(`★ ${overInfo.winnerName} wins with ${KILL_CAP} — next round in ${RESTART_DELAY / 1000}s`);
+
+  // Persist the round for every signed-in player BEFORE resetRound wipes scores.
+  const results = [];
+  for (const [, q] of players) {
+    if (!q.authUserId || q.bot || q.flushed) continue;
+    q.flushed = true;
+    results.push({ userId: q.authUserId, username: q.username,
+      roundKills: q.roundKills, roundDeaths: q.deaths, headshots: q.roundHeadshots,
+      weaponKills: q.roundWeaponKills, weaponHeadshots: q.roundWeaponHeadshots,
+      won: !!winner && q.authUserId === winner.authUserId });
+  }
+  flushResults(results);
+
   restartTimer = setTimeout(resetRound, RESTART_DELAY);
   restartTimer.unref?.();
 }
@@ -119,6 +170,8 @@ function resetRound() {
   const now = Date.now();
   for (const [, p] of players) {
     p.score = 0; p.deaths = 0; p.hp = MAX_HP; p.alive = true;
+    p.roundKills = 0; p.roundHeadshots = 0; p.flushed = false;  // fresh round, fresh tally (deaths via p.deaths)
+    p.roundWeaponKills = BODY_DMG.map(() => 0); p.roundWeaponHeadshots = BODY_DMG.map(() => 0);
     p.x = SPAWN.x; p.y = SPAWN.y; p.z = SPAWN.z; p.yaw = SPAWN.yaw;
     p.m = 0; p.r = 0;                                   // clear stale walk/run anim flags
     p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // brief mercy after the reset
@@ -180,9 +233,12 @@ function spawnBots(n) {
     const id = nextId++;
     const ws = { readyState: 1, send() {} };
     const p = { ws, name: `Dummy ${k}`, color: COLORS[id % COLORS.length],
+      authUserId: null, username: null,
       x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
-      lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0 };
+      lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0,
+      roundKills: 0, roundHeadshots: 0,
+      roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
     placeBot(p);
     p.nextShot = Date.now() + Math.floor(Math.random() * BOT_FIRE_CD);  // stagger first volleys
     players.set(id, p);
@@ -215,7 +271,11 @@ function resolveHit(shooterId, targetId, head, w = 0) {
     broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp });
   } else {
     p.score += 1;
-    q.deaths += 1;
+    q.deaths += 1;                                              // round deaths (scoreboard + stat flush)
+    p.roundKills += 1;                                          // per-round tallies for the stat flush
+    if (head) p.roundHeadshots += 1;
+    p.roundWeaponKills[w] = (p.roundWeaponKills[w] || 0) + 1;   // …split by the weapon that felled them
+    if (head) p.roundWeaponHeadshots[w] = (p.roundWeaponHeadshots[w] || 0) + 1;
     // who chipped them down, this life — best first, for the killscreen
     const dmg = [...q.dmgFrom.entries()]
       .map(([aid, r]) => ({ id: aid, name: r.name, dmg: r.dmg }))
@@ -243,13 +303,28 @@ function attachGame(httpServer, opts = {}) {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
 
-  wss.on('connection', (ws, req) => {
+  wss.on('connection', async (ws, req) => {
     const id = nextId++;
-    const wanted = cleanName(new URLSearchParams((req?.url || '').split('?')[1] || '').get('name') || '');
-    const p = { ws, name: wanted ? uniqueName(wanted, id) : pickName(), color: COLORS[id % COLORS.length],
+    const qs = new URLSearchParams((req?.url || '').split('?')[1] || '');
+    const token = qs.get('token') || '';
+    const wanted = cleanName(qs.get('name') || '');
+
+    // A token (if any) is traded for a trusted account identity. A guest keeps
+    // their free-typed name. If guests are barred, an unverified socket is shut.
+    const auth = await identify(token);
+    if (ws.readyState !== 1) return;                  // bailed during the lookup
+    if (!auth && !ALLOW_GUESTS) { try { ws.close(4001, 'sign in to play'); } catch { /* gone */ } return; }
+
+    const p = { ws,
+      name: auth ? uniqueName(auth.username, id) : (wanted ? uniqueName(wanted, id) : pickName()),
+      color: COLORS[id % COLORS.length],
+      authUserId: auth ? auth.userId : null,          // null = guest (never scored to an account)
+      username: auth ? auth.username : null,
       x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
-      lastDamaged: 0, dmgFrom: new Map(), weapon: 0 };   // dmgFrom: attackerId → {name, dmg} this life
+      lastDamaged: 0, dmgFrom: new Map(), weapon: 0,  // dmgFrom: attackerId → {name, dmg} this life
+      roundKills: 0, roundHeadshots: 0,               // per-round, for stat flush (deaths via p.deaths)
+      roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
     players.set(id, p);
 
     ws.send(JSON.stringify({
@@ -291,6 +366,7 @@ function attachGame(httpServer, opts = {}) {
           d: msg.d.slice(0, 3).map(v => num(v, -1, 1, 0)),
           l: num(msg.l, 0, 120, 70) }, id);
       } else if (msg.t === 'name') {
+        if (p.authUserId) return;                          // signed-in players keep their fixed account name
         const now = Date.now();
         if (now - p.lastRename < 1000) return;             // no rename spam
         const clean = cleanName(msg.name);
@@ -312,6 +388,13 @@ function attachGame(httpServer, opts = {}) {
     });
     ws.on('pong', () => { p.alive = true; });
     ws.on('close', () => {
+      // a signed-in player who bails mid-round still has their partial tally counted
+      if (p.authUserId && !p.flushed && (p.roundKills || p.deaths)) {
+        p.flushed = true;
+        flushResults([{ userId: p.authUserId, username: p.username,
+          roundKills: p.roundKills, roundDeaths: p.deaths, headshots: p.roundHeadshots,
+          weaponKills: p.roundWeaponKills, weaponHeadshots: p.roundWeaponHeadshots, won: false }]);
+      }
       players.delete(id);
       broadcast({ t: 'leave', id, name: p.name });
       console.log(`- ${p.name} (#${id}) — ${players.size} in town`);

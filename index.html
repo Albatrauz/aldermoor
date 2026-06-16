@@ -89,6 +89,48 @@
                     tunnels. Take Long, hold Mid, rush B — and you will not be
                     the only soul on the sand.
                 </p>
+                <div id="authPanel" class="auth" data-auth="out">
+                    <form id="authForm" class="auth-form" autocomplete="off">
+                        <div class="auth-fields">
+                            <input
+                                id="authUser"
+                                maxlength="20"
+                                autocomplete="username"
+                                spellcheck="false"
+                                placeholder="Username"
+                            />
+                            <input
+                                id="authPass"
+                                type="password"
+                                autocomplete="current-password"
+                                placeholder="Password"
+                            />
+                        </div>
+                        <button type="submit" id="authSubmit">
+                            Return to arms
+                        </button>
+                        <button type="button" id="authToggle" class="auth-link">
+                            New here? Forge a name
+                        </button>
+                        <div id="authError" class="auth-error" role="alert"></div>
+                    </form>
+                    <div id="authMe" class="auth-me">
+                        <span class="auth-me-label">Sworn in as</span>
+                        <span id="authMeName" class="auth-me-name"></span>
+                        <div id="careerPanel" class="career"></div>
+                        <button
+                            type="button"
+                            id="authLogout"
+                            class="auth-link"
+                        >
+                            lay down your name
+                        </button>
+                    </div>
+                </div>
+                <div class="auth-or">
+                    ✦&nbsp;&nbsp; or take the field as a stranger
+                    &nbsp;&nbsp;✦
+                </div>
                 <input
                     id="nameInput"
                     maxlength="20"
@@ -108,6 +150,10 @@
                     <span><kbd>Space</kbd> hop</span>
                     <span><kbd>Tab</kbd> hold for the tally</span>
                     <span><kbd>Esc</kbd> menu</span>
+                </div>
+                <div id="leaderboard" class="lb">
+                    <div class="sc-title">⚔ Champions of the Sand</div>
+                    <div id="lbRows" class="lb-rows"></div>
                 </div>
             </div>
         </div>

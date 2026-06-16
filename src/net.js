@@ -10,10 +10,17 @@ import { announce } from './zones.js';
 import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath, weaponIdx } from './combat.js';
 
 import { player, vel, keys } from './controls.js';
+import { getToken, getSession, onAuthChange } from './auth.js';
 
 const presenceEl=document.getElementById('presence');
 export let net=null, myId=null, myName=null;
 let netRetry=1000;
+// the socket we currently care about; a reconnect supersedes any earlier one
+let curWs=null;
+// the identity token the live connection was opened with — so an auth-change
+// that doesn't actually change the token (e.g. the initial session restore)
+// leaves the socket alone instead of needlessly re-handshaking
+let connectedToken=null;
 // a stride between two 80ms snapshots is well under a metre; anything past this
 // is a respawn (or debug teleport), so we cut to it rather than glide across town
 const WARP_DIST=6;
@@ -32,8 +39,9 @@ document.getElementById('enter').addEventListener('click',()=>{
     try{ localStorage.setItem('aldermoor.name', desiredName); }catch{ /* private mode */ }
   }
   // compare against the *applied* name so re-entering it can reclaim a
-  // "Name 2" handed out while a ghost of our own session held the original
-  if(desiredName && desiredName!==myName) sendNet({t:'name', name:desiredName});
+  // "Name 2" handed out while a ghost of our own session held the original.
+  // Signed-in players keep their account username — never offer a rename.
+  if(!getSession() && desiredName && desiredName!==myName) sendNet({t:'name', name:desiredName});
 });
 
 /* send a JSON message if the socket is open */
@@ -51,11 +59,16 @@ function updatePresence(){
 function connect(){
   if(location.protocol==='file:'){ presenceEl.textContent='⚜ offline — wandering alone'; return; }
   let ws;
-  // hand the remembered name to the server up front so a returning player keeps
-  // their name from the first frame, rather than flashing a server-picked one
-  try{ ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'
-    +(desiredName?'?name='+encodeURIComponent(desiredName):'')); }
+  // A signed-in player hands the server their session token, which the server
+  // trades for a trusted, fixed username. A guest hands their remembered free
+  // name (or nothing, and the server picks one). Token wins when both exist.
+  const tok=getToken();
+  connectedToken=tok;
+  const q = tok ? '?token='+encodeURIComponent(tok)
+                : (desiredName ? '?name='+encodeURIComponent(desiredName) : '');
+  try{ ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'+q); }
   catch{ presenceEl.textContent='⚜ offline — wandering alone'; return; }
+  curWs=ws;
   ws.onopen=()=>{ netRetry=1000; };
   ws.onmessage=e=>{
     let m; try{ m=JSON.parse(e.data); }catch{ return; }
@@ -67,8 +80,9 @@ function connect(){
       setHp(MAX_HP); renderScores();
       updatePresence();
       announce(`Welcome, ${myName}`);
-      // a name typed before the socket finished opening → apply it now as a rename
-      if(desiredName && desiredName!==myName) sendNet({t:'name', name:desiredName});
+      // a name typed before the socket finished opening → apply it now as a
+      // rename (guests only — a signed-in player's username is fixed)
+      if(!getSession() && desiredName && desiredName!==myName) sendNet({t:'name', name:desiredName});
       if(m.over) handleOver(m.over);   // a round was already decided — show the overview
     }else if(m.t==='rename'){
       // the server's authoritative (deduped) name for someone — us included. Keep
@@ -119,15 +133,28 @@ function connect(){
     }
   };
   ws.onclose=()=>{
-    const had=net; net=null; myId=null;
+    if(ws!==curWs) return;           // superseded by a reconnect — let it be
+    net=null; myId=null; curWs=null;
     for(const id of [...remotes.keys()]) dropRemote(id);
     updatePresence();
-    if(had!==undefined) setTimeout(connect, netRetry);
+    setTimeout(connect, netRetry);
     netRetry=Math.min(netRetry*1.7, 10000);
   };
   ws.onerror=()=>ws.close();
 }
 connect();
+
+// Logging in or out re-handshakes the socket so the server picks up (or drops)
+// our trusted identity — and so stats start/stop being attributed to us. A no-op
+// when the token is unchanged (e.g. the initial session restore confirming it).
+function reconnect(){
+  if(getToken()===connectedToken) return;
+  netRetry=1000;
+  const old=curWs; curWs=null;       // mark any in-flight socket superseded
+  if(old){ try{ old.close(); }catch{ /* already closing */ } }
+  connect();
+}
+onAuthChange(reconnect);
 
 setInterval(()=>{
   if(net && net.readyState===1){
