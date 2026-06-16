@@ -4,12 +4,15 @@
 // by SERVER_SHARED_SECRET, a value the client never sees. The leaderboard and
 // myStats are public reads (stats carry no secrets).
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 
 function assertServer(secret) {
   const expected = process.env.SERVER_SHARED_SECRET;
-  // fail closed: if the secret isn't configured, nobody may write
-  if (!expected || secret !== expected) throw new Error("forbidden");
+  // fail closed: if the secret isn't configured, nobody may write. Throw a
+  // ConvexError so the reason survives the trip to the caller — a plain Error
+  // is masked as a generic "Server Error" and the cause is lost.
+  if (!expected) throw new ConvexError("forbidden: SERVER_SHARED_SECRET is not set on the Convex deployment");
+  if (secret !== expected) throw new ConvexError("forbidden: SERVER_SHARED_SECRET mismatch between game server and Convex deployment");
 }
 
 // element-wise add of two per-weapon arrays, padded to the longer length so the
