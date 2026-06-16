@@ -20,13 +20,31 @@ try {
     const { anyApi } = require('convex/server');
     convex = new ConvexHttpClient(process.env.CONVEX_URL);
     convexApi = anyApi;
-    if (!SERVER_SECRET) console.warn('⚠ CONVEX_URL set but SERVER_SHARED_SECRET is empty — stat writes will be rejected.');
-    console.log('✦ Convex enabled — accounts & stats on');
+    if (SERVER_SECRET) {
+      console.log(`✦ Convex enabled — accounts & stats on (${process.env.CONVEX_URL})`);
+    } else {
+      // The client is up, but writes will silently no-op in flushResults until a
+      // secret is present. Call it out loudly so it isn't mistaken for "working".
+      console.warn('⚠ Convex stats DISABLED: CONVEX_URL is set but SERVER_SHARED_SECRET is empty.');
+      console.warn('  → set SERVER_SHARED_SECRET at RUNTIME, and the SAME value in the Convex deployment:');
+      console.warn('      npx convex env set SERVER_SHARED_SECRET <value>');
+    }
   } else {
-    console.log('· CONVEX_URL not set — guest-only, no stats');
+    // No URL means no token verification and no flush — every player is a guest.
+    console.warn('⚠ Convex stats DISABLED: CONVEX_URL is not set — guest-only, no stats recorded.');
+    console.warn('  → set CONVEX_URL at RUNTIME to the same deployment as the browser\'s VITE_CONVEX_URL (build arg).');
   }
 } catch (e) {
-  console.warn('· Convex client unavailable — guest-only:', e.message);
+  console.warn('⚠ Convex client unavailable — guest-only, no stats:', e.message);
+}
+
+// One-time reminder of the build-time half of the chain, which the server can't
+// see: if the browser bundle was built without VITE_CONVEX_URL, nobody can sign
+// in, so every player arrives as a guest and nothing is ever flushed — even with
+// the server-side vars above all correct.
+if (convex && SERVER_SECRET) {
+  console.log('  ↳ stats also require: the browser built WITH VITE_CONVEX_URL (build arg),');
+  console.log('    the SAME SERVER_SHARED_SECRET set in the Convex deployment, and `npx convex deploy` run.');
 }
 
 // Trade a session token for a trusted { userId, username }, or null.
