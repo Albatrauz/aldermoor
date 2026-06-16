@@ -30,11 +30,17 @@ export function setHp(n){
   healthEl.classList.toggle('low', f<=.3);
 }
 setHp(MAX_HP);                     // start the bar full, even before we connect
-/* shot pips for the handgonne; an italic note while ramming a fresh charge */
-export function setAmmo(n, max, reloading){
-  ammoEl.innerHTML=reloading
-    ? '<span class="ramming">ramming powder…</span>'
-    : '● '.repeat(n)+(n<max?`<span class="spent">${'○ '.repeat(max-n)}</span>`:'');
+/* ammo display: pips for small mags (handgonne), numeric + spare for larger (AK-47) */
+export function setAmmo(n, max, reloading, spare=Infinity, weapon=null){
+  if(reloading){
+    ammoEl.innerHTML=`<span class="ramming">${weapon?.reloadLabel ?? 'reloading…'}</span>`;
+    return;
+  }
+  if(max<=10){
+    ammoEl.innerHTML='● '.repeat(n)+(n<max?`<span class="spent">${'○ '.repeat(max-n)}</span>`:'');
+  }else{
+    ammoEl.innerHTML=`${n}`+(isFinite(spare)?`<span class="spare"> / ${spare}</span>`:'');
+  }
 }
 export function renderScores(){
   if(myId===null){ scoresEl.style.display='none'; return; }

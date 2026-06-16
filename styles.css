@@ -49,23 +49,54 @@ canvas#scene {
     );
 }
 
+/* a four-tick crosshair pinned to screen centre. --gap (set each frame by combat.js)
+   is the spread cone mapped to pixels, so the ticks bound where a shot can land. */
 #crosshair {
     position: fixed;
     left: 50%;
     top: 50%;
-    width: 7px;
-    height: 7px;
-    margin: -3px 0 0 -3px;
-    background: var(--white);
-    border: 1px solid var(--ink);
+    width: 0;
+    height: 0;
+    --gap: 6px;
     opacity: 0.9;
-    transform: rotate(45deg);
     pointer-events: none;
     z-index: 6;
-    transition: opacity 0.2s ease;
 }
-#crosshair.cool {
-    opacity: 0.1;
+#crosshair i {
+    position: absolute;
+    background: var(--white);
+    box-shadow: 0 0 0 1px var(--ink);
+}
+#crosshair i.dot {
+    left: -1px;
+    top: -1px;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+}
+#crosshair i.t,
+#crosshair i.b {
+    left: -1px;
+    width: 2px;
+    height: 6px;
+}
+#crosshair i.l,
+#crosshair i.r {
+    top: -1px;
+    width: 6px;
+    height: 2px;
+}
+#crosshair i.t {
+    bottom: var(--gap);
+}
+#crosshair i.b {
+    top: var(--gap);
+}
+#crosshair i.l {
+    right: var(--gap);
+}
+#crosshair i.r {
+    left: var(--gap);
 }
 
 #scores {
@@ -172,6 +203,10 @@ canvas#scene {
     font-size: 14px;
     letter-spacing: 0.06em;
     color: var(--gold-dim);
+}
+#ammo .spare {
+    color: rgba(216, 169, 72, 0.45);
+    font-size: 13px;
 }
 
 #hitmark {
