@@ -12,12 +12,23 @@ function assertServer(secret) {
   if (!expected || secret !== expected) throw new Error("forbidden");
 }
 
+// element-wise add of two per-weapon arrays, padded to the longer length so the
+// result is always dense (no holes — Convex rejects nulls in a number array)
+function addArr(a = [], b = []) {
+  const n = Math.max(a.length, b.length);
+  const out = [];
+  for (let i = 0; i < n; i++) out[i] = (a[i] || 0) + (b[i] || 0);
+  return out;
+}
+
 const matchResult = v.object({
   userId: v.id("users"),
   username: v.string(),
   roundKills: v.number(),
   roundDeaths: v.number(),
   headshots: v.number(),
+  weaponKills: v.array(v.number()),
+  weaponHeadshots: v.array(v.number()),
   won: v.boolean(),
 });
 
@@ -43,6 +54,8 @@ export const recordMatch = mutation({
           wins: stat.wins + (r.won ? 1 : 0),
           matchesPlayed: stat.matchesPlayed + 1,
           bestRoundKills: Math.max(stat.bestRoundKills, r.roundKills),
+          weaponKills: addArr(stat.weaponKills, r.weaponKills),
+          weaponHeadshots: addArr(stat.weaponHeadshots, r.weaponHeadshots),
           lastSeen: now,
         });
       } else {
@@ -56,6 +69,8 @@ export const recordMatch = mutation({
           wins: r.won ? 1 : 0,
           matchesPlayed: 1,
           bestRoundKills: r.roundKills,
+          weaponKills: addArr([], r.weaponKills),
+          weaponHeadshots: addArr([], r.weaponHeadshots),
           lastSeen: now,
         });
       }
@@ -65,6 +80,8 @@ export const recordMatch = mutation({
         roundKills: r.roundKills,
         roundDeaths: r.roundDeaths,
         headshots: r.headshots,
+        weaponKills: r.weaponKills,
+        weaponHeadshots: r.weaponHeadshots,
         won: r.won,
         finishedAt: now,
       });
@@ -111,6 +128,8 @@ export const myStats = query({
       wins: s.wins,
       matchesPlayed: s.matchesPlayed,
       bestRoundKills: s.bestRoundKills,
+      weaponKills: s.weaponKills ?? [],
+      weaponHeadshots: s.weaponHeadshots ?? [],
     };
   },
 });

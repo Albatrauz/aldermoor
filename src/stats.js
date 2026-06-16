@@ -5,6 +5,7 @@
 // recorded — no polling, no reload. Guest-only (no Convex) → this is inert.
 import { convex, api, hasConvex } from './convex.js';
 import { getSession, onAuthChange } from './auth.js';
+import { WEAPONS } from './weapons.js';
 
 const lbEl     = document.getElementById('leaderboard');
 const lbRowsEl = document.getElementById('lbRows');
@@ -38,9 +39,15 @@ function renderCareer(s) {
   if (!careerEl) return;
   if (!s) { careerEl.innerHTML = ''; return; }
   const stat = (v, label) => `<div class="stat"><b>${v}</b><span>${label}</span></div>`;
+  // per-weapon breakdown (kills + headshots), labelled from the weapon table
+  const wk = s.weaponKills || [], wh = s.weaponHeadshots || [];
+  const arms = WEAPONS.map((w, i) =>
+    `<div class="arm"><span class="arm-name">${esc(w.name)}</span>` +
+    `<b>${wk[i] || 0}</b><span class="arm-hs">${wh[i] || 0} hs</span></div>`).join('');
   careerEl.innerHTML =
     stat(s.kills, 'kills') + stat(s.deaths, 'deaths') + stat(kd(s.kills, s.deaths), 'K/D') +
-    stat(s.wins, 'wins') + stat(s.matchesPlayed, 'matches') + stat(s.headshots, 'heads');
+    stat(s.wins, 'wins') + stat(s.matchesPlayed, 'matches') + stat(s.headshots, 'heads') +
+    `<div class="career-arms">${arms}</div>`;
 }
 
 // (re)subscribe to our own career whenever the session changes

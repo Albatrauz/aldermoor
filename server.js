@@ -153,6 +153,7 @@ function endRound(winnerId) {
     q.flushed = true;
     results.push({ userId: q.authUserId, username: q.username,
       roundKills: q.roundKills, roundDeaths: q.roundDeaths, headshots: q.roundHeadshots,
+      weaponKills: q.roundWeaponKills, weaponHeadshots: q.roundWeaponHeadshots,
       won: !!winner && q.authUserId === winner.authUserId });
   }
   flushResults(results);
@@ -170,6 +171,7 @@ function resetRound() {
   for (const [, p] of players) {
     p.score = 0; p.hp = MAX_HP; p.alive = true;
     p.roundKills = 0; p.roundDeaths = 0; p.roundHeadshots = 0; p.flushed = false;  // fresh round, fresh tally
+    p.roundWeaponKills = BODY_DMG.map(() => 0); p.roundWeaponHeadshots = BODY_DMG.map(() => 0);
     p.x = SPAWN.x; p.y = SPAWN.y; p.z = SPAWN.z; p.yaw = SPAWN.yaw;
     p.m = 0; p.r = 0;                                   // clear stale walk/run anim flags
     p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // brief mercy after the reset
@@ -235,7 +237,8 @@ function spawnBots(n) {
       x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0,
-      roundKills: 0, roundDeaths: 0, roundHeadshots: 0, flushed: false };
+      roundKills: 0, roundDeaths: 0, roundHeadshots: 0,
+      roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
     placeBot(p);
     p.nextShot = Date.now() + Math.floor(Math.random() * BOT_FIRE_CD);  // stagger first volleys
     players.set(id, p);
@@ -270,6 +273,8 @@ function resolveHit(shooterId, targetId, head, w = 0) {
     p.score += 1;
     p.roundKills += 1;                                          // per-round tallies for the stat flush
     if (head) p.roundHeadshots += 1;
+    p.roundWeaponKills[w] = (p.roundWeaponKills[w] || 0) + 1;   // …split by the weapon that felled them
+    if (head) p.roundWeaponHeadshots[w] = (p.roundWeaponHeadshots[w] || 0) + 1;
     q.roundDeaths += 1;
     // who chipped them down, this life — best first, for the killscreen
     const dmg = [...q.dmgFrom.entries()]
@@ -318,7 +323,8 @@ function attachGame(httpServer, opts = {}) {
       x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0,  // dmgFrom: attackerId → {name, dmg} this life
-      roundKills: 0, roundDeaths: 0, roundHeadshots: 0, flushed: false };  // per-round, for stat flush
+      roundKills: 0, roundDeaths: 0, roundHeadshots: 0,                    // per-round, for stat flush
+      roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
     players.set(id, p);
 
     ws.send(JSON.stringify({
@@ -386,7 +392,8 @@ function attachGame(httpServer, opts = {}) {
       if (p.authUserId && !p.flushed && (p.roundKills || p.roundDeaths)) {
         p.flushed = true;
         flushResults([{ userId: p.authUserId, username: p.username,
-          roundKills: p.roundKills, roundDeaths: p.roundDeaths, headshots: p.roundHeadshots, won: false }]);
+          roundKills: p.roundKills, roundDeaths: p.roundDeaths, headshots: p.roundHeadshots,
+          weaponKills: p.roundWeaponKills, weaponHeadshots: p.roundWeaponHeadshots, won: false }]);
       }
       players.delete(id);
       broadcast({ t: 'leave', id, name: p.name });

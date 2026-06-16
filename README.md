@@ -28,7 +28,8 @@ npm start        # serves dist/ + the WebSocket game on http://localhost:4174
 
 Optional but recommended: a [Convex](https://convex.dev) backend adds player
 **accounts with a fixed username** and **persistent stats** (kills, deaths, K/D,
-wins, matches, headshots) plus a **public leaderboard**. Without it the game runs
+wins, matches, headshots, and a per-weapon kill/headshot breakdown) plus a
+**public leaderboard**. Without it the game runs
 exactly as before — anonymous, guest-only, no stats.
 
 The live game still runs over the WebSocket relay in `server.js`; Convex is only

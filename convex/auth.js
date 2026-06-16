@@ -178,6 +178,8 @@ export const createUserAndSession = internalMutation({
       wins: 0,
       matchesPlayed: 0,
       bestRoundKills: 0,
+      weaponKills: [],
+      weaponHeadshots: [],
       lastSeen: now,
     });
   },

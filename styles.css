@@ -967,6 +967,34 @@ kbd {
     text-transform: uppercase;
     color: var(--gold-dim);
 }
+/* per-weapon kills/headshots, wrapped to its own row beneath the stat tiles */
+.career-arms {
+    flex-basis: 100%;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    margin-top: 8px;
+}
+.career-arms .arm {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    font-family: 'Lora', serif;
+    font-size: 13px;
+}
+.career-arms .arm-name {
+    color: var(--gold-dim);
+    font-style: italic;
+}
+.career-arms .arm b {
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+.career-arms .arm-hs {
+    font-size: 11px;
+    color: var(--gold-dim);
+}
 
 .auth-or {
     margin: 28px auto 0;

@@ -39,6 +39,10 @@ export default defineSchema({
     wins: v.number(),
     matchesPlayed: v.number(),
     bestRoundKills: v.number(),
+    // per-weapon lifetime tallies, indexed by weapon id (0=handgonne, 1=ak47).
+    // Arrays grow as weapons are added — no schema change needed.
+    weaponKills: v.array(v.number()),
+    weaponHeadshots: v.array(v.number()),
     lastSeen: v.number(),
   })
     .index("by_userId", ["userId"])
@@ -53,6 +57,8 @@ export default defineSchema({
     roundKills: v.number(),
     roundDeaths: v.number(),
     headshots: v.number(),
+    weaponKills: v.array(v.number()),
+    weaponHeadshots: v.array(v.number()),
     won: v.boolean(),
     finishedAt: v.number(),
   })
