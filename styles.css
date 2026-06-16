@@ -173,6 +173,10 @@ canvas#scene {
     letter-spacing: 0.06em;
     color: var(--gold-dim);
 }
+#ammo .spare {
+    color: rgba(216, 169, 72, 0.45);
+    font-size: 13px;
+}
 
 #hitmark {
     position: fixed;
