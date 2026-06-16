@@ -40,7 +40,8 @@ async function identify(token) {
 function flushResults(results) {
   if (!convex || !SERVER_SECRET || !results.length) return;
   convex.mutation(convexApi.stats.recordMatch, { secret: SERVER_SECRET, results })
-    .catch((e) => console.warn('recordMatch failed:', e.message));
+    // ConvexError carries its reason on `.data`; plain errors only have `.message`.
+    .catch((e) => console.warn('recordMatch failed:', e.data ?? e.message));
 }
 
 // In production we serve Vite's build output; if it hasn't been built yet we
