@@ -75,8 +75,8 @@ function connect(){
     if(m.t==='welcome'){
       myId=m.id; myName=m.name; net=ws;
       scoresMap.clear();
-      scoresMap.set(myId,{name:myName, score:m.score||0});
-      for(const p of m.players){ addRemote(p); scoresMap.set(p.id,{name:p.name, score:p.score||0}); }
+      scoresMap.set(myId,{name:myName, score:m.score||0, deaths:m.deaths||0});
+      for(const p of m.players){ addRemote(p); scoresMap.set(p.id,{name:p.name, score:p.score||0, deaths:p.deaths||0}); }
       setHp(MAX_HP); renderScores();
       updatePresence();
       announce(`Welcome, ${myName}`);
@@ -95,7 +95,7 @@ function connect(){
       updatePresence();
     }else if(m.t==='join'){
       addRemote(m);
-      scoresMap.set(m.id,{name:m.name, score:0});
+      scoresMap.set(m.id,{name:m.name, score:0, deaths:0});
       renderScores();
       updatePresence();
       announce(`${m.name} enters the gates`);

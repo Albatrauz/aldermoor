@@ -128,7 +128,7 @@ const num = (v, lo, hi, dflt) =>
 // The final tally, best score first, as plain rows the overview screen renders.
 function standings() {
   return [...players.entries()]
-    .map(([id, p]) => ({ id, name: p.name, color: p.color, score: p.score }))
+    .map(([id, p]) => ({ id, name: p.name, color: p.color, score: p.score, deaths: p.deaths }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
@@ -152,7 +152,7 @@ function endRound(winnerId) {
     if (!q.authUserId || q.bot || q.flushed) continue;
     q.flushed = true;
     results.push({ userId: q.authUserId, username: q.username,
-      roundKills: q.roundKills, roundDeaths: q.roundDeaths, headshots: q.roundHeadshots,
+      roundKills: q.roundKills, roundDeaths: q.deaths, headshots: q.roundHeadshots,
       weaponKills: q.roundWeaponKills, weaponHeadshots: q.roundWeaponHeadshots,
       won: !!winner && q.authUserId === winner.authUserId });
   }
@@ -169,8 +169,8 @@ function resetRound() {
   overInfo = null;
   const now = Date.now();
   for (const [, p] of players) {
-    p.score = 0; p.hp = MAX_HP; p.alive = true;
-    p.roundKills = 0; p.roundDeaths = 0; p.roundHeadshots = 0; p.flushed = false;  // fresh round, fresh tally
+    p.score = 0; p.deaths = 0; p.hp = MAX_HP; p.alive = true;
+    p.roundKills = 0; p.roundHeadshots = 0; p.flushed = false;  // fresh round, fresh tally (deaths via p.deaths)
     p.roundWeaponKills = BODY_DMG.map(() => 0); p.roundWeaponHeadshots = BODY_DMG.map(() => 0);
     p.x = SPAWN.x; p.y = SPAWN.y; p.z = SPAWN.z; p.yaw = SPAWN.yaw;
     p.m = 0; p.r = 0;                                   // clear stale walk/run anim flags
@@ -235,9 +235,9 @@ function spawnBots(n) {
     const p = { ws, name: `Dummy ${k}`, color: COLORS[id % COLORS.length],
       authUserId: null, username: null,
       x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
-      hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
+      hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0,
-      roundKills: 0, roundDeaths: 0, roundHeadshots: 0,
+      roundKills: 0, roundHeadshots: 0,
       roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
     placeBot(p);
     p.nextShot = Date.now() + Math.floor(Math.random() * BOT_FIRE_CD);  // stagger first volleys
@@ -271,11 +271,11 @@ function resolveHit(shooterId, targetId, head, w = 0) {
     broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp });
   } else {
     p.score += 1;
+    q.deaths += 1;                                              // round deaths (scoreboard + stat flush)
     p.roundKills += 1;                                          // per-round tallies for the stat flush
     if (head) p.roundHeadshots += 1;
     p.roundWeaponKills[w] = (p.roundWeaponKills[w] || 0) + 1;   // …split by the weapon that felled them
     if (head) p.roundWeaponHeadshots[w] = (p.roundWeaponHeadshots[w] || 0) + 1;
-    q.roundDeaths += 1;
     // who chipped them down, this life — best first, for the killscreen
     const dmg = [...q.dmgFrom.entries()]
       .map(([aid, r]) => ({ id: aid, name: r.name, dmg: r.dmg }))
@@ -284,7 +284,7 @@ function resolveHit(shooterId, targetId, head, w = 0) {
     q.lastFell = now;
     q.dmgFrom.clear();                                          // next life starts unwounded
     broadcast({ t: 'fell', shooter: shooterId, sname: p.name, target: targetId,
-      tname: q.name, score: p.score, head, dmg });
+      tname: q.name, score: p.score, tdeaths: q.deaths, head, dmg });
     console.log(`⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''} (${p.score})`);
     if (q.bot) placeBot(q);                                     // re-scatter the dummy for the next pass
     if (p.score >= KILL_CAP) endRound(shooterId);              // first to the cap wins the round
@@ -321,17 +321,17 @@ function attachGame(httpServer, opts = {}) {
       authUserId: auth ? auth.userId : null,          // null = guest (never scored to an account)
       username: auth ? auth.username : null,
       x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
-      hp: MAX_HP, score: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
+      hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0,  // dmgFrom: attackerId → {name, dmg} this life
-      roundKills: 0, roundDeaths: 0, roundHeadshots: 0,                    // per-round, for stat flush
+      roundKills: 0, roundHeadshots: 0,               // per-round, for stat flush (deaths via p.deaths)
       roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
     players.set(id, p);
 
     ws.send(JSON.stringify({
-      t: 'welcome', id, name: p.name, color: p.color, score: p.score,
+      t: 'welcome', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
       players: [...players.entries()]
         .filter(([pid]) => pid !== id)
-        .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
+        .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, deaths: q.deaths, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
       // Drop a late joiner straight into the overview if a round just ended.
       over: phase === 'over' && overInfo ? {
         winnerId: overInfo.winnerId, winnerName: overInfo.winnerName, cap: overInfo.cap,
@@ -389,10 +389,10 @@ function attachGame(httpServer, opts = {}) {
     ws.on('pong', () => { p.alive = true; });
     ws.on('close', () => {
       // a signed-in player who bails mid-round still has their partial tally counted
-      if (p.authUserId && !p.flushed && (p.roundKills || p.roundDeaths)) {
+      if (p.authUserId && !p.flushed && (p.roundKills || p.deaths)) {
         p.flushed = true;
         flushResults([{ userId: p.authUserId, username: p.username,
-          roundKills: p.roundKills, roundDeaths: p.roundDeaths, headshots: p.roundHeadshots,
+          roundKills: p.roundKills, roundDeaths: p.deaths, headshots: p.roundHeadshots,
           weaponKills: p.roundWeaponKills, weaponHeadshots: p.roundWeaponHeadshots, won: false }]);
       }
       players.delete(id);

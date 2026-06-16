@@ -27,6 +27,9 @@ const DEATH_T = 4;
 // here (body cylinder tops out ~1.35, head sphere centres ~1.52). See rayPlayer.
 const HEAD_Y = 1.4;
 let fireCd=0, gunKick=0, reloadT=0, deathT=0;
+// sustained-fire "heat": climbs by one per shot and bleeds off at the weapon's
+// `cool` rate, scaling each shot's bloom so a held spray walks the cone open.
+let fireHeat=0;
 let mouseDown=false;
 // shot scatter as a cone half-angle (radians), drawn from the active weapon's
 // `spread` config. a small idle floor keeps even a settled shot from being a
@@ -39,7 +42,7 @@ const crosshairEl=document.getElementById('crosshair');
 
 function refillAll(){
   for(let i=0;i<WEAPONS.length;i++){ ammo[i]=WEAPONS[i].mag; spare[i]=WEAPONS[i].spareMax; }
-  reloadT=0; fireCd=0; gunKick=0; spread=WEAPONS[weaponIdx].spread.base;
+  reloadT=0; fireCd=0; gunKick=0; fireHeat=0; spread=WEAPONS[weaponIdx].spread.base;
   const w=WEAPONS[weaponIdx];
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
 }
@@ -72,7 +75,10 @@ export function fire(){
   const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
   const up=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
   d.addScaledVector(right, Math.cos(aRand)*rr).addScaledVector(up, Math.sin(aRand)*rr).normalize();
-  spread=Math.min(w.spread.max, spread+w.spread.shot);
+  // each held shot blooms harder than the last: heat scales the per-shot growth,
+  // then ticks up so the next round in a sustained spray opens the cone further
+  spread=Math.min(w.spread.max, spread+w.spread.shot*(1+fireHeat*(w.spread.ramp||0)));
+  fireHeat+=1;
   let end=w.range;
   if(d.y<-1e-6) end=Math.min(end, -o.y/d.y);             // ground stops shot
   for(const c of colliders) end=Math.min(end, rayAABB(o,d,c));
@@ -116,6 +122,7 @@ function switchWeapon(idx){
   fpModels[weaponIdx].group.visible=true;
   fireCd=Math.max(fireCd,.25); // brief draw delay
   mouseDown=false;             // avoid carrying a held trigger into the new weapon
+  fireHeat=0;                            // a fresh arm starts cold — no carried spray heat
   spread=WEAPONS[weaponIdx].spread.base; // fresh arm draws to its own settled cone
   const w=WEAPONS[weaponIdx];
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
@@ -149,6 +156,8 @@ export function handleHitFx(m){
 export function handleFell(m){
   const s=scoresMap.get(m.shooter);
   if(s) s.score=m.score;
+  const td=scoresMap.get(m.target);
+  if(td && m.tdeaths!=null) td.deaths=m.tdeaths;
   renderScores();
   if(m.target!==myId) killRemote(m.target);   // topple the felled body for onlookers
   if(m.target===myId){
@@ -176,7 +185,7 @@ export function handleOver(m){
 export function handleRestart(){
   hideOverview();
   setFrozen(false);
-  for(const s of scoresMap.values()) s.score=0;
+  for(const s of scoresMap.values()){ s.score=0; s.deaths=0; }
   setHp(MAX_HP); renderScores();
   respawn();
   syncZone();
@@ -234,6 +243,7 @@ export function update(dt){
   else if(movingNow)   floor+=running?sp.run:sp.walk;
   spread += (floor-spread)*Math.min(1,dt*sp.recover);
   spread = Math.min(spread, sp.max);
+  fireHeat = Math.max(0, fireHeat-dt*(sp.cool||0));  // spray heat bleeds off between shots / once the trigger's let off
   const gapPx=Math.tan(spread)/Math.tan(camera.fov*Math.PI/360)*(renderer.domElement.clientHeight/2);
   crosshairEl.style.setProperty('--gap', gapPx.toFixed(1)+'px');
   const w=WEAPONS[weaponIdx];

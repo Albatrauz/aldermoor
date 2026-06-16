@@ -28,12 +28,24 @@
         <div id="hud">
             W&thinsp;A&thinsp;S&thinsp;D wander &nbsp;·&nbsp; click fire (hold for AK-47)
             &nbsp;·&nbsp; R reload &nbsp;·&nbsp; 1&thinsp;/&thinsp;2 swap arms
-            &nbsp;·&nbsp; shift run &nbsp;·&nbsp; space hop &nbsp;·&nbsp; esc menu
+            &nbsp;·&nbsp; shift run &nbsp;·&nbsp; space hop &nbsp;·&nbsp; hold tab tally
+            &nbsp;·&nbsp; esc menu
         </div>
         <div id="presence"></div>
         <div id="scores">
             <div class="sc-title">⚔ The Tally</div>
             <div id="scoreRows"></div>
+        </div>
+        <div id="scoreboard">
+            <div class="sb-inner">
+                <div class="sb-title">⚔ Roll of Arms</div>
+                <div class="sb-head">
+                    <span class="sb-name">Combatant</span>
+                    <span class="sb-num">Kills</span>
+                    <span class="sb-num">Deaths</span>
+                </div>
+                <div id="sbRows"></div>
+            </div>
         </div>
         <div id="health"><div id="healthFill"></div></div>
         <div id="ammo"></div>
@@ -136,6 +148,7 @@
                     <span><kbd>R</kbd> reload</span>
                     <span><kbd>Shift</kbd> run</span>
                     <span><kbd>Space</kbd> hop</span>
+                    <span><kbd>Tab</kbd> hold for the tally</span>
                     <span><kbd>Esc</kbd> menu</span>
                 </div>
                 <div id="leaderboard" class="lb">

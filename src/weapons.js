@@ -8,17 +8,22 @@ import { matPlank, matIron, matGoldTrim, matDarkWood } from './materials.js';
 // `spread` is the shot-scatter cone (half-angle in radians) read by combat.js:
 //   base — idle floor (even a settled shot isn't a guaranteed headshot at range)
 //   walk/run/air — added to the floor while moving, sprinting, or airborne
-//   shot — bloom added per shot; eases back toward the floor at `recover`
+//   shot — base bloom of a cold shot; eases back toward the floor at `recover`
+//   ramp — sustained-fire growth: each held shot stokes a "heat" that scales the
+//          per-shot bloom (bloom = shot·(1 + heat·ramp)), so the cone opens up the
+//          longer the trigger is down
+//   cool — how fast that heat bleeds off (per second) once you ease off the trigger
 //   max  — hard cap on the cone     recover — ease rate toward the floor
 // The crosshair draws this same cone, so its tick gap is an honest hit-area gauge.
-// The AK starts tighter but blooms harder, so a sustained spray walks wide open.
+// The AK starts tight, but each held round blooms harder than the last, so a long
+// spray walks wide open while a tap or short burst stays honest.
 export const WEAPONS = [
   { id:'handgonne', name:'Handgonne', fireCd:.9, mag:5,  spareMax:Infinity, reloadTime:2.2,
     full:false, range:70, kick:1,  reloadLabel:'ramming powder…',
-    spread:{ base:.007, walk:.028, run:.045, air:.08, shot:.024, max:.12, recover:5 } },
-  { id:'ak47',      name:'AK-47',     fireCd:.1, mag:30, spareMax:160,      reloadTime:2.6,
+    spread:{ base:.007, walk:.028, run:.045, air:.08, shot:.022, ramp:.12, cool:5, max:.12, recover:5 } },
+  { id:'ak47',      name:'AK-47',     fireCd:.1, mag:30, spareMax:160,      reloadTime:1.3,
     full:true,  range:70, kick:.6, reloadLabel:'reloading…',
-    spread:{ base:.005, walk:.03,  run:.05,  air:.09, shot:.03,  max:.16, recover:4 } },
+    spread:{ base:.005, walk:.03,  run:.05,  air:.09, shot:.016, ramp:.25, cool:5, max:.16, recover:4 } },
 ];
 
 /* ── first-person: handgonne (original combat.js geometry) ── */
