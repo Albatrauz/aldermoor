@@ -91,10 +91,11 @@ const TRADE = ['the Cooper', 'the Miller', 'the Weaver', 'the Smith', 'the Baker
 const COLORS = [0x7a3b2e, 0x3f5d43, 0x3c4668, 0x8a6d2f, 0x6b3a5c, 0x4a6b6e, 0x935b25, 0x5c5340];
 
 const KILL_CAP = 10;          // first to this many kills wins the round
-const RESTART_DELAY = 20000;  // overview screen lingers this long, then a fresh round
+const RESTART_DELAY = 15000;  // overview screen lingers this long, then a fresh round
 const MAX_HP = 100;           // a full health bar
-const BODY_DMG = [25, 12];    // body damage per weapon: [handgonne, ak47] — headshots always fell outright
-const REGEN_DELAY = 5000;     // unharmed this long and the bar begins to refill
+const BODY_DMG = [25, 12];    // body damage per weapon: [handgonne, ak47]
+const HEAD_MULT = 2;          // a ball to the head hits this much harder than a body shot
+const REGEN_DELAY = 3000;     // unharmed this long and the bar begins to refill
 const REGEN_TICK_MS = 500;    // …topped up this often
 const REGEN_PER_TICK = 8;     // …by this much each step (≈16 hp/s, ~6s from the brink)
 const SPAWN = { x: 0, y: 1.65, z: 38.5, yaw: 0 };
@@ -296,7 +297,8 @@ function resolveHit(shooterId, targetId, head, w = 0) {
   const dx = p.x - q.x, dz = p.z - q.z;
   if (dx * dx + dz * dz > 75 * 75) return;                      // out of range, impossible shot
 
-  const dealt = head ? q.hp : Math.min(BODY_DMG[w] ?? BODY_DMG[0], q.hp); // a ball to the head fells outright
+  const base = BODY_DMG[w] ?? BODY_DMG[0];
+  const dealt = Math.min(base * (head ? HEAD_MULT : 1), q.hp);  // a ball to the head hits harder, but no longer fells outright
   q.hp -= dealt;
   q.lastDamaged = now;                                          // holds off the bar's regen
   // tally the wound against the shooter for this life's death summary
