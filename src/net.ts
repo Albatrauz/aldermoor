@@ -7,9 +7,9 @@ import { addRemote, dropRemote, renameRemote, remotes, setRemoteWeapon } from '.
 import { scoresMap, setHp, renderScores, MAX_HP } from './hud';
 import { announce } from './zones';
 
-import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath, weaponIdx } from './combat';
+import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, enterField, handleLobby, resetFieldState, weaponIdx } from './combat';
 
-import { player, vel, keys } from './controls';
+import { player, vel, keys, introVisible } from './controls';
 import { getToken, getSession, onAuthChange } from './auth';
 
 const presenceEl=document.getElementById('presence');
@@ -42,6 +42,8 @@ document.getElementById('enter').addEventListener('click',()=>{
   // "Name 2" handed out while a ghost of our own session held the original.
   // Signed-in players keep their account username — never offer a rename.
   if(!getSession() && desiredName && desiredName!==myName) sendNet({t:'name', name:desiredName});
+  // step out of the lobby and onto the field: a fresh life + a spawn to the server
+  enterField();
 });
 
 /* send a JSON message if the socket is open */
@@ -74,6 +76,7 @@ function connect(){
     let m; try{ m=JSON.parse(e.data); }catch{ return; }
     if(m.t==='welcome'){
       myId=m.id; myName=m.name; net=ws;
+      resetFieldState();                 // a fresh socket starts as a lobby spectator
       scoresMap.clear();
       scoresMap.set(myId,{name:myName, score:m.score||0, deaths:m.deaths||0});
       for(const p of m.players){ addRemote(p); scoresMap.set(p.id,{name:p.name, score:p.score||0, deaths:p.deaths||0}); }
@@ -83,7 +86,9 @@ function connect(){
       // a name typed before the socket finished opening → apply it now as a
       // rename (guests only — a signed-in player's username is fixed)
       if(!getSession() && desiredName && desiredName!==myName) sendNet({t:'name', name:desiredName});
-      if(m.over) handleOver(m.over);   // a round was already decided — show the overview
+      // a fresh socket lands in the lobby; but if we reconnected while already on
+      // the field (e.g. the server bounced), retake it so we're a combatant again
+      if(!introVisible) enterField();
     }else if(m.t==='rename'){
       // the server's authoritative (deduped) name for someone — us included. Keep
       // myName, the live tally and the floating nametag all in lockstep with it.
@@ -95,7 +100,7 @@ function connect(){
       updatePresence();
     }else if(m.t==='join'){
       addRemote(m);
-      scoresMap.set(m.id,{name:m.name, score:0, deaths:0});
+      scoresMap.set(m.id,{name:m.name, score:m.score||0, deaths:m.deaths||0});
       renderScores();
       updatePresence();
       announce(`${m.name} enters the gates`);
@@ -117,6 +122,12 @@ function connect(){
       handleOver(m);
     }else if(m.t==='restart'){
       handleRestart(m);
+    }else if(m.t==='lobby'){
+      handleLobby();                     // round over — back to the menu + leaderboard, safe
+    }else if(m.t==='denied'){
+      // tried to take the field while a contest was wrapping up — bounce to the menu
+      handleLobby();
+      announce(m.restartIn>0 ? `A contest is finishing — try again in ${m.restartIn}s` : 'A contest is finishing — one moment…');
     }else if(m.t==='snap'){
       for(const id of Object.keys(m.p)){
         if(+id===myId) continue;
@@ -157,7 +168,7 @@ function reconnect(){
 onAuthChange(reconnect);
 
 setInterval(()=>{
-  if(net && net.readyState===1){
+  if(net && net.readyState===1 && !introVisible){   // only stream state while on the field
     net.send(JSON.stringify({t:'state',
       x:+player.x.toFixed(2), y:+player.y.toFixed(2), z:+player.z.toFixed(2),
       yaw:+player.yaw.toFixed(3),

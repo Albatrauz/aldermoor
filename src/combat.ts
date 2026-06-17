@@ -12,7 +12,7 @@ import { boom, crack, ding, thudSnd, clack } from './audio';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
   showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud';
 import { announce, syncZone } from './zones';
-import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, player, vel, keys } from './controls';
+import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, showMenu, onMenuShown, player, vel, keys } from './controls';
 
 scene.add(camera); // the viewmodel rides on the camera
 const fpModels = [buildHandgonneFP(), buildAK47FP()];
@@ -193,6 +193,68 @@ export function handleRestart(_msg?: unknown){
   mouseDown=false;
   announce('A new contest begins!');
 }
+
+// true while the live socket has us as an active combatant (between a spawn and
+// the next lobby return / disconnect). Lets a menu peek mid-fight resume in place
+// rather than respawn, and tells us whether Esc means "bow out" or "still fighting".
+let inField=false;
+
+/* Take the field: a fresh life with weapons restored, and tell the server we're
+   now a combatant (so we can shoot and be shot). Wired to the intro's "Take the
+   Field" button and re-fired on a reconnect that lands us mid-fight. If we're
+   already on the field (resuming a menu peek), this just hands control back — no
+   teleport, no fresh spawn. */
+export function enterField(){
+  if(inField) return;                 // already fighting — resuming a peek, stay put
+  inField=true;
+  setFrozen(false);
+  setDead(false);
+  deathT=0;
+  hideKillscreen();
+  hideOverview();
+  respawn();
+  syncZone();
+  setHp(MAX_HP);
+  refillAll();
+  mouseDown=false;
+  renderScores();
+  sendNet({t:'spawn',
+    x:+player.x.toFixed(2), y:+player.y.toFixed(2), z:+player.z.toFixed(2), yaw:+player.yaw.toFixed(3)});
+}
+
+/* A reconnect opens a fresh socket that the server treats as a lobby spectator,
+   so forget any prior field standing before the welcome decides whether to retake it. */
+export function resetFieldState(){ inField=false; }
+
+/* Back to the lobby — the round is over (server `lobby`), or the server bounced
+   our spawn (`denied`). Clear the battle overlays, drop the live tally, and raise
+   the menu, where the freshly-updated leaderboard waits. We're a safe spectator
+   until we take the field again. */
+export function handleLobby(){
+  inField=false;
+  hideOverview();
+  hideKillscreen();
+  deathT=0;
+  setDead(false);
+  setFrozen(false);
+  mouseDown=false;
+  for(const s of scoresMap.values()){ s.score=0; s.deaths=0; }
+  renderScores();
+  showMenu();
+}
+
+/* Raising the lobby menu mid-fight: a felled player (the killscreen is counting)
+   may bow out to the lobby and become a safe spectator. A living one stays in the
+   fight — Esc must never be an escape hatch from a losing trade. */
+onMenuShown(()=>{
+  if(inField && deathT>0){
+    inField=false;
+    deathT=0;
+    setDead(false);
+    hideKillscreen();
+    sendNet({t:'spectate'});
+  }
+});
 
 /* end a death: fresh spawn, restored weapons, control handed back */
 function rise(){

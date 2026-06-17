@@ -133,11 +133,26 @@ The client exposes `window.__town` for automated checks: `hideIntro()`,
 `fire()`, `teleport(x, z, yaw, pitch)`, `over(stats)` / `restart()` (raise and
 clear the end-of-round overview), and getters `pos`, `me`, `remotes`.
 
-## Rounds
+## Rounds & the lobby
 
-A contest runs to **15 kills** (`KILL_CAP` in `server.js`). The first player to
-reach it wins: the server freezes scoring, broadcasts the final tally, and every
-client raises the overview screen with a **20-second** countdown
-(`RESTART_DELAY`). When it elapses the server wipes all scores, sends everyone
-back to the gates, and a fresh contest begins. Players who join mid-overview are
-shown it too, with the countdown's remaining time.
+Connecting puts you in the **lobby** — the intro screen, where the leaderboard
+and your dossier live. There you're a spectator: invisible to others, unable to
+shoot, and impossible to shoot. You become a live combatant only when you
+**Take the Field** (the client sends a `spawn`; the server marks you `active`).
+A player reading the leaderboard is never a target.
+
+Once you're on the field, **Esc keeps you in the fight** — it opens the menu but
+your body stays put and shootable, so it's no escape hatch from a losing trade.
+You return to the safe lobby only two ways: a **felled** player (while the
+killscreen counts down) may bow out with Esc, and the **end of a round** sends
+everyone back (a `spectate` / `lobby` message). Re-taking the field while still
+alive just resumes you in place — no respawn.
+
+A contest runs to **10 kills** (`KILL_CAP` in `server.js`). The first player to
+reach it wins: the server freezes scoring and shows every *combatant* the
+overview screen with a **20-second** countdown (`RESTART_DELAY`); lobby
+spectators keep their menu. When the countdown elapses the server wipes all
+scores and sends every combatant back to the **lobby** (a `lobby` message), where
+the freshly-updated leaderboard is waiting — no refresh needed. The next contest
+begins when players take the field again. Dev practice dummies stay in the field
+across rounds so a lone developer always has foes.
