@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "start": "node server.js",
     "convex:dev": "convex dev",
@@ -16,6 +17,9 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/node": "^22.19.21",
+    "@types/three": "^0.160.0",
+    "typescript": "^6.0.3",
     "vite": "^8.0.16"
   }
 }

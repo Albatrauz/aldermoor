@@ -3,9 +3,9 @@
 // and the signed-in player's own lifetime career line. Both stream over the
 // ConvexClient WebSocket via onUpdate, so they refresh the instant a match is
 // recorded — no polling, no reload. Guest-only (no Convex) → this is inert.
-import { convex, api, hasConvex } from './convex.js';
-import { getSession, onAuthChange } from './auth.js';
-import { WEAPONS } from './weapons.js';
+import { convex, api, hasConvex } from './convex';
+import { getSession, onAuthChange } from './auth';
+import { WEAPONS } from './weapons';
 
 const lbEl      = document.getElementById('leaderboard');
 const lbRowsEl  = document.getElementById('lbRows');
@@ -19,7 +19,7 @@ const kd = (k, d) => (k / Math.max(1, d)).toFixed(2);
 
 /* roman numerals for the board ranks (the algorithm repeats X, so any n works) */
 function toRoman(n) {
-  const map = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  const map: [number, string][] = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
   let out = '';
   for (const [v, s] of map) { while (n >= v) { out += s; n -= v; } }
   return out;
@@ -73,7 +73,7 @@ function renderDossier() {
     ? `rank ${toRoman(idx + 1)} of ${lastRows.length} on the sand`
     : (s.matchesPlayed ? 'beyond the ranked' : 'unranked recruit');
 
-  const stat = (v, label, gold) =>
+  const stat = (v, label, gold?) =>
     `<div class="fs-stat${gold ? ' gold' : ''}"><b>${v}</b><span>${label}</span></div>`;
 
   // per-weapon kills + headshots, labelled from the weapon table

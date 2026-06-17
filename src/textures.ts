@@ -2,7 +2,7 @@
 // Every surface in town is painted procedurally onto a 2D canvas and uploaded
 // as a CanvasTexture. `mr` (texture-only randomness) keeps each bake lively.
 import * as THREE from 'three';
-import { mr } from './core.js';
+import { mr } from './core';
 
 function makeTex(size, fn){
   const c = document.createElement('canvas'); c.width = c.height = size;

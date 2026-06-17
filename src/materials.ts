@@ -6,7 +6,7 @@ import {
   clonedTex, cobbleTex, grassTex, dirtTex, stoneTex, stoneTex2, plankTex,
   wallStyles, roofTexes, stripeTex,
   sandTex, sandPathTex, sandstoneTex, sandstoneTex2, concreteTex, crateTex,
-} from './textures.js';
+} from './textures';
 
 export const matCobble = new THREE.MeshStandardMaterial({map:clonedTex(cobbleTex,22,22), roughness:1});
 export const matGrass  = new THREE.MeshStandardMaterial({map:clonedTex(grassTex,56,56), roughness:1});

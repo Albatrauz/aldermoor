@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { createRequire } from 'module';
 
 // server.js is CommonJS (it's also the production server). Load it through
@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 // listens on the `/ws` path, while Vite's HMR socket keeps the root path, so
 // the two share a single port — no second process, no proxy. In production the
 // same `attachGame` is hosted by server.js (`npm start`).
-function gameServer() {
+function gameServer(): Plugin {
   return {
     name: 'aldermoor-game-server',
     // Vite exposes only VITE_-prefixed vars (to the browser, via import.meta.env)

@@ -2,15 +2,15 @@
 // The WebSocket link to the little node server. Sends a throttled snapshot of
 // the local player and routes inbound messages to the villager, hud, zone and
 // combat layers. `net`/`myId`/`myName` are exported as live bindings.
-import { EYE } from './core.js';
-import { addRemote, dropRemote, renameRemote, remotes, setRemoteWeapon } from './villagers.js';
-import { scoresMap, setHp, renderScores, MAX_HP } from './hud.js';
-import { announce } from './zones.js';
+import { EYE } from './core';
+import { addRemote, dropRemote, renameRemote, remotes, setRemoteWeapon } from './villagers';
+import { scoresMap, setHp, renderScores, MAX_HP } from './hud';
+import { announce } from './zones';
 
-import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath, weaponIdx } from './combat.js';
+import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, clearDeath, weaponIdx } from './combat';
 
-import { player, vel, keys } from './controls.js';
-import { getToken, getSession, onAuthChange } from './auth.js';
+import { player, vel, keys } from './controls';
+import { getToken, getSession, onAuthChange } from './auth';
 
 const presenceEl=document.getElementById('presence');
 export let net=null, myId=null, myName=null;
@@ -30,7 +30,7 @@ const WARP_DIST=6;
 let desiredName='';
 try{ desiredName=(localStorage.getItem('aldermoor.name')||'').trim().slice(0,20); }
 catch{ /* storage blocked — boot without a remembered name */ }
-const nameInputEl=document.getElementById('nameInput');
+const nameInputEl=document.getElementById('nameInput') as HTMLInputElement | null;
 if(nameInputEl) nameInputEl.value=desiredName;
 document.getElementById('enter').addEventListener('click',()=>{
   const n=(nameInputEl?.value||'').trim().slice(0,20);
