@@ -33,10 +33,21 @@ export function setFrozen(v){ frozen=v; }
 // combat owns the timer and flips it back on respawn
 export let dead=false;
 export function setDead(v){ dead=v; }
+// fired the moment the lobby menu is raised from the field — net listens so it
+// can tell the server we've stepped off (a player reading the menu is no target)
+const menuListeners=new Set<()=>void>();
+export function onMenuShown(fn:()=>void){ menuListeners.add(fn); return ()=>menuListeners.delete(fn); }
 // blur the name field on entry — a focused (invisible) input would swallow
 // every gameplay key via its stopPropagation handler below
 export function hideIntro(){ intro.classList.add('hidden'); introVisible=false; nameInput.blur(); }
-function showIntro(){ intro.classList.remove('hidden'); introVisible=true; }
+function showIntro(){
+  const wasVisible=introVisible;
+  intro.classList.remove('hidden'); introVisible=true;
+  if(!wasVisible) for(const fn of menuListeners){ try{ fn(); }catch{ /* ignore */ } }
+}
+// raise the lobby menu from gameplay (round over, or stepping out) and free the
+// cursor so the leaderboard to the right is readable
+export function showMenu(){ showIntro(); try{ document.exitPointerLock?.(); }catch{ /* not locked */ } }
 
 // typing a name must not feed the game's key handlers (Space is
 // preventDefault-ed above, WASD would land in `keys`) — and Enter submits

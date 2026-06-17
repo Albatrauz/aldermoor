@@ -141,12 +141,21 @@ function broadcast(msg, exceptId) {
     if (id !== exceptId && p.ws.readyState === 1) p.ws.send(s);
 }
 
+// Like broadcast, but only to players currently in the field. The round-over
+// overview is sent this way so a lobby spectator never has the menu yanked away.
+function broadcastActive(msg, exceptId) {
+  const s = JSON.stringify(msg);
+  for (const [id, p] of players)
+    if (id !== exceptId && p.active && p.ws.readyState === 1) p.ws.send(s);
+}
+
 const num = (v, lo, hi, dflt) =>
   (typeof v === 'number' && isFinite(v)) ? Math.max(lo, Math.min(hi, v)) : dflt;
 
 // The final tally, best score first, as plain rows the overview screen renders.
 function standings() {
   return [...players.entries()]
+    .filter(([, p]) => p.active)
     .map(([id, p]) => ({ id, name: p.name, color: p.color, score: p.score, deaths: p.deaths }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
@@ -161,14 +170,14 @@ function endRound(winnerId) {
     winnerId, winnerName: winner ? winner.name : 'Nobody',
     cap: KILL_CAP, standings: standings(), endsAt: Date.now() + RESTART_DELAY,
   };
-  broadcast({ t: 'over', winnerId: overInfo.winnerId, winnerName: overInfo.winnerName,
+  broadcastActive({ t: 'over', winnerId: overInfo.winnerId, winnerName: overInfo.winnerName,
     cap: KILL_CAP, restartIn: RESTART_DELAY / 1000, standings: overInfo.standings });
   console.log(`★ ${overInfo.winnerName} wins with ${KILL_CAP} — next round in ${RESTART_DELAY / 1000}s`);
 
   // Persist the round for every signed-in player BEFORE resetRound wipes scores.
   const results = [];
   for (const [, q] of players) {
-    if (!q.authUserId || q.bot || q.flushed) continue;
+    if (!q.authUserId || q.bot || q.flushed || !q.active) continue;
     q.flushed = true;
     results.push({ userId: q.authUserId, username: q.username,
       roundKills: q.roundKills, roundDeaths: q.deaths, headshots: q.roundHeadshots,
@@ -181,13 +190,16 @@ function endRound(winnerId) {
   restartTimer.unref?.();
 }
 
-// Wipe the slate for a fresh contest and send everyone back to the gates.
+// The overview has run its course: wipe the slate and send every combatant back
+// to the lobby (the menu, where the leaderboard lives). They rejoin the next
+// contest by taking the field again — until then they're safe spectators, not
+// targets. Dev dummies stay in the field so a lone developer still has foes.
 function resetRound() {
   restartTimer = null;
   phase = 'play';
   overInfo = null;
   const now = Date.now();
-  for (const [, p] of players) {
+  for (const [id, p] of players) {
     p.score = 0; p.deaths = 0; p.hp = MAX_HP; p.alive = true;
     p.roundKills = 0; p.roundHeadshots = 0; p.flushed = false;  // fresh round, fresh tally (deaths via p.deaths)
     p.roundWeaponKills = BODY_DMG.map(() => 0); p.roundWeaponHeadshots = BODY_DMG.map(() => 0);
@@ -195,10 +207,15 @@ function resetRound() {
     p.m = 0; p.r = 0;                                   // clear stale walk/run anim flags
     p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // brief mercy after the reset
     p.lastDamaged = 0; p.dmgFrom.clear();              // fresh life, no wounds tallied
+    if (p.bot) { placeBot(p); continue; }              // re-scatter dummies, don't clump at SPAWN
+    if (p.active) {                                     // a combatant heads back to the lobby
+      p.active = false;
+      broadcast({ t: 'leave', id, name: p.name }, id); // others drop them from the field
+      if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'lobby' })); // their client raises the menu
+    }
   }
-  for (const [, p] of players) if (p.bot) placeBot(p); // re-scatter dummies, don't clump at SPAWN
-  broadcast({ t: 'restart', spawn: SPAWN });
-  console.log(`↻ new round — ${players.size} in town`);
+  const watching = [...players.values()].filter((p) => !p.bot).length;
+  console.log(`↻ round over — back to the lobby (${watching} connected)`);
 }
 
 /* ============================ dev-only practice dummies ============================ */
@@ -252,7 +269,7 @@ function spawnBots(n) {
     const id = nextId++;
     const ws = { readyState: 1, send() {} };
     const p = { ws, name: `Dummy ${k}`, color: COLORS[id % COLORS.length],
-      authUserId: null, username: null,
+      authUserId: null, username: null, active: true,   // dummies are always in the field
       x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0,
@@ -273,6 +290,7 @@ function resolveHit(shooterId, targetId, head, w = 0) {
   const p = players.get(shooterId);
   const q = players.get(targetId);
   if (!p || !q || q === p) return;
+  if (!p.active || !q.active) return;                          // only combatants in the field trade fire
   const now = Date.now();
   if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) return;   // dead, or freshly risen
   const dx = p.x - q.x, dz = p.z - q.z;
@@ -334,32 +352,32 @@ function attachGame(httpServer, opts = {}) {
     if (ws.readyState !== 1) return;                  // bailed during the lookup
     if (!auth && !ALLOW_GUESTS) { try { ws.close(4001, 'sign in to play'); } catch { /* gone */ } return; }
 
+    // `baseName` is the bare chosen/account name; `name` is it deduped against the
+    // field. We keep the base so a later spawn can re-dedupe cleanly (no suffix creep).
+    const baseName = auth ? auth.username : (wanted || pickName());
     const p = { ws,
-      name: auth ? uniqueName(auth.username, id) : (wanted ? uniqueName(wanted, id) : pickName()),
+      baseName,
+      name: uniqueName(baseName, id),
       color: COLORS[id % COLORS.length],
       authUserId: auth ? auth.userId : null,          // null = guest (never scored to an account)
       username: auth ? auth.username : null,
-      x: -105, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
+      active: false,                                  // a fresh socket waits in the lobby, not the field
+      x: SPAWN.x, y: SPAWN.y, z: SPAWN.z, yaw: SPAWN.yaw, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0,  // dmgFrom: attackerId → {name, dmg} this life
       roundKills: 0, roundHeadshots: 0,               // per-round, for stat flush (deaths via p.deaths)
       roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
     players.set(id, p);
 
+    // A spectator sees who's already fighting (so the field is populated the moment
+    // they take it), but isn't announced to anyone and isn't yet a target.
     ws.send(JSON.stringify({
       t: 'welcome', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
       players: [...players.entries()]
-        .filter(([pid]) => pid !== id)
+        .filter(([pid, q]) => pid !== id && q.active)
         .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, deaths: q.deaths, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
-      // Drop a late joiner straight into the overview if a round just ended.
-      over: phase === 'over' && overInfo ? {
-        winnerId: overInfo.winnerId, winnerName: overInfo.winnerName, cap: overInfo.cap,
-        restartIn: Math.max(0, Math.ceil((overInfo.endsAt - Date.now()) / 1000)),
-        standings: overInfo.standings,
-      } : null,
     }));
-    broadcast({ t: 'join', id, name: p.name, color: p.color, x: p.x, y: p.y, z: p.z, yaw: p.yaw }, id);
-    console.log(`+ ${p.name} (#${id}) — ${players.size} in town`);
+    console.log(`+ ${p.name} (#${id}) — watching from the lobby`);
 
     ws.on('message', (buf) => {
       let msg; try { msg = JSON.parse(buf); } catch { return; }
@@ -372,7 +390,7 @@ function attachGame(httpServer, opts = {}) {
         p.r = msg.r ? 1 : 0;
         p.weapon = msg.w === 1 ? 1 : 0;
       } else if (msg.t === 'shoot') {
-        if (phase !== 'play') return;                // the contest is decided
+        if (phase !== 'play' || !p.active) return;   // decided, or only watching from the lobby
         const now = Date.now();
         const sw = msg.w === 1 ? 1 : 0;
         const minInterval = sw === 1 ? 90 : 450;    // ak47 ~10 rps, handgonne ~2 rps
@@ -394,11 +412,39 @@ function attachGame(httpServer, opts = {}) {
         if (next === p.name) return;                       // or we rebroadcast "X is now X"
         p.lastRename = now;
         const old = p.name;
-        p.name = next;
-        broadcast({ t: 'rename', id, name: p.name });      // everyone, sender included
-        console.log(`✎ ${old} is now ${p.name}`);
+        p.baseName = clean; p.name = next;                 // remember the bare choice for the next spawn
+        if (p.active) {                                    // only a combatant's rename is announced to the field
+          broadcast({ t: 'rename', id, name: p.name });    // everyone, sender included
+          console.log(`✎ ${old} is now ${p.name}`);
+        }
+      } else if (msg.t === 'spawn') {
+        // Take the field from the lobby: become a live, shootable combatant.
+        if (p.active) return;                              // already fighting
+        if (phase !== 'play') {                            // a contest is wrapping up — hold in the lobby
+          if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'denied', reason: 'over',
+            restartIn: overInfo ? Math.max(0, Math.ceil((overInfo.endsAt - Date.now()) / 1000)) : 0 }));
+          return;
+        }
+        const now = Date.now();
+        p.name = uniqueName(p.authUserId ? p.username : p.baseName, id);  // dedupe against the live field
+        p.active = true;
+        p.hp = MAX_HP; p.alive = true;
+        // score/deaths/round tallies survive a within-round lobby trip; resetRound zeroes them per contest
+        p.x = num(msg.x, -120, 120, SPAWN.x); p.y = num(msg.y, 0, 30, SPAWN.y);
+        p.z = num(msg.z, -120, 120, SPAWN.z); p.yaw = num(msg.yaw, -1e4, 1e4, SPAWN.yaw);
+        p.m = 0; p.r = 0; p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // a breath of spawn grace
+        p.lastDamaged = 0; p.dmgFrom.clear();
+        broadcast({ t: 'join', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
+          x: p.x, y: p.y, z: p.z, yaw: p.yaw }, id);
+        console.log(`▶ ${p.name} (#${id}) takes the field`);
+      } else if (msg.t === 'spectate') {
+        // Step off the field back to the lobby: no longer a target, no longer shooting.
+        if (!p.active) return;                             // already watching
+        p.active = false;
+        broadcast({ t: 'leave', id, name: p.name }, id);   // others drop them from the field
+        console.log(`◦ ${p.name} (#${id}) steps back to the lobby`);
       } else if (msg.t === 'hit') {
-        if (phase !== 'play') return;                     // no scoring once it's over
+        if (phase !== 'play' || !p.active) return;        // no scoring once it's over, or from the lobby
         const now = Date.now();
         if (p.hitUsed || now - p.lastShot > 400) return;  // one hit per shot, right after it
         p.hitUsed = true;
@@ -415,8 +461,8 @@ function attachGame(httpServer, opts = {}) {
           weaponKills: p.roundWeaponKills, weaponHeadshots: p.roundWeaponHeadshots, won: false }]);
       }
       players.delete(id);
-      broadcast({ t: 'leave', id, name: p.name });
-      console.log(`- ${p.name} (#${id}) — ${players.size} in town`);
+      if (p.active) broadcast({ t: 'leave', id, name: p.name });  // only announce someone who was on the field
+      console.log(`- ${p.name} (#${id}) — disconnected`);
     });
     ws.on('error', () => ws.terminate());
   });
@@ -424,8 +470,10 @@ function attachGame(httpServer, opts = {}) {
   const snapTimer = setInterval(() => { // position snapshots
     if (!players.size) return;
     const snap = {};
-    for (const [id, p] of players)
+    for (const [id, p] of players) {
+      if (!p.active) continue;             // lobby spectators aren't on the field
       snap[id] = [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(3), p.m, p.r, p.weapon];
+    }
     broadcast({ t: 'snap', p: snap });
   }, 80);
 
@@ -444,6 +492,7 @@ function attachGame(httpServer, opts = {}) {
     if (phase !== 'play') return;
     const now = Date.now();
     for (const [, p] of players) {
+      if (!p.active) continue;                            // lobby spectators don't bleed or heal
       if (p.hp >= MAX_HP) continue;
       if (now - p.lastDamaged < REGEN_DELAY) continue;   // still smarting
       if (now - p.lastFell < RESPAWN_MS) continue;        // lying felled
@@ -467,6 +516,7 @@ function attachGame(httpServer, opts = {}) {
         let targetId = null, target = null, best = BOT_RANGE * BOT_RANGE;
         for (const [qid, q] of players) {
           if (q.bot || q === b) continue;
+          if (!q.active) continue;                                 // skip lobby spectators
           if (now - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) continue;
           const dx = b.x - q.x, dz = b.z - q.z, d2 = dx * dx + dz * dz;
           if (d2 < best) { best = d2; target = q; targetId = qid; }
