@@ -1,8 +1,8 @@
 /* ============================ heads-up display ============================ */
 // The on-screen tally of scores, the heart pips, and the brief hit/hurt flourishes.
 // Holds the local player's health and the shared score table.
-import { myId } from './net.js';
-import { introVisible } from './controls.js';
+import { myId } from './net';
+import { introVisible } from './controls';
 
 const scoresEl=document.getElementById('scores');
 const scoreRowsEl=document.getElementById('scoreRows');

@@ -1,5 +1,6 @@
 # ---- Build stage: install all deps and bundle the client into dist/ ----
-FROM node:20-alpine AS build
+# Node 22: Vite 8 requires Node >=20.19 (or >=22.12) to run its bundler.
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -11,7 +12,7 @@ ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
 RUN npm run build
 
 # ---- Runtime stage: prod deps + server + built assets only ----
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./

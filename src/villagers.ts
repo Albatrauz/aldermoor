@@ -3,11 +3,23 @@
 // Holds the `remotes` registry and smoothly interpolates each one toward the
 // latest network snapshot.
 import * as THREE from 'three';
-import { scene, mesh, EYE } from './core.js';
-import { matIron, matDarkWood } from './materials.js';
-import { buildHandgonneTP, buildAK47TP } from './weapons.js';
+import { scene, mesh, EYE } from './core';
+import { matIron, matDarkWood } from './materials';
+import { buildHandgonneTP, buildAK47TP } from './weapons';
 
-export const remotes=new Map();
+// A tracked fellow traveller: the visual rig built by buildVillager, plus the
+// interpolation/animation state that addRemote attaches and updateRemotes drives.
+type Remote = ReturnType<typeof buildVillager> & {
+  cur: { x: number; y: number; z: number; yaw: number };
+  tgt: { x: number; y: number; z: number; yaw: number; m: number; r: number };
+  phase: number;
+  name: string;
+  shootT: number;
+  deadT: number;
+  weapon: number;
+};
+
+export const remotes = new Map<number, Remote>();
 
 // How long a felled traveller lies dead before rising at a fresh spawn. Kept in
 // step with combat.js DEATH_T and the server's RESPAWN_MS so the body is back on
@@ -84,10 +96,11 @@ function buildVillager(name, color){
 
 export function addRemote(d){
   if(remotes.has(d.id)) return;
-  const v=buildVillager(d.name, d.color??0x7a3b2e);
-  v.cur={x:d.x??0, y:(d.y??EYE)-EYE, z:d.z??38.5, yaw:d.yaw??0};
-  v.tgt={...v.cur, m:0, r:0};
-  v.phase=0; v.name=d.name; v.shootT=0; v.deadT=0; v.weapon=0;
+  const cur={x:d.x??0, y:(d.y??EYE)-EYE, z:d.z??38.5, yaw:d.yaw??0};
+  const v: Remote = {
+    ...buildVillager(d.name, d.color??0x7a3b2e),
+    cur, tgt:{...cur, m:0, r:0}, phase:0, name:d.name, shootT:0, deadT:0, weapon:0,
+  };
   v.group.position.set(v.cur.x, v.cur.y, v.cur.z);
   v.group.rotation.y=v.cur.yaw+Math.PI;
   scene.add(v.group);

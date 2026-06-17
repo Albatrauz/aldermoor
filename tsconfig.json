@@ -1,0 +1,25 @@
+{
+  // Type-checking only — Vite/esbuild does the actual transpiling and bundling,
+  // so `noEmit` is on and `tsc` is run purely as a checker (`npm run typecheck`).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
+
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Staged migration: keep things permissive so the rename compiles immediately.
+    // Tighten these (strict, noImplicitAny, …) incrementally in follow-up passes.
+    "allowJs": true,
+    "checkJs": false,
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "include": ["src", "vite.config.ts"]
+}

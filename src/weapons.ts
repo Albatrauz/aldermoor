@@ -2,8 +2,8 @@
 // Shared weapon stats and geometry builders (FP + TP) for every weapon in the game.
 // Imported by combat.js (first-person) and villagers.js (third-person).
 import * as THREE from 'three';
-import { mesh } from './core.js';
-import { matPlank, matIron, matGoldTrim, matDarkWood } from './materials.js';
+import { mesh } from './core';
+import { matPlank, matIron, matGoldTrim, matDarkWood } from './materials';
 
 // `spread` is the shot-scatter cone (half-angle in radians) read by combat.js:
 //   base — idle floor (even a settled shot isn't a guaranteed headshot at range)

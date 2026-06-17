@@ -2,7 +2,7 @@
 // Dust2 location callouts that raise a fleeting toast as you enter them.
 // `announce` is also used by the net layer for join/leave/kill messages.
 // Order matters: the first matching circle wins, so specific spots come first.
-import { player, introVisible } from './controls.js';
+import { player, introVisible } from './controls';
 
 const zones=[
   {x:-66,z:30, r:6,  name:'Long Doors'},

@@ -7,12 +7,12 @@
 // Colliders carry a vertical span (base..top) and may be ramps whose top
 // interpolates along one axis — controls.js and effects.js consume this.
 import * as THREE from 'three';
-import { scene, mesh, uvBox } from './core.js';
+import { scene, mesh, uvBox } from './core';
 import {
   matSand, matSandPath, matSandstone, matSandstoneDark, matConcrete,
   matCrate, matIron, matContainerBlue, matCarRed, matSandbag, matMetalDoor,
-} from './materials.js';
-import { glowTex } from './textures.js';
+} from './materials';
+import { glowTex } from './textures';
 
 /* ============================ sky & light ============================ */
 const sky = new THREE.Mesh(
@@ -376,4 +376,4 @@ export const SPAWNS=[
 
 /* ============================ per-frame ambient animation ============================ */
 // High noon in the desert: nothing flickers. Kept because main.js calls it.
-export function updateAmbient(){}
+export function updateAmbient(_time?: number){}

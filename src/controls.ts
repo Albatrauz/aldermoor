@@ -3,9 +3,9 @@
 // state and the circle-vs-AABB collision against the town's colliders.
 // `walkPhase` and `introVisible` are exported as live bindings so the gun
 // viewmodel (combat) and zone/toast logic can read them without owning them.
-import { canvas, camera, EYE } from './core.js';
-import { colliders, colliderTopAt, SPAWNS } from './world.js';
-import { ac } from './audio.js';
+import { canvas, camera, EYE } from './core';
+import { colliders, colliderTopAt, SPAWNS } from './world';
+import { ac } from './audio';
 
 // player.y is the eye height that travels over the wire; player.feet is the
 // floor the player stands on. Invariant each frame: y = feet + EYE.

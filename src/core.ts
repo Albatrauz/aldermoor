@@ -64,7 +64,7 @@ export function prismGeo(w,h,d,uvScale=0.45){
   g.computeVertexNormals();
   return uvBox(g, uvScale);
 }
-export function mesh(geo, mat, x,y,z, opts={}){
+export function mesh(geo, mat, x,y,z, opts: { ry?: number; rx?: number; rz?: number; cast?: boolean; receive?: boolean } = {}){
   const m=new THREE.Mesh(geo,mat);
   m.position.set(x,y,z);
   if(opts.ry) m.rotation.y=opts.ry;

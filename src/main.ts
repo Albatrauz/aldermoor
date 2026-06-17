@@ -3,15 +3,15 @@
 // side effects (build the town, attach input, open the socket, raise the gun),
 // then this file drives the single render loop and exposes the debug hook.
 import * as THREE from 'three';
-import { renderer, scene, camera } from './core.js';
-import * as world from './world.js';
-import * as controls from './controls.js';
-import * as zones from './zones.js';
-import * as combat from './combat.js';
-import * as villagers from './villagers.js';
-import { updateFx } from './effects.js';
-import * as net from './net.js';
-import './stats.js';            // reactive leaderboard + career (no-op without Convex)
+import { renderer, scene, camera } from './core';
+import * as world from './world';
+import * as controls from './controls';
+import * as zones from './zones';
+import * as combat from './combat';
+import * as villagers from './villagers';
+import { updateFx } from './effects';
+import * as net from './net';
+import './stats';            // reactive leaderboard + career (no-op without Convex)
 
 const clock=new THREE.Clock();
 let time=0;

@@ -6,19 +6,21 @@
 //
 // We reuse the reactive ConvexClient from convex.js for the one-shot
 // action/mutation/query calls here — no second client, no second URL.
-import { convex, api, hasConvex } from './convex.js';
+import { convex, api, hasConvex } from './convex';
 
 const TOKEN_KEY = 'aldermoor.token';
 
+type Session = { userId: string; username: string };
+
 let token = '';
 try { token = localStorage.getItem(TOKEN_KEY) || ''; } catch { /* storage blocked */ }
-let session = null;            // { userId, username } once verified, else null
-const listeners = new Set();
+let session: Session | null = null;   // verified account, else null (guest)
+const listeners = new Set<(s: Session | null) => void>();
 
 export function getToken(){ return token; }
 export function getSession(){ return session; }
 /* subscribe to login/logout; returns an unsubscribe fn. Fires with the session. */
-export function onAuthChange(fn){ listeners.add(fn); return ()=>listeners.delete(fn); }
+export function onAuthChange(fn: (s: Session | null) => void){ listeners.add(fn); return ()=>listeners.delete(fn); }
 function emit(){ for(const fn of listeners){ try{ fn(session); }catch{ /* ignore */ } } }
 
 function setToken(t){
@@ -31,9 +33,9 @@ function setToken(t){
 const introEl  = document.getElementById('intro');
 const panel    = document.getElementById('authPanel');
 const form     = document.getElementById('authForm');
-const userEl   = document.getElementById('authUser');
-const passEl   = document.getElementById('authPass');
-const submitEl = document.getElementById('authSubmit');
+const userEl   = document.getElementById('authUser') as HTMLInputElement | null;
+const passEl   = document.getElementById('authPass') as HTMLInputElement | null;
+const submitEl = document.getElementById('authSubmit') as HTMLButtonElement | null;
 const toggleEl = document.getElementById('authToggle');
 const errEl    = document.getElementById('authError');
 const meNameEl = document.getElementById('authMeName');

@@ -2,17 +2,17 @@
 // First-person viewmodels, firing (ray test → tracer, flash, sound, network
 // shot/hit), and reactions to incoming shots and kills.
 import * as THREE from 'three';
-import { scene, camera, renderer } from './core.js';
-import { WEAPONS, buildHandgonneFP, buildAK47FP } from './weapons.js';
-import { colliders } from './world.js';
-import { remotes, killRemote } from './villagers.js';
-import { myId, sendNet } from './net.js';
-import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects.js';
-import { boom, crack, ding, thudSnd, clack } from './audio.js';
+import { scene, camera, renderer } from './core';
+import { WEAPONS, buildHandgonneFP, buildAK47FP } from './weapons';
+import { colliders } from './world';
+import { remotes, killRemote } from './villagers';
+import { myId, sendNet } from './net';
+import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects';
+import { boom, crack, ding, thudSnd, clack } from './audio';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
-  showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud.js';
-import { announce, syncZone } from './zones.js';
-import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, player, vel, keys } from './controls.js';
+  showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud';
+import { announce, syncZone } from './zones';
+import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, player, vel, keys } from './controls';
 
 scene.add(camera); // the viewmodel rides on the camera
 const fpModels = [buildHandgonneFP(), buildAK47FP()];
@@ -182,7 +182,7 @@ export function handleOver(m){
   showOverview(m);
 }
 
-export function handleRestart(){
+export function handleRestart(_msg?: unknown){
   hideOverview();
   setFrozen(false);
   for(const s of scoresMap.values()){ s.score=0; s.deaths=0; }

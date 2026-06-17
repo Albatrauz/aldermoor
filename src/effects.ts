@@ -2,8 +2,8 @@
 // Short-lived visuals (tracers, muzzle flashes, powder smoke) plus the ray-cast
 // helpers used by the handgonne to decide what a shot hits.
 import * as THREE from 'three';
-import { scene } from './core.js';
-import { flameTex, smokeTex } from './textures.js';
+import { scene } from './core';
+import { flameTex, smokeTex } from './textures';
 
 /* --- transient effects: tracers, muzzle flashes, powder smoke --- */
 const fx=[];
