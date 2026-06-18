@@ -15,6 +15,48 @@ export function spawnTracer(a,b){
       blending:THREE.AdditiveBlending, depthWrite:false}));
   fxAdd(line,.13,'fade');
 }
+/* Borderlands-style floating damage number: a chunky figure that punches in over
+   the struck traveller, arcs up and out, then fades — so onlookers (and the
+   shooter) read how hard each ball landed. Headshots read bigger and gold.
+   Textures are cached by (amount, head): a firefight reuses a handful of values,
+   so we bake each once and share it (never disposed — the fx cleanup leaves the
+   shared map alone, like the muzzle-flash sprites). */
+const dmgTexCache=new Map();
+function dmgTex(amount, head){
+  const key=amount+'|'+(head?1:0);
+  const hit=dmgTexCache.get(key);
+  if(hit) return hit;
+  const c=document.createElement('canvas'); c.width=256; c.height=128;
+  const g=c.getContext('2d');
+  const txt=String(amount);
+  g.font='900 '+(head?92:72)+'px Georgia, "Arial Black", sans-serif';
+  g.textAlign='center'; g.textBaseline='middle';
+  g.lineJoin='round'; g.miterLimit=2;
+  g.lineWidth=head?13:11;
+  g.strokeStyle='rgba(18,7,2,.95)';            // heavy dark outline so it reads on any backdrop
+  g.strokeText(txt,128,66);
+  const grad=g.createLinearGradient(0,22,0,108);
+  if(head){ grad.addColorStop(0,'#fff3b0'); grad.addColorStop(1,'#ff8a1e'); }  // crit gold→orange
+  else    { grad.addColorStop(0,'#ffffff'); grad.addColorStop(1,'#ffcf8c'); }  // warm white
+  g.fillStyle=grad;
+  g.fillText(txt,128,66);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
+  dmgTexCache.set(key, t);
+  return t;
+}
+export function spawnDamageNumber(pos, amount, head=false){
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:dmgTex(Math.round(amount), head),
+    transparent:true, depthWrite:false}));   // depth-tested: walls between us and the struck foe hide it
+  s.renderOrder=12;
+  s.position.copy(pos);
+  const base=head?.95:.72;
+  s.scale.set(base*2, base, 1);                                // canvas is 2:1
+  // launch each number on its own arc so a burst of hits fans out instead of stacking
+  const ang=Math.random()*Math.PI*2;
+  scene.add(s);
+  fx.push({obj:s, ttl:1.1, t0:1.1, kind:'dmg', base,
+    vx:Math.cos(ang)*.55, vz:Math.sin(ang)*.55, vy:1.7});
+}
 export function spawnFlash(pos, big=1){
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:flameTex, transparent:true,
     blending:THREE.AdditiveBlending, depthWrite:false}));
@@ -37,6 +79,17 @@ export function updateFx(dt){
       f.obj.material.opacity=.32*k;
       f.obj.position.y+=dt*.8;
       f.obj.scale.addScalar(dt*1.5);
+    }
+    else if(f.kind==='dmg'){
+      const age=f.t0-f.ttl;
+      f.obj.position.x+=f.vx*dt;
+      f.obj.position.z+=f.vz*dt;
+      f.obj.position.y+=f.vy*dt;
+      f.vy-=dt*2.6;                                   // a gentle arc: pops up, settles back
+      const punch=1+Math.max(0,.1-age)*4.5;          // brief overshoot in the first 100ms
+      const sc=f.base*punch;
+      f.obj.scale.set(sc*2, sc, 1);
+      f.obj.material.opacity = k<.3 ? k/.3 : 1;       // hold full, fade over the last 30%
     }
     else f.obj.material.opacity=.85*k;
     if(f.ttl<=0){

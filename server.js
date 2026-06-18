@@ -307,7 +307,7 @@ function resolveHit(shooterId, targetId, head, w = 0) {
   q.dmgFrom.set(shooterId, rec);
 
   if (q.hp > 0) {
-    broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp });
+    broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp, dmg: dealt, head });
   } else {
     p.score += 1;
     q.deaths += 1;                                              // round deaths (scoreboard + stat flush)
@@ -323,7 +323,7 @@ function resolveHit(shooterId, targetId, head, w = 0) {
     q.lastFell = now;
     q.dmgFrom.clear();                                          // next life starts unwounded
     broadcast({ t: 'fell', shooter: shooterId, sname: p.name, target: targetId,
-      tname: q.name, score: p.score, tdeaths: q.deaths, head, dmg });
+      tname: q.name, score: p.score, tdeaths: q.deaths, head, dmg, lastDmg: dealt });
     console.log(`⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''} (${p.score})`);
     if (q.bot) placeBot(q);                                     // re-scatter the dummy for the next pass
     if (p.score >= KILL_CAP) endRound(shooterId);              // first to the cap wins the round

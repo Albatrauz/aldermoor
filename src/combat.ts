@@ -7,7 +7,7 @@ import { WEAPONS, buildHandgonneFP, buildAK47FP } from './weapons';
 import { colliders } from './world';
 import { remotes, killRemote } from './villagers';
 import { myId, sendNet } from './net';
-import { spawnFlash, spawnTracer, rayAABB, rayPlayer } from './effects';
+import { spawnFlash, spawnTracer, spawnDamageNumber, rayAABB, rayPlayer } from './effects';
 import { boom, crack, ding, thudSnd, clack } from './audio';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
   showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud';
@@ -152,6 +152,16 @@ export function handleHitFx(m){
     gunKick=Math.max(gunKick,.5);                         // flinch
   }
   if(m.shooter===myId){ hitmark(); ding(); }
+  popDamage(m.target, m.dmg, m.head);                     // float the ball's bite off the struck traveller
+}
+
+// Pop a Borderlands-style damage number off a struck remote so every onlooker
+// (the shooter included) sees how hard the ball landed. We can't see our own
+// first-person body, so a hit on us shows as the screen flinch, not a number.
+function popDamage(targetId, dmg, head){
+  if(dmg==null || targetId===myId) return;
+  const v=remotes.get(targetId);
+  if(v) spawnDamageNumber(new THREE.Vector3(v.cur.x, v.cur.y+1.55, v.cur.z), dmg, head);
 }
 export function handleFell(m){
   const s=scoresMap.get(m.shooter);
@@ -159,6 +169,7 @@ export function handleFell(m){
   const td=scoresMap.get(m.target);
   if(td && m.tdeaths!=null) td.deaths=m.tdeaths;
   renderScores();
+  popDamage(m.target, m.lastDmg, m.head);      // the felling ball's bite, before the body topples
   if(m.target!==myId) killRemote(m.target);   // topple the felled body for onlookers
   if(m.target===myId){
     if(deathT>0) return;                  // already lying dead — ignore a stray second blow
