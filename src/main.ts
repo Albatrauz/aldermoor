@@ -46,6 +46,9 @@ window.__town={
   restart: combat.handleRestart,
   teleport(x,z,yaw=0,pitch=0){ controls.player.x=x; controls.player.z=z; controls.player.yaw=yaw; controls.player.pitch=pitch; controls.snapDown(); },
   respawn: controls.respawn,
+  setMap: world.setMap,                   // jump to a named map (offline / debug)
+  rotateMap: world.rotateMap,             // advance to the next map in the rotation
+  get map(){ return world.currentMapName; },
   get pos(){ return [controls.player.x, controls.player.z]; },
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly

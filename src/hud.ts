@@ -3,6 +3,7 @@
 // Holds the local player's health and the shared score table.
 import { myId } from './net';
 import { introVisible } from './controls';
+import { mapLabel } from './world';
 
 const scoresEl=document.getElementById('scores');
 const scoreRowsEl=document.getElementById('scoreRows');
@@ -70,15 +71,17 @@ const ovWinnerEl=document.getElementById('ovWinner');
 const ovCapEl=document.getElementById('ovCap');
 const ovRowsEl=document.getElementById('ovRows');
 const ovCountEl=document.getElementById('ovCount');
+const ovNextEl=document.getElementById('ovNext');
 let countTimer=null;
 
 function paintCount(s){
   ovCountEl.textContent = s>0 ? `The next contest begins in ${s}…` : 'Returning to the town…';
 }
-/* raise the overview with the final tally; m: {winnerId, winnerName, cap, restartIn, standings} */
+/* raise the overview with the final tally; m: {winnerId, winnerName, cap, restartIn, standings, nextMap} */
 export function showOverview(m){
   ovWinnerEl.textContent=m.winnerName||'Nobody';
   ovCapEl.textContent=m.cap;
+  if(ovNextEl) ovNextEl.textContent=m.nextMap ? `Next field · ${mapLabel(m.nextMap)}` : '';
   ovRowsEl.innerHTML=(m.standings||[]).map((s,i)=>{
     const cls=(s.id===m.winnerId?' win':'')+(s.id===myId?' me':'');
     const rank=s.id===m.winnerId?'♛':i+1;

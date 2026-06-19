@@ -318,5 +318,89 @@ export const crateTex = makeTex(256,(g,s)=>{
   }
 });
 
+/* ============================ urban (Skidrow) textures ============================ */
+// A cold, snow-dusted city block. Snow underfoot, ploughed asphalt down the
+// middle, brick and concrete apartment facades whose window grid is baked into a
+// tiling texture so a tall block reads as a high-rise the moment it's raised.
+export const snowTex = makeTex(512,(g,s)=>{
+  g.fillStyle='#d9e0e8'; g.fillRect(0,0,s,s);
+  for(let i=0;i<2600;i++){                                  // grain: cold blue-greys + sparkle
+    const v=mr(0,1);
+    g.fillStyle=`rgba(${210+v*45|0},${220+v*35|0},${232+v*23|0},${mr(.12,.45)})`;
+    g.fillRect(mr(0,s),mr(0,s),mr(2,5),mr(2,5));
+  }
+  for(let i=0;i<28;i++){                                    // soft windblown drifts
+    g.fillStyle=`rgba(255,255,255,${mr(.06,.18)})`;
+    g.beginPath(); g.ellipse(mr(0,s),mr(0,s),mr(30,80),mr(14,40),mr(0,3),0,7); g.fill();
+  }
+  for(let i=0;i<40;i++){                                    // grey slush flecks
+    g.fillStyle=`rgba(${mr(120,150)|0},${mr(128,158)|0},${mr(138,168)|0},${mr(.10,.28)})`;
+    g.beginPath(); g.arc(mr(0,s),mr(0,s),mr(2,6),0,7); g.fill();
+  }
+});
+export const snowPathTex = makeTex(256,(g,s)=>{             // trodden snow — greyer, scuffed
+  g.fillStyle='#b9c2cc'; g.fillRect(0,0,s,s);
+  speckle(g,s,1200,.12);
+  g.strokeStyle='rgba(90,98,108,.20)'; g.lineWidth=5;       // footworn ruts
+  g.beginPath(); g.moveTo(s*.34,0); g.lineTo(s*.30,s); g.stroke();
+  g.beginPath(); g.moveTo(s*.66,0); g.lineTo(s*.70,s); g.stroke();
+});
+export const asphaltTex = makeTex(256,(g,s)=>{
+  g.fillStyle='#33363b'; g.fillRect(0,0,s,s);
+  speckle(g,s,2600,.16);
+  for(let i=0;i<26;i++){                                    // aggregate grit
+    g.fillStyle=`rgba(${mr(70,100)|0},${mr(72,102)|0},${mr(78,108)|0},${mr(.1,.3)})`;
+    g.beginPath(); g.arc(mr(0,s),mr(0,s),mr(1.5,4),0,7); g.fill();
+  }
+  g.strokeStyle='rgba(20,20,22,.5)'; g.lineWidth=2;         // cracks
+  for(let i=0;i<5;i++){
+    let x=mr(0,s), y=mr(0,s); g.beginPath(); g.moveTo(x,y);
+    for(let k=0;k<4;k++){ x+=mr(-40,40); y+=mr(-40,40); g.lineTo(x,y); } g.stroke();
+  }
+  g.fillStyle='rgba(228,210,120,.55)';                      // faded centre line
+  for(let y=0;y<s;y+=64) g.fillRect(s/2-4,y+12,8,34);
+});
+function brickMaker(base, mortar, courseH){
+  return makeTex(256,(g,s)=>{
+    g.fillStyle=mortar; g.fillRect(0,0,s,s);
+    const rows=Math.round(s/courseH);
+    for(let y=0;y<rows;y++){
+      let x=(y%2)*-22;
+      while(x<s){
+        const w=mr(40,52), v=mr(-16,16);
+        g.fillStyle=`rgb(${base[0]+v|0},${base[1]+v*.6|0},${base[2]+v*.6|0})`;
+        g.fillRect(x+2, y*courseH+2, Math.min(w,s-x)-4, courseH-4);
+        x+=w;
+      }
+    }
+    speckle(g,s,1400,.10);
+  });
+}
+export const brickTex = brickMaker([138,68,52], '#3a322c', 22);
+// A tiling apartment facade: concrete-or-brick wall carrying one window cell that
+// wraps seamlessly, so uvBox tiling turns a tall block into rows of windows.
+function facadeMaker(wall, frame, glassTop, glassLow){
+  return makeTex(256,(g,s)=>{
+    g.fillStyle=wall; g.fillRect(0,0,s,s);
+    speckle(g,s,700,.06);
+    // concrete floor band along the bottom edge (reads as a slab between storeys)
+    g.fillStyle='rgba(0,0,0,.16)'; g.fillRect(0,s-10,s,10);
+    g.fillStyle='rgba(255,255,255,.05)'; g.fillRect(0,s-12,s,2);
+    const mL=s*.22, mT=s*.16, w=s-2*mL, h=s-2*mT;           // one centred window
+    g.fillStyle=frame; g.fillRect(mL-6,mT-6,w+12,h+12);     // frame / reveal
+    const grd=g.createLinearGradient(0,mT,0,mT+h);
+    grd.addColorStop(0,glassTop); grd.addColorStop(1,glassLow);
+    g.fillStyle=grd; g.fillRect(mL,mT,w,h);
+    g.strokeStyle='rgba(255,255,255,.10)'; g.lineWidth=2;   // mullions
+    g.beginPath(); g.moveTo(mL+w/2,mT); g.lineTo(mL+w/2,mT+h); g.stroke();
+    g.beginPath(); g.moveTo(mL,mT+h/2); g.lineTo(mL+w,mT+h/2); g.stroke();
+    g.fillStyle='rgba(255,255,255,.06)';                    // a faint glint
+    g.beginPath(); g.moveTo(mL+4,mT+4); g.lineTo(mL+w*.4,mT+4); g.lineTo(mL+4,mT+h*.4); g.fill();
+  });
+}
+export const facadeConcreteTex = facadeMaker('#8b8d90', '#5a5c5f', '#39424d', '#212a33');
+export const facadeBrickTex     = facadeMaker('#7c4438', '#43352c', '#39424d', '#202831');
+export const facadeWornTex      = facadeMaker('#9a958c', '#6b6660', '#3c4650', '#242c34');
+
 /* clone a texture with its own repeat — used by materials and the town builder */
 export function clonedTex(t, rx, ry){ const c=t.clone(); c.needsUpdate=true; c.repeat.set(rx,ry); return c; }
