@@ -98,7 +98,61 @@ const HEAD_MULT = 2;          // a ball to the head hits this much harder than a
 const REGEN_DELAY = 3000;     // unharmed this long and the bar begins to refill
 const REGEN_TICK_MS = 500;    // …topped up this often
 const REGEN_PER_TICK = 8;     // …by this much each step (≈16 hp/s, ~6s from the brink)
-const SPAWN = { x: 0, y: 1.65, z: 38.5, yaw: 0 };
+
+// The maps the server rotates through — one swap per finished round. The server
+// holds no geometry; it only needs each map's fallback spawn and the dev-bot
+// spots (eye height `y` baked in, since there are no colliders server-side). The
+// browser builds the matching world from the map name we broadcast.
+const GAME_MAPS = [
+  {
+    name: 'dust2', label: 'de_aldermoor',
+    spawn: { x: 0, y: 1.65, z: 38.5, yaw: 0 },
+    botSpots: [
+      { x: -105, z: 0,     y: 1.65, yaw: -Math.PI / 2 }, // T spawn
+      { x: -70,  z: 11.5,  y: 1.65, yaw: -Math.PI / 2 }, // T upper
+      { x: -69,  z: 24,    y: 1.65, yaw: Math.PI },      // outside long
+      { x: -40,  z: 40.5,  y: 1.65, yaw: -Math.PI / 2 }, // long A
+      { x: 13,   z: 44,    y: 2.85, yaw: Math.PI / 2 },  // bombsite A platform (+1.2)
+      { x: -20,  z: 0,     y: 1.65, yaw: -Math.PI / 2 }, // mid
+      { x: 22,   z: 0,     y: 1.65, yaw: Math.PI / 2 },  // CT mid
+      { x: -57,  z: -21.5, y: 1.65, yaw: -Math.PI / 2 }, // upper tunnels
+      { x: -29,  z: -34,   y: 1.65, yaw: -Math.PI / 2 }, // lower tunnels
+      { x: 2,    z: -33,   y: 1.65, yaw: -Math.PI / 2 }, // bombsite B
+      { x: 30,   z: -18,   y: 1.65, yaw: Math.PI / 2 },  // B doors corridor
+      { x: 55,   z: 35,    y: 1.65, yaw: Math.PI / 2 },  // CT→A connector
+      { x: 95,   z: 2,     y: 1.65, yaw: Math.PI / 2 },  // CT spawn
+    ],
+  },
+  {
+    name: 'skidrow', label: 'mp_skidrow',
+    spawn: { x: -66, y: 1.65, z: 0, yaw: -Math.PI / 2 },
+    botSpots: [
+      { x: -66, z: 0,   y: 1.65, yaw: -Math.PI / 2 },  // west spawn
+      { x: -58, z: 22,  y: 1.65, yaw: -Math.PI / 2 },  // west yard north
+      { x: -58, z: -22, y: 1.65, yaw: -Math.PI / 2 },  // west yard south
+      { x: 66,  z: 0,   y: 1.65, yaw: Math.PI / 2 },   // east spawn
+      { x: 58,  z: 22,  y: 1.65, yaw: Math.PI / 2 },
+      { x: 58,  z: -22, y: 1.65, yaw: Math.PI / 2 },
+      { x: -16, z: 29,  y: 1.65, yaw: -Math.PI / 2 },  // north apartment
+      { x: 22,  z: 29,  y: 1.65, yaw: Math.PI / 2 },
+      { x: -16, z: -29, y: 1.65, yaw: -Math.PI / 2 },  // south apartment
+      { x: 18,  z: -29, y: 1.65, yaw: Math.PI / 2 },
+      { x: -30, z: 49,  y: 1.65, yaw: -Math.PI / 2 },  // north alley
+      { x: 30,  z: -49, y: 1.65, yaw: Math.PI / 2 },   // south alley
+      { x: 0,   z: 9,   y: 5.05, yaw: Math.PI / 2 },   // street porch (+3.4)
+    ],
+  },
+];
+let mapIndex = 0;
+let SPAWN = GAME_MAPS[mapIndex].spawn;
+let BOT_SPOTS = GAME_MAPS[mapIndex].botSpots;
+function applyMap(i) {
+  mapIndex = ((i % GAME_MAPS.length) + GAME_MAPS.length) % GAME_MAPS.length;
+  SPAWN = GAME_MAPS[mapIndex].spawn;
+  BOT_SPOTS = GAME_MAPS[mapIndex].botSpots;
+}
+const activeMapName = () => GAME_MAPS[mapIndex].name;
+const nextMapName = () => GAME_MAPS[(mapIndex + 1) % GAME_MAPS.length].name;
 // The felled lie dead this long on the client (its killscreen countdown), then
 // rise with a brief grace. Hits inside the whole window are ignored, so a corpse
 // can't be re-felled — that would hand out a phantom kill and reset the count.
@@ -172,7 +226,8 @@ function endRound(winnerId) {
     cap: KILL_CAP, standings: standings(), endsAt: Date.now() + RESTART_DELAY,
   };
   broadcastActive({ t: 'over', winnerId: overInfo.winnerId, winnerName: overInfo.winnerName,
-    cap: KILL_CAP, restartIn: RESTART_DELAY / 1000, standings: overInfo.standings });
+    cap: KILL_CAP, restartIn: RESTART_DELAY / 1000, standings: overInfo.standings,
+    nextMap: nextMapName() });
   console.log(`★ ${overInfo.winnerName} wins with ${KILL_CAP} — next round in ${RESTART_DELAY / 1000}s`);
 
   // Persist the round for every signed-in player BEFORE resetRound wipes scores.
@@ -199,6 +254,7 @@ function resetRound() {
   restartTimer = null;
   phase = 'play';
   overInfo = null;
+  applyMap(mapIndex + 1);                              // rotate to the next map for the fresh round
   const now = Date.now();
   for (const [id, p] of players) {
     p.score = 0; p.deaths = 0; p.hp = MAX_HP; p.alive = true;
@@ -212,7 +268,7 @@ function resetRound() {
     if (p.active) {                                     // a combatant heads back to the lobby
       p.active = false;
       broadcast({ t: 'leave', id, name: p.name }, id); // others drop them from the field
-      if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'lobby' })); // their client raises the menu
+      if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'lobby', map: activeMapName() })); // raise the menu on the new map
     }
   }
   const watching = [...players.values()].filter((p) => !p.bot).length;
@@ -227,24 +283,9 @@ function resetRound() {
 // attachGame's `opts.bots` — production (`attachGame(server)`) never passes it,
 // so dummies can never appear outside `npm run dev`.
 
-// Curated open-floor spots mirroring world.js SPAWNS. `y` is eye height baked per
-// spot (the server has no colliders) so a dummy stands right even on the raised
-// bombsite-A platform (+1.2).
-const BOT_SPOTS = [
-  { x: -105, z: 0,     y: 1.65, yaw: -Math.PI / 2 }, // T spawn
-  { x: -70,  z: 11.5,  y: 1.65, yaw: -Math.PI / 2 }, // T upper
-  { x: -69,  z: 24,    y: 1.65, yaw: Math.PI },      // outside long
-  { x: -40,  z: 40.5,  y: 1.65, yaw: -Math.PI / 2 }, // long A
-  { x: 13,   z: 44,    y: 2.85, yaw: Math.PI / 2 },  // bombsite A platform (+1.2)
-  { x: -20,  z: 0,     y: 1.65, yaw: -Math.PI / 2 }, // mid
-  { x: 22,   z: 0,     y: 1.65, yaw: Math.PI / 2 },  // CT mid
-  { x: -57,  z: -21.5, y: 1.65, yaw: -Math.PI / 2 }, // upper tunnels
-  { x: -29,  z: -34,   y: 1.65, yaw: -Math.PI / 2 }, // lower tunnels
-  { x: 2,    z: -33,   y: 1.65, yaw: -Math.PI / 2 }, // bombsite B
-  { x: 30,   z: -18,   y: 1.65, yaw: Math.PI / 2 },  // B doors corridor
-  { x: 55,   z: 35,    y: 1.65, yaw: Math.PI / 2 },  // CT→A connector
-  { x: 95,   z: 2,     y: 1.65, yaw: Math.PI / 2 },  // CT spawn
-];
+// Dummies scatter onto the active map's BOT_SPOTS (see GAME_MAPS). `y` is eye
+// height baked per spot (the server has no colliders) so a dummy stands right
+// even on a raised platform.
 const BOT_RANGE = 40;        // how far a dummy will return fire
 const BOT_HEADSHOT = 0.12;   // chance its ball finds the head (a one-shot)
 const BOT_FIRE_CD = 4000;    // base delay between a dummy's volleys (ms)
@@ -375,6 +416,7 @@ function attachGame(httpServer, opts = {}) {
     // they take it), but isn't announced to anyone and isn't yet a target.
     ws.send(JSON.stringify({
       t: 'welcome', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
+      map: activeMapName(),
       players: [...players.entries()]
         .filter(([pid, q]) => pid !== id && q.active)
         .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, deaths: q.deaths, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),

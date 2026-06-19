@@ -4,7 +4,7 @@
 // `walkPhase` and `introVisible` are exported as live bindings so the gun
 // viewmodel (combat) and zone/toast logic can read them without owning them.
 import { canvas, camera, EYE } from './core';
-import { colliders, colliderTopAt, SPAWNS } from './world';
+import { colliders, colliderTopAt, SPAWNS, menuCam } from './world';
 import { ac } from './audio';
 
 // player.y is the eye height that travels over the wire; player.feet is the
@@ -208,9 +208,9 @@ export function update(dt, time){
     camera.fov += (targetFov-camera.fov)*Math.min(1,dt*5);
     camera.updateProjectionMatrix();
   }else{
-    // gentle establishing drift behind the menu — drifting high over mid
+    // gentle establishing drift behind the menu — the active map sets the vantage
     const a=time*.04;
-    camera.position.set(-48+Math.sin(a)*5, 12+Math.cos(a*.7)*1.5, 2+Math.cos(a*1.3)*4);
-    camera.rotation.set(-.16, -Math.PI/2+Math.sin(a*.5)*.22, 0);
+    camera.position.set(menuCam.x+Math.sin(a)*5, menuCam.y+Math.cos(a*.7)*1.5, menuCam.z+Math.cos(a*1.3)*4);
+    camera.rotation.set(menuCam.pitch, menuCam.yaw+Math.sin(a*.5)*.22, 0);
   }
 }

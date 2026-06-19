@@ -11,6 +11,15 @@ import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, enterF
 
 import { player, vel, keys, introVisible } from './controls';
 import { getToken, getSession, onAuthChange } from './auth';
+import { setMap, mapLabel, mapBlurb, onMapChange } from './world';
+
+// Keep the lobby's map nameplate in step with whatever map is live.
+const introTitleEl=document.getElementById('introMapTitle');
+const introSubEl=document.getElementById('introMapSub');
+onMapChange(name=>{
+  if(introTitleEl) introTitleEl.textContent=mapLabel(name);
+  if(introSubEl) introSubEl.textContent=mapBlurb(name);
+});
 
 const presenceEl=document.getElementById('presence');
 export let net=null, myId=null, myName=null;
@@ -76,6 +85,7 @@ function connect(){
     let m; try{ m=JSON.parse(e.data); }catch{ return; }
     if(m.t==='welcome'){
       myId=m.id; myName=m.name; net=ws;
+      if(m.map) setMap(m.map);           // build the map the server has live right now
       resetFieldState();                 // a fresh socket starts as a lobby spectator
       scoresMap.clear();
       scoresMap.set(myId,{name:myName, score:m.score||0, deaths:m.deaths||0});
@@ -123,6 +133,7 @@ function connect(){
     }else if(m.t==='restart'){
       handleRestart(m);
     }else if(m.t==='lobby'){
+      if(m.map) setMap(m.map);           // the new round rotates the map — swap it in before the menu
       handleLobby();                     // round over — back to the menu + leaderboard, safe
     }else if(m.t==='denied'){
       // tried to take the field while a contest was wrapping up — bounce to the menu

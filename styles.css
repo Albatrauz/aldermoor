@@ -618,6 +618,16 @@ canvas#scene {
     color: var(--gold);
     text-shadow: 0 0 22px rgba(216, 169, 72, 0.35);
 }
+.ov-next {
+    margin-top: 8px;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(232, 222, 198, 0.62);
+}
+.ov-next:empty {
+    display: none;
+}
 /* keep the tally from overflowing very narrow viewports (desktop is unaffected) */
 @media (max-width: 380px) {
     .ov-inner {
