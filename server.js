@@ -62,6 +62,23 @@ function flushResults(results) {
     .catch((e) => console.warn('recordMatch failed:', e.data ?? e.message));
 }
 
+// Best-effort client IP from an upgrade request: prefer the proxy's forwarded
+// address (production runs behind one — see Dockerfile), else the raw socket.
+// Strip the IPv4-in-IPv6 prefix Node hands back for v4 clients (::ffff:1.2.3.4).
+function clientIp(req) {
+  const fwd = String(req?.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
+  const ip = fwd || req?.socket?.remoteAddress || '';
+  return ip.replace(/^::ffff:/, '');
+}
+
+// Stamp a signed-in player's last-seen IP onto their Convex account so it shows
+// in the dashboard. Fire-and-forget; never throws (mirrors flushResults).
+function recordLogin(userId, ip) {
+  if (!convex || !SERVER_SECRET || !userId) return;
+  convex.mutation(convexApi.auth.recordLogin, { secret: SERVER_SECRET, userId, ip })
+    .catch((e) => console.warn('recordLogin failed:', e.data ?? e.message));
+}
+
 // In production we serve Vite's build output; if it hasn't been built yet we
 // fall back to the project root so the server still boots (with a hint).
 const DIST = path.join(__dirname, 'dist');
@@ -394,6 +411,14 @@ function attachGame(httpServer, opts = {}) {
     const auth = await identify(token);
     if (ws.readyState !== 1) return;                  // bailed during the lookup
     if (!auth && !ALLOW_GUESTS) { try { ws.close(4001, 'sign in to play'); } catch { /* gone */ } return; }
+
+    // For a signed-in player, log the IP server-side and record it on their
+    // Convex account (visible in the dashboard as their last-known IP).
+    if (auth) {
+      const ip = clientIp(req);
+      console.log(`🔐 ${auth.username} (#${id}) signed in — IP ${ip || 'unknown'}`);
+      recordLogin(auth.userId, ip);
+    }
 
     // `baseName` is the bare chosen/account name; `name` is it deduped against the
     // field. We keep the base so a later spawn can re-dedupe cleanly (no suffix creep).

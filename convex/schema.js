@@ -17,6 +17,12 @@ export default defineSchema({
     passwordHash: v.string(), // hex PBKDF2-derived key
     salt: v.string(), // hex random salt
     createdAt: v.number(),
+    // Last client IP seen when this account connected to the game, and when.
+    // Written ONLY by server.js (the sole place with the real request IP) via
+    // auth.recordLogin. Optional so a schema push never fails against rows
+    // created before these fields existed.
+    lastIp: v.optional(v.string()),
+    lastLoginAt: v.optional(v.number()),
   }).index("by_username", ["username"]),
 
   // Bearer tokens handed to the browser on sign-in. server.js trades a token

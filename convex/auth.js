@@ -15,7 +15,7 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 // OWASP-recommended floor for PBKDF2-HMAC-SHA256. NOTE: this count is baked into
@@ -128,6 +128,28 @@ export const signOut = mutation({
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
     if (session) await ctx.db.delete(session._id);
+  },
+});
+
+/* ---- server-only login record (guarded by the secret server.js holds) ---- */
+// Stamp the client IP server.js saw when a signed-in player connected, so the
+// last-known IP is visible in the Convex dashboard. The browser never calls
+// this — only the authoritative game server, which alone sees the real request
+// IP (Convex actions don't get the caller's address). Same fail-closed secret
+// check as stats.recordMatch.
+function assertServer(secret) {
+  const expected = process.env.SERVER_SHARED_SECRET;
+  if (!expected) throw new ConvexError("forbidden: SERVER_SHARED_SECRET is not set on the Convex deployment");
+  if (secret !== expected) throw new ConvexError("forbidden: SERVER_SHARED_SECRET mismatch between game server and Convex deployment");
+}
+
+export const recordLogin = mutation({
+  args: { secret: v.string(), userId: v.id("users"), ip: v.string() },
+  handler: async (ctx, { secret, userId, ip }) => {
+    assertServer(secret);
+    const user = await ctx.db.get(userId);
+    if (!user) return; // account vanished between connect and write — nothing to stamp
+    await ctx.db.patch(userId, { lastIp: ip, lastLoginAt: Date.now() });
   },
 });
 
