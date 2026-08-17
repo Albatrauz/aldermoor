@@ -80,13 +80,13 @@ function build(): BuiltMap {
       const w = mesh(new THREE.CylinderGeometry(.34, .34, .22, 10), matIron, cx + wx, .34, cz + wz, { rx: Math.PI / 2 });
       add(w);
     }
-    addCollider(cx, cz, 2.2, .95, 1.6);
+    addCollider(cx, cz, 2.2, .95, 1.6, 0, matCarRed);
   }
   ramp(-6, 40.5, 8, 9, 1.2, '+x', matSandstone);         // ramp up to A
 
   /* ============================ Bombsite A (raised +1.2) ============================ */
   block(13, 44, 30, 1.2, 26, matConcrete);
-  addCollider(13, 44, 15, 13, 1.2);
+  addCollider(13, 44, 15, 13, 1.2, 0, matConcrete);
   wallX(57, -2, 28);                                     // site north
   wallZ(-2, 31, 57, { gaps: [[36, 45]] });               // site west (open at long ramp)
   wallZ(28, 31, 57, { gaps: [[31, 39]] });               // site east (open to CT ramp)
@@ -101,7 +101,7 @@ function build(): BuiltMap {
   wallZ(8, 5, 31);
   ramp(4, 12, 7.2, 6, 1.4, '+z', matConcrete);
   block(4, 23, 7.2, 1.4, 16, matConcrete);
-  addCollider(4, 23, 3.6, 8, 1.4);
+  addCollider(4, 23, 3.6, 8, 1.4, 0, matConcrete);
 
   /* ============================ Mid ============================ */
   wallX(5, -88, 80, { gaps: [[-57, -52], [0, 8]] });     // north (T-upper entrance, catwalk)
@@ -152,7 +152,7 @@ function build(): BuiltMap {
   block(16, -28, WT, 2.6, 6, matSandstone, 2.4);         // window head
   addCollider(16, -28, WT / 2, 3, 5, 2.4);
   block(11, -43, 10, 1.6, 8, matConcrete);               // back plat (raised 1.6)
-  addCollider(11, -43, 5, 4, 1.6);
+  addCollider(11, -43, 5, 4, 1.6, 0, matConcrete);
   ramp(11, -36.6, 8, 4.8, 1.6, '-z', matConcrete);
   solid(-2, -40, 1.8, .8, 1.8, matCrate);
   solid(-.2, -40, 1.8, 1.6, 1.8, matCrate);
@@ -254,13 +254,38 @@ export const dust2: MapDef = {
   blurb: 'A sun-bleached desert stronghold of long lanes and dark tunnels.',
   menuCam: { x: -48, y: 12, z: 2, yaw: -Math.PI / 2, pitch: -.16 },
   env: {
-    skyTop: 0x4a78b8, skyMid: 0x9fc0e0, skyLow: 0xe8d9b0,
-    sunColor: 0xfff0d8, sunIntensity: 2.6, sunDir: [0.4, 0.85, 0.3],
-    hemiSky: 0x9fc0e0, hemiGround: 0x8a7350, hemiIntensity: 0.9,
-    fillColor: 0xb9c9de, fillIntensity: 0.4,
+    // Hard, dry, cloudless. Low turbidity keeps the zenith deep and the light
+    // punchy — the sky a desert noon actually has.
+    sky: {
+      turbidity: 2.2, rayleigh: 0.9,
+      mieCoefficient: 0.005, mieDirectionalG: 0.8,
+      cloudCoverage: 0, cloudDensity: 0.4,
+      cloudScale: 0.0002, cloudSpeed: 0.0001, cloudElevation: 0.5,
+    },
+    sunDir: [0.4, 0.85, 0.3],
+    sunColor: 0xfff0d8, sunIntensity: 3.2,
+    // Calibrated, not guessed. A Preetham sky carries real radiance — far above
+    // the 0..1 the old hand-painted gradient produced — so a baked env map at
+    // full strength bleaches every albedo in the map to grey. Measured against
+    // frame saturation: 1.0 gave 0.10, this gives 0.28 at the same brightness.
+    // The sun stays dominant, and the env fills the shadows with sky colour,
+    // which is exactly the division of labour we want.
+    environmentIntensity: 0.2,
+    shadowIntensity: 0.9,          // strong sun, strong shadow
+    // The baked sky now does the work the hemisphere light used to fake, so
+    // these drop hard. What's left is the one thing a sky-only bake can't give:
+    // bounce off the sand, which keeps undersides from going to slate.
+    hemiSky: 0x9fc0e0, hemiGround: 0xc9a76e, hemiIntensity: 0.25,
+    fillColor: 0xb9c9de, fillIntensity: 0.12,
     fogColor: 0xcdbb94, fogDensity: 0.0025,
-    exposure: 1.15,
-    glowColor: 0xfff4dc, glowOpacity: 0.85,
+    fogHeight: 9, fogHeightFalloff: 0.10,
+    exposure: 0.4,
+    toneMapping: THREE.ACESFilmicToneMapping,
+    groundSurface: 'sand',
+    // Fine dust hanging in the heat — sparse, tiny, barely falling.
+    weather: { count: 700, colour: 0xe8d3a8, size: 42, fall: .55, sway: 2.2, opacity: .3, streak: 0 },
+    glowColor: 0xfff4dc, glowOpacity: 0.0,   // Sky draws its own sun disc now
+    lanterns: false,
   },
   build,
 };

@@ -7,25 +7,54 @@
 // controls.ts and effects.ts consume them.
 import * as THREE from 'three';
 import { mesh, uvBox } from './core';
+import type { Surface } from './materials';
+import type { WeatherSpec } from './weather';
+import type { SkyParams } from './sky';
 
 export interface Collider {
   x: number; z: number; hx: number; hz: number;
   base: number; top: number; h: number;
   kind: 'box' | 'ramp';
   loTop?: number; hiTop?: number; axis?: 'x' | 'z';
+  // The material this collider was built from. Carried so a bullet impact can
+  // look up what it hit (sand throws dust, steel throws sparks) without every
+  // map having to declare its surfaces a second time.
+  mat?: THREE.Material;
 }
 export interface Spawn { x: number; z: number; yaw: number; }
 export interface Zone { x: number; z: number; r: number; name: string; }
 
 // The colour/atmosphere a map asks the shared sky, sun and fog to wear.
 export interface MapEnv {
-  skyTop: number; skyMid: number; skyLow: number;
-  sunColor: number; sunIntensity: number; sunDir: [number, number, number];
+  // The atmosphere itself. This drives the visible sky AND — baked once at map
+  // load — the ambient light every material sees, so the two cannot drift apart.
+  sky: SkyParams;
+  sunDir: [number, number, number];
+  sunColor: number; sunIntensity: number;
+  // How much of the baked sky reaches the materials. The lever that lets one
+  // lighting rig serve a glaring desert and an overcast street.
+  environmentIntensity: number;
+  // 0..1. Low on an overcast map, where shadows should be a suggestion rather
+  // than a hole — and where a black shadow is somewhere a player disappears.
+  shadowIntensity: number;
+  // A little direct fill survives the env map: it shapes surfaces the sky alone
+  // leaves ambiguous. Both are much weaker than they were before the env map.
   hemiSky: number; hemiGround: number; hemiIntensity: number;
   fillColor: number; fillIntensity: number;
   fogColor: number; fogDensity: number;
+  // Fog thickens toward the ground: haze in the desert, mist pooling in alleys.
+  fogHeight: number; fogHeightFalloff: number;
   exposure: number;
+  toneMapping: THREE.ToneMapping;
   glowColor: number; glowOpacity: number;
+  // What the open ground throws up when shot — fire() resolves ground hits
+  // geometrically, so there is no collider material to look up.
+  groundSurface: Surface;
+  // Falling snow, drifting dust, or nothing. count:0 switches it off.
+  weather?: WeatherSpec;
+  // Player lanterns. They belong to a night-time market town, not to high noon
+  // in a desert — off unless a map actually wants them.
+  lanterns: boolean;
 }
 
 // Where the lobby camera drifts while the menu is up (a gentle establishing shot).
@@ -87,8 +116,8 @@ export interface Builder {
   WH: number;
   WT: number;
   add(obj: THREE.Object3D): void;
-  addCollider(x: number, z: number, hx: number, hz: number, top?: number, base?: number): void;
-  addRamp(x: number, z: number, hx: number, hz: number, loTop: number, hiTop: number, axis?: 'x' | 'z'): void;
+  addCollider(x: number, z: number, hx: number, hz: number, top?: number, base?: number, mat?: THREE.Material): void;
+  addRamp(x: number, z: number, hx: number, hz: number, loTop: number, hiTop: number, axis?: 'x' | 'z', mat?: THREE.Material): void;
   block(cx: number, cz: number, sx: number, sy: number, sz: number, mat?: THREE.Material, base?: number, uv?: number): THREE.Mesh;
   solid(cx: number, cz: number, sx: number, sy: number, sz: number, mat?: THREE.Material, base?: number): void;
   wallX(z: number, x1: number, x2: number, opts?: WallOpts): void;
@@ -118,12 +147,12 @@ export function createBuilder(opts: BuilderOpts): Builder {
 
   const add = (obj: THREE.Object3D) => { group.add(obj); };
 
-  const addCollider: Builder['addCollider'] = (x, z, hx, hz, top = 5, base = 0) =>
-    colliders.push({ x, z, hx, hz, base, top, h: top, kind: 'box' });
+  const addCollider: Builder['addCollider'] = (x, z, hx, hz, top = 5, base = 0, mat = wallMat) =>
+    colliders.push({ x, z, hx, hz, base, top, h: top, kind: 'box', mat });
 
-  const addRamp: Builder['addRamp'] = (x, z, hx, hz, loTop, hiTop, axis = 'x') =>
+  const addRamp: Builder['addRamp'] = (x, z, hx, hz, loTop, hiTop, axis = 'x', mat = rampMat) =>
     colliders.push({ x, z, hx, hz, base: 0, loTop, hiTop, axis,
-      top: Math.max(loTop, hiTop), h: Math.max(loTop, hiTop), kind: 'ramp' });
+      top: Math.max(loTop, hiTop), h: Math.max(loTop, hiTop), kind: 'ramp', mat });
 
   // a textured box whose *base* sits at y=`base` (no collider)
   const block: Builder['block'] = (cx, cz, sx, sy, sz, mat = wallMat, base = 0, uv = .22) => {
@@ -135,7 +164,7 @@ export function createBuilder(opts: BuilderOpts): Builder {
   // box + matching collider
   const solid: Builder['solid'] = (cx, cz, sx, sy, sz, mat = wallMat, base = 0) => {
     block(cx, cz, sx, sy, sz, mat, base);
-    addCollider(cx, cz, sx / 2, sz / 2, base + sy, base);
+    addCollider(cx, cz, sx / 2, sz / 2, base + sy, base, mat);
   };
 
   // wall running along X at fixed z, with optional doorway gaps
@@ -150,7 +179,7 @@ export function createBuilder(opts: BuilderOpts): Builder {
   // overhead beam across a doorway: passable below `under`, blocks shots above
   const lintel: Builder['lintel'] = (cx, cz, sx, sz, under = 3.0, top = WH, mat = wallMat) => {
     block(cx, cz, sx, top - under, sz, mat, under);
-    addCollider(cx, cz, sx / 2, sz / 2, top, under);
+    addCollider(cx, cz, sx / 2, sz / 2, top, under, mat);
   };
 
   // walkable ramp: `facing` is the direction of ascent
@@ -159,10 +188,10 @@ export function createBuilder(opts: BuilderOpts): Builder {
     const g = wedgeGeo(along ? sx : sz, h, along ? sz : sx);
     const ry = facing === '+x' ? 0 : facing === '-x' ? Math.PI : facing === '+z' ? -Math.PI / 2 : Math.PI / 2;
     group.add(mesh(g, mat, cx, 0, cz, { ry }));
-    if (facing === '+x') addRamp(cx, cz, sx / 2, sz / 2, 0, h, 'x');
-    else if (facing === '-x') addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'x');
-    else if (facing === '+z') addRamp(cx, cz, sx / 2, sz / 2, 0, h, 'z');
-    else addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'z');
+    if (facing === '+x') addRamp(cx, cz, sx / 2, sz / 2, 0, h, 'x', mat);
+    else if (facing === '-x') addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'x', mat);
+    else if (facing === '+z') addRamp(cx, cz, sx / 2, sz / 2, 0, h, 'z', mat);
+    else addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'z', mat);
   };
 
   return { group, colliders, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp };

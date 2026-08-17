@@ -10,27 +10,70 @@ import * as zones from './zones';
 import * as combat from './combat';
 import * as villagers from './villagers';
 import { updateFx } from './effects';
+import { updateParticles } from './particles';
+import { updateWeather } from './weather';
 import * as net from './net';
+import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
 import './stats';            // reactive leaderboard + career (no-op without Convex)
 
-const clock=new THREE.Clock();
+// Timer over Clock: Clock warns on construction from r183, and Timer takes the
+// timestamp requestAnimationFrame already hands us instead of calling
+// performance.now() a second time. getDelta() is in seconds either way.
+const clock=new THREE.Timer();
 let time=0;
+// compileAsync yields back to the event loop. The render loop must not run
+// while pooled meshes are temporarily visible, or they draw at the origin
+// for a frame — and a shot fired in that window would then be hidden again
+// when visibility is restored.
+let prewarming = false;
 
 function frame(dt){
   time+=dt;
   controls.update(dt, time);   // movement / menu drift + camera
   zones.update(dt);            // zone toasts
   combat.update(dt);           // handgonne viewmodel
-  updateFx(dt);                // tracers, flashes, smoke puffs
+  updateFx(dt);                // tracers, flashes, smoke puffs, impacts
+  updateParticles(dt);         // GPU debris — just advances the shader's clock
+  updateWeather(dt);           // snow / dust, box snapped to the camera
   world.updateAmbient(time);   // ambient animation (a no-op at high noon)
   villagers.updateRemotes(dt); // interpolate fellow travellers
   renderer.render(scene,camera);
+  quality.sample(dt);          // after the render: info.render resets on each render()
 }
-function animate(){
+function animate(ts?: number){
   requestAnimationFrame(animate);
+  clock.update(ts);
+  if (prewarming) return;
   frame(Math.min(clock.getDelta(), .05));
 }
 animate();
+
+/* ============================ shader pre-warming ============================ */
+// Three compiles a shader program the first time a given material/light/geometry
+// combination is actually drawn. Measured: firing the first shot took the program
+// count from 25 to 27, i.e. two compiles mid-firefight — exactly the wrong moment.
+// The same happens the first time a player joins and their rig is drawn.
+//
+// compileAsync walks the scene and builds everything it can ahead of time, off
+// the critical path. The effect pools already live in the scene (they are just
+// invisible), so briefly revealing them is what lets the compiler see them at all
+// — an invisible object is skipped by the renderer and therefore never compiled.
+async function prewarm(){
+  const hidden: THREE.Object3D[] = [];
+  prewarming = true;
+  try {
+    scene.traverse((o) => {
+      if (!o.visible) { o.visible = true; hidden.push(o); }
+    });
+    await renderer.compileAsync(scene, camera);
+  } catch { /* a warm-up failure must never keep the game from starting */ }
+  finally {
+    for (const o of hidden) o.visible = false;
+    prewarming = false;
+  }
+}
+// After the first frames, so it never competes with getting something on screen.
+setTimeout(prewarm, 400);
 
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
@@ -52,6 +95,9 @@ window.__town={
   get pos(){ return [controls.player.x, controls.player.z]; },
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly
+  perf: quality.stats,                    // frame time + draw counts
+  showPerf: quality.showPerf,             // on-screen overlay (also: backquote)
+  renderer, sun: world.sun,               // handles for A/B-ing lighting costs
   kill(id){ villagers.killRemote(id); },                 // topple a fellow traveller (death-anim check)
 
   get me(){ return {id:net.myId, name:net.myName, connected:!!net.net}; },

@@ -262,13 +262,46 @@ export const skidrow: MapDef = {
   blurb: 'A snow-choked city block of tall apartments and a long, cover-strewn street.',
   menuCam: { x: -58, y: 11, z: 0, yaw: -Math.PI / 2, pitch: -.12 },
   env: {
-    skyTop: 0x6c7884, skyMid: 0x97a2ac, skyLow: 0xc3cace,
-    sunColor: 0xdce4ee, sunIntensity: 1.5, sunDir: [0.25, 0.9, 0.35],
-    hemiSky: 0xaeb8c2, hemiGround: 0x55585c, hemiIntensity: 1.05,
-    fillColor: 0xc2ccd6, fillIntensity: 0.35,
+    // Heavy overcast. High turbidity plus near-total cloud gives the flat white
+    // ceiling of a snowy city day — the thing the old three-band gradient could
+    // never fake, and the reason this map now reads as a different climate
+    // rather than the desert in grey paint.
+    sky: {
+      turbidity: 12, rayleigh: 0.35,
+      mieCoefficient: 0.008, mieDirectionalG: 0.75,
+      // Coverage has a hard ceiling worth knowing about: the shader thresholds
+      // its noise with smoothstep(1-coverage, 1-coverage+0.3, n) where n lands
+      // in roughly [0.5, 1.25]. Past ~0.5 that saturates to 1 everywhere, so the
+      // sky becomes one flat sheet and cloudScale stops doing anything at all.
+      // 0.45 keeps the threshold inside the noise range, which is where you
+      // actually get clouds instead of grey paint.
+      cloudCoverage: 0.45, cloudDensity: 0.7,
+      // The default 0.0002 spans well under one noise cell across the visible
+      // sky — a smooth gradient, not weather. This gives readable cloud masses.
+      cloudScale: 0.012, cloudSpeed: 0.00008, cloudElevation: 0.42,
+    },
+    sunDir: [0.25, 0.9, 0.35],
+    // The inverse balance to the desert: on an overcast day almost all the light
+    // is ambient, so the sun is barely more than a direction hint and the env map
+    // carries the scene. See dust2 for why the absolute numbers are this small.
+    sunColor: 0xdce4ee, sunIntensity: 1.2,
+    environmentIntensity: 1.3,
+    shadowIntensity: 0.3,          // a suggestion, not a hole to hide in
+    // Snow is a huge reflector — the ground bounce here is a real effect, not a
+    // cheat, and it's what stops undersides going muddy on a sunless day.
+    hemiSky: 0xaeb8c2, hemiGround: 0xd9e0e8, hemiIntensity: 0.35,
+    fillColor: 0xc2ccd6, fillIntensity: 0.1,
     fogColor: 0xb6bec6, fogDensity: 0.0045,
-    exposure: 1.05,
+    fogHeight: 6, fogHeightFalloff: 0.16,   // mist sits low, between the blocks
+    exposure: 0.8,
+    // AgX rolls the blown-out sky off far more gracefully than ACES, which
+    // pushes bright snow toward cyan.
+    toneMapping: THREE.AgXToneMapping,
+    groundSurface: 'snow',
+    // Heavy, slow snow: the map's whole identity in one draw call.
+    weather: { count: 1800, colour: 0xf2f7fc, size: 105, fall: 3.4, sway: 1.5, opacity: .62, streak: 1 },
     glowColor: 0xdfe6ee, glowOpacity: 0.0,
+    lanterns: false,
   },
   build,
 };

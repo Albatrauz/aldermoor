@@ -3,56 +3,89 @@
 // reused across every building, prop and villager.
 import * as THREE from 'three';
 import {
-  clonedTex, cobbleTex, grassTex, dirtTex, stoneTex, stoneTex2, plankTex,
-  wallStyles, roofTexes, stripeTex,
+  clonedTex, normalFor, plankTex,
   sandTex, sandPathTex, sandstoneTex, sandstoneTex2, concreteTex, crateTex,
   snowTex, snowPathTex, asphaltTex, brickTex,
   facadeConcreteTex, facadeBrickTex, facadeWornTex,
 } from './textures';
 
-export const matCobble = new THREE.MeshStandardMaterial({map:clonedTex(cobbleTex,22,22), roughness:1});
-export const matGrass  = new THREE.MeshStandardMaterial({map:clonedTex(grassTex,56,56), roughness:1});
-export const matDirt   = new THREE.MeshStandardMaterial({map:clonedTex(dirtTex,1.4,9), roughness:1});
-export const matStone  = new THREE.MeshStandardMaterial({map:stoneTex,  roughness:.95});
-export const matStone2 = new THREE.MeshStandardMaterial({map:stoneTex2, roughness:.95});
-export const matPlank  = new THREE.MeshStandardMaterial({map:plankTex, roughness:.9});
-export const matDarkWood = new THREE.MeshStandardMaterial({color:0x3a2a1c, roughness:.9});
-export const matIron   = new THREE.MeshStandardMaterial({color:0x2c2824, roughness:.55, metalness:.7});
-export const matLitWin = new THREE.MeshBasicMaterial({color:0xffbe69});
-export const matLitWin2= new THREE.MeshBasicMaterial({color:0xffa84e});
-export const matDarkWin= new THREE.MeshStandardMaterial({color:0x161d2e, roughness:.25, metalness:.5});
-export const matFoliage= new THREE.MeshStandardMaterial({color:0x36482c, roughness:1});
-export const matFoliage2=new THREE.MeshStandardMaterial({color:0x2c3d26, roughness:1});
-export const matGoldTrim=new THREE.MeshStandardMaterial({color:0xcaa64e, roughness:.35, metalness:.8});
-export const wallMats  = wallStyles.map(t=>new THREE.MeshStandardMaterial({map:t, roughness:.95}));
-export const roofMats  = roofTexes.map(t=>new THREE.MeshStandardMaterial({map:t, roughness:.95}));
-export const stripeMats= ['#8d3b32','#3f5d43','#3c4668'].map(c=>new THREE.MeshStandardMaterial({map:stripeTex(c), roughness:.9, side:THREE.DoubleSide}));
+/* A world surface: albedo plus the relief derived from it.
+   The repeat has to be applied to BOTH — three gives every texture slot its own
+   UV transform, so a normal map left at 1x1 under a floor tiled 40x34 would
+   stretch a single bump across the entire map. `relief` is the normalScale:
+   masonry wants a firm edge, sand and snow only want a suggestion. */
+function surface(
+  tex: THREE.Texture,
+  opts: { repeat?: [number, number]; roughness?: number; metalness?: number; relief?: number } = {},
+) {
+  const [rx, ry] = opts.repeat ?? [1, 1];
+  const relief = opts.relief ?? 1;
+  return new THREE.MeshStandardMaterial({
+    map: (rx === 1 && ry === 1) ? tex : clonedTex(tex, rx, ry),
+    normalMap: normalFor(tex, rx, ry),
+    normalScale: new THREE.Vector2(relief, relief),
+    roughness: opts.roughness ?? 1,
+    metalness: opts.metalness ?? 0,
+  });
+}
 
+/* ============================ impact surfaces ============================ */
+// What a bullet should throw up when it hits a thing. Colliders carry the
+// material they were built from, so the shot code can look the surface up here
+// rather than every map having to declare it a second time.
+export type Surface = 'stone' | 'sand' | 'snow' | 'metal' | 'wood' | 'concrete';
+
+const surfaces = new WeakMap<THREE.Material, Surface>();
+function tag<T extends THREE.Material>(m: T, s: Surface): T { surfaces.set(m, s); return m; }
+export function surfaceOf(m?: THREE.Material | null): Surface {
+  return (m && surfaces.get(m)) || 'stone';
+}
+
+// Dust colour per surface, plus how big a puff it kicks up. Metal throws almost
+// no dust but bright sparks; snow throws a lot of very pale powder.
+export const IMPACT: Record<Surface, { dust: number; puff: number; specks: number }> = {
+  stone:    { dust: 0xc9b48c, puff: 1.0, specks: 6 },
+  sand:     { dust: 0xd8bd8b, puff: 1.5, specks: 7 },
+  snow:     { dust: 0xeef3f8, puff: 1.7, specks: 8 },
+  metal:    { dust: 0xffd08a, puff: 0.35, specks: 9 },
+  wood:     { dust: 0xb08b56, puff: 0.8, specks: 7 },
+  concrete: { dust: 0xb9b4aa, puff: 1.2, specks: 6 },
+};
+
+/* --- shared props & kit (both maps) ---
+   What survives of the original market town: the handful of materials the
+   weapons and the villager rig still dress themselves in. The rest of the
+   medieval set went with the town itself. */
+export const matPlank    = tag(new THREE.MeshStandardMaterial({map:plankTex, roughness:.9}), 'wood');
+export const matDarkWood = tag(new THREE.MeshStandardMaterial({color:0x3a2a1c, roughness:.9}), 'wood');
+export const matIron     = tag(new THREE.MeshStandardMaterial({color:0x2c2824, roughness:.55, metalness:.7}), 'metal');
+export const matGoldTrim = tag(new THREE.MeshStandardMaterial({color:0xcaa64e, roughness:.35, metalness:.8}), 'metal');
 /* --- desert (Dust2) palette --- */
-export const matSand          = new THREE.MeshStandardMaterial({map:clonedTex(sandTex,40,34), roughness:1});
-export const matSandPath      = new THREE.MeshStandardMaterial({map:clonedTex(sandPathTex,3,18), roughness:1});
-export const matSandstone     = new THREE.MeshStandardMaterial({map:sandstoneTex,  roughness:.95});
-export const matSandstoneDark = new THREE.MeshStandardMaterial({map:sandstoneTex2, roughness:.95});
-export const matConcrete      = new THREE.MeshStandardMaterial({map:concreteTex, roughness:.9});
-export const matCrate         = new THREE.MeshStandardMaterial({map:crateTex, roughness:.85});
-export const matContainerBlue = new THREE.MeshStandardMaterial({color:0x2f6fb0, roughness:.55, metalness:.35});
-export const matCarRed        = new THREE.MeshStandardMaterial({color:0xb5402e, roughness:.5,  metalness:.25});
-export const matSandbag       = new THREE.MeshStandardMaterial({color:0xb8a878, roughness:1});
-export const matMetalDoor     = new THREE.MeshStandardMaterial({color:0x5a6b3a, roughness:.55, metalness:.5});
-
+export const matSand          = tag(surface(sandTex,       {repeat:[40,34], roughness:1,   relief:.35}), 'sand');
+export const matSandPath      = tag(surface(sandPathTex,   {repeat:[3,18],  roughness:1,   relief:.25}), 'sand');
+export const matSandstone     = tag(surface(sandstoneTex,  {roughness:.95, relief:1.1}), 'stone');   // masonry courses
+export const matSandstoneDark = tag(surface(sandstoneTex2, {roughness:.95, relief:1.1}), 'stone');
+export const matConcrete      = tag(surface(concreteTex,   {roughness:.9,  relief:.55}), 'concrete');
+export const matCrate         = tag(surface(crateTex,      {roughness:.85, relief:.9}), 'wood');   // plank edges
+export const matContainerBlue = tag(new THREE.MeshStandardMaterial({color:0x2f6fb0, roughness:.55, metalness:.35}), 'metal');
+export const matCarRed        = tag(new THREE.MeshStandardMaterial({color:0xb5402e, roughness:.5,  metalness:.25}), 'metal');
+export const matSandbag       = tag(new THREE.MeshStandardMaterial({color:0xb8a878, roughness:1}), 'sand');
+export const matMetalDoor     = tag(new THREE.MeshStandardMaterial({color:0x5a6b3a, roughness:.55, metalness:.5}), 'metal');
 /* --- urban (Skidrow) palette --- */
-export const matSnow      = new THREE.MeshStandardMaterial({map:clonedTex(snowTex,30,26), roughness:.95});
-export const matSnowPath  = new THREE.MeshStandardMaterial({map:clonedTex(snowPathTex,4,16), roughness:1});
-export const matAsphalt   = new THREE.MeshStandardMaterial({map:clonedTex(asphaltTex,8,30), roughness:.95});
-export const matBrick     = new THREE.MeshStandardMaterial({map:brickTex, roughness:.95});
+export const matSnow      = tag(surface(snowTex,     {repeat:[30,26], roughness:.95, relief:.3}), 'snow');
+export const matSnowPath  = tag(surface(snowPathTex, {repeat:[4,16],  roughness:1,   relief:.3}), 'snow');
+export const matAsphalt   = tag(surface(asphaltTex,  {repeat:[8,30],  roughness:.95, relief:.45}), 'concrete');
+export const matBrick     = tag(surface(brickTex,    {roughness:.95, relief:1.2}), 'stone');   // brick courses read hard
 // Facades read their window grid from a tiling texture; the apartment-building
 // helper clones these per block so each tower repeats the grid at its own scale.
-export const matFacadeConcrete = new THREE.MeshStandardMaterial({map:facadeConcreteTex, roughness:.92});
-export const matFacadeBrick    = new THREE.MeshStandardMaterial({map:facadeBrickTex,    roughness:.95});
-export const matFacadeWorn     = new THREE.MeshStandardMaterial({map:facadeWornTex,     roughness:.92});
-export const matRoofTar   = new THREE.MeshStandardMaterial({color:0x2b2d31, roughness:.9});
-export const matSnowCap   = new THREE.MeshStandardMaterial({color:0xe6ecf2, roughness:.9});  // snow on ledges/roofs
-export const matRust      = new THREE.MeshStandardMaterial({color:0x7a4a32, roughness:.85, metalness:.3});
-export const matDumpster  = new THREE.MeshStandardMaterial({color:0x2f5a3e, roughness:.6, metalness:.35});
-export const matCarBlue   = new THREE.MeshStandardMaterial({color:0x2c4763, roughness:.5, metalness:.3});
-export const matCarGrey   = new THREE.MeshStandardMaterial({color:0x6a6f76, roughness:.5, metalness:.3});
+// Low relief on purpose: the window grid is painted, so a strong normal map
+// embosses the glass itself rather than just the reveal around it.
+export const matFacadeConcrete = tag(surface(facadeConcreteTex, {roughness:.92, relief:.6}), 'concrete');
+export const matFacadeBrick    = tag(surface(facadeBrickTex,    {roughness:.95, relief:.6}), 'stone');
+export const matFacadeWorn     = tag(surface(facadeWornTex,     {roughness:.92, relief:.6}), 'concrete');
+export const matRoofTar   = tag(new THREE.MeshStandardMaterial({color:0x2b2d31, roughness:.9}), 'concrete');
+export const matSnowCap   = tag(new THREE.MeshStandardMaterial({color:0xe6ecf2, roughness:.9}), 'snow');   // snow on ledges/roofs
+export const matRust      = tag(new THREE.MeshStandardMaterial({color:0x7a4a32, roughness:.85, metalness:.3}), 'metal');
+export const matDumpster  = tag(new THREE.MeshStandardMaterial({color:0x2f5a3e, roughness:.6, metalness:.35}), 'metal');
+export const matCarBlue   = tag(new THREE.MeshStandardMaterial({color:0x2c4763, roughness:.5, metalness:.3}), 'metal');
+export const matCarGrey   = tag(new THREE.MeshStandardMaterial({color:0x6a6f76, roughness:.5, metalness:.3}), 'metal');

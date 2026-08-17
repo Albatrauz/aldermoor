@@ -4,3 +4,4 @@ dist/
 .env.local
 .env
 convex/_generated
+.DS_Store
