@@ -10,6 +10,8 @@ import * as zones from './zones';
 import * as combat from './combat';
 import * as villagers from './villagers';
 import { updateFx } from './effects';
+import { updateParticles } from './particles';
+import { updateWeather } from './weather';
 import * as net from './net';
 import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
 import './stats';            // reactive leaderboard + career (no-op without Convex)
@@ -25,7 +27,9 @@ function frame(dt){
   controls.update(dt, time);   // movement / menu drift + camera
   zones.update(dt);            // zone toasts
   combat.update(dt);           // handgonne viewmodel
-  updateFx(dt);                // tracers, flashes, smoke puffs
+  updateFx(dt);                // tracers, flashes, smoke puffs, impacts
+  updateParticles(dt);         // GPU debris — just advances the shader's clock
+  updateWeather(dt);           // snow / dust, box snapped to the camera
   world.updateAmbient(time);   // ambient animation (a no-op at high noon)
   villagers.updateRemotes(dt); // interpolate fellow travellers
   renderer.render(scene,camera);

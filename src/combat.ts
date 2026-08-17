@@ -4,10 +4,11 @@
 import * as THREE from 'three';
 import { scene, camera, renderer } from './core';
 import { WEAPONS, buildHandgonneFP, buildAK47FP } from './weapons';
-import { colliders } from './world';
+import { colliders, groundSurface } from './world';
 import { remotes, killRemote } from './villagers';
 import { myId, sendNet } from './net';
-import { spawnFlash, spawnTracer, spawnDamageNumber, rayAABB, rayPlayer } from './effects';
+import { spawnFlash, spawnTracer, spawnDamageNumber, spawnImpact, aabbNormal,
+  impactSurfaceOf, rayAABB, rayPlayer } from './effects';
 import { boom, crack, ding, thudSnd, clack } from './audio';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
   showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud';
@@ -26,6 +27,7 @@ const DEATH_T = 4;
 // height above a foe's feet that counts as a head — the model's skull/hood sit
 // here (body cylinder tops out ~1.35, head sphere centres ~1.52). See rayPlayer.
 const HEAD_Y = 1.4;
+const GROUND_N = new THREE.Vector3(0, 1, 0);
 let fireCd=0, gunKick=0, reloadT=0, deathT=0;
 // sustained-fire "heat": climbs by one per shot and bleeds off at the weapon's
 // `cool` rate, scaling each shot's bloom so a held spray walks the cone open.
@@ -59,6 +61,23 @@ export function startReload(){
   clack();
 }
 
+/* Trace a shot against the world (ground plane + colliders) and report what it
+   lands on. Remote shots re-run this locally: the map is identical on every
+   client, so the surface it reports matches what the shooter saw. */
+function traceWorld(o, d, maxLen){
+  let end=maxLen, c=null, ground=false;
+  if(d.y<-1e-6){ const t=-o.y/d.y; if(t<end){ end=t; ground=true; } }
+  for(const k of colliders){ const t=rayAABB(o,d,k); if(t<end){ end=t; c=k; ground=false; } }
+  return {end, c, ground};
+}
+
+/* Dress the end of a shot: dust, specks and a chip, in the struck surface's
+   own colour. Shared by our shots and remote echoes. */
+function impactAt(point, hit){
+  if(hit.ground) spawnImpact(point, GROUND_N, groundSurface());
+  else if(hit.c) spawnImpact(point, aabbNormal(point, hit.c), impactSurfaceOf(hit.c));
+}
+
 export function fire(){
   const w=WEAPONS[weaponIdx];
   if(fireCd>0||reloadT>0||introVisible||deathT>0) return;
@@ -79,17 +98,18 @@ export function fire(){
   // then ticks up so the next round in a sustained spray opens the cone further
   spread=Math.min(w.spread.max, spread+w.spread.shot*(1+fireHeat*(w.spread.ramp||0)));
   fireHeat+=1;
-  let end=w.range;
-  if(d.y<-1e-6) end=Math.min(end, -o.y/d.y);             // ground stops shot
-  for(const c of colliders) end=Math.min(end, rayAABB(o,d,c));
+  const hit=traceWorld(o,d,w.range);
+  let end=hit.end;
   let hitId=null;
   for(const [id,v] of remotes){
     const t=rayPlayer(o,d,v.cur);
-    if(t<end){ end=t; hitId=id; }
+    if(t<end){ end=t; hitId=id; hit.c=null; hit.ground=false; }   // a body absorbs it
   }
   const muz=fpModels[weaponIdx].muzzle.getWorldPosition(new THREE.Vector3());
+  const hitPoint=o.clone().addScaledVector(d,end);
   spawnFlash(muz, w.id==='ak47' ? .7 : .9);
-  spawnTracer(muz, o.clone().addScaledVector(d,end));
+  spawnTracer(muz, hitPoint);
+  if(hitId===null) impactAt(hitPoint, hit);
   (w.id==='ak47' ? crack : boom)(.85);
   sendNet({t:'shoot', w:weaponIdx,
     o:[+o.x.toFixed(2),+o.y.toFixed(2),+o.z.toFixed(2)],
@@ -132,7 +152,11 @@ export function remoteShoot(m){
   const v=remotes.get(m.id);
   const o=new THREE.Vector3(m.o[0],m.o[1],m.o[2]);
   const d=new THREE.Vector3(m.d[0],m.d[1],m.d[2]);
-  const end=o.clone().addScaledVector(d, Math.min(m.l??70,120));
+  const len=Math.min(m.l??70,120);
+  const end=o.clone().addScaledVector(d, len);
+  // Re-trace locally to learn what they hit; the wire only carries the distance.
+  const hit=traceWorld(o,d,len+.01);
+  if(hit.end<len-.05 || hit.ground || hit.c) impactAt(o.clone().addScaledVector(d,hit.end), hit);
   const rw=m.w===1 ? 1 : 0;
   if(v){
     v.shootT=.45;
