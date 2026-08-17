@@ -8,6 +8,9 @@
 import * as THREE from 'three';
 import { scene, renderer } from './core';
 import { glowTex } from './textures';
+import { setSky, bakeEnvironment } from './sky';
+import { setFogHeight } from './fog';
+import { bakeContactAO } from './ao';
 import { colliderTopAt, type Collider, type Spawn, type Zone, type MapEnv, type MenuCam, type MapDef } from './mapkit';
 import { dust2 } from './maps/dust2';
 import { skidrow } from './maps/skidrow';
@@ -16,27 +19,8 @@ export { colliderTopAt };
 
 /* ============================ shared sky, sun & fog ============================ */
 // These objects persist across map switches; each map repaints them via its env.
-const sky = new THREE.Mesh(
-  new THREE.SphereGeometry(560, 32, 16),
-  new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: {
-      top: { value: new THREE.Color(0x4a78b8) },
-      mid: { value: new THREE.Color(0x9fc0e0) },
-      low: { value: new THREE.Color(0xe8d9b0) },
-    },
-    vertexShader: 'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 mid; uniform vec3 low;
-      void main(){
-        float h=normalize(vP).y;
-        vec3 c = h<0.14 ? mix(low,mid,smoothstep(-0.06,0.14,h)) : mix(mid,top,smoothstep(0.14,0.6,h));
-        gl_FragColor=vec4(c,1.0);
-      }`,
-  }),
-);
-sky.renderOrder = -3; sky.frustumCulled = false;
-scene.add(sky);
-const skyU = (sky.material as THREE.ShaderMaterial).uniforms;
+// The sky itself lives in ./sky — it is a real Preetham atmosphere now, and the
+// same sky gets baked into scene.environment so ambient and backdrop agree.
 
 const glow = new THREE.Sprite(new THREE.SpriteMaterial({
   map: glowTex, color: 0xfff4dc, transparent: true, opacity: .85,
@@ -47,7 +31,7 @@ scene.add(glow);
 
 const hemi = new THREE.HemisphereLight(0x9fc0e0, 0x8a7350, 0.9);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
+export const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
 sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
@@ -60,20 +44,32 @@ fill.position.set(-60, 40, -45);
 scene.add(fill);
 
 function applyEnv(env: MapEnv) {
-  skyU.top.value.setHex(env.skyTop);
-  skyU.mid.value.setHex(env.skyMid);
-  skyU.low.value.setHex(env.skyLow);
   const dir = new THREE.Vector3(...env.sunDir).normalize();
+
+  // One vector, three consumers: the visible sky, the sun that casts the
+  // shadows, and the environment map baked from that same sky.
+  setSky(env.sky, dir);
+  bakeEnvironment(env.sky, dir);
+  scene.environmentIntensity = env.environmentIntensity;
+
   sun.color.setHex(env.sunColor); sun.intensity = env.sunIntensity;
   sun.position.copy(dir).multiplyScalar(160);
+  sun.shadow.intensity = env.shadowIntensity;
+
   glow.material.color.setHex(env.glowColor);
   glow.material.opacity = env.glowOpacity;
   glow.visible = env.glowOpacity > 0;
   glow.position.copy(dir).multiplyScalar(520);
+
   hemi.color.setHex(env.hemiSky); hemi.groundColor.setHex(env.hemiGround); hemi.intensity = env.hemiIntensity;
   fill.color.setHex(env.fillColor); fill.intensity = env.fillIntensity;
+
   (scene.fog as THREE.FogExp2).color.setHex(env.fogColor);
   (scene.fog as THREE.FogExp2).density = env.fogDensity;
+  setFogHeight(env.fogHeight, env.fogHeightFalloff);
+
+
+  renderer.toneMapping = env.toneMapping;
   renderer.toneMappingExposure = env.exposure;
 }
 
@@ -94,6 +90,10 @@ let currentGroup: THREE.Group | null = null;
 
 const changeListeners = new Set<(name: string) => void>();
 export function onMapChange(fn: (name: string) => void) { changeListeners.add(fn); return () => changeListeners.delete(fn); }
+
+/* What the open ground is made of on the live map. Bullet impacts on the ground
+   plane are resolved geometrically, so there is no collider material to read. */
+export function groundSurface() { return MAPS[currentMapName].env.groundSurface; }
 
 export function mapLabel(name = currentMapName) { return MAPS[name]?.label ?? name; }
 export function mapBlurb(name = currentMapName) { return MAPS[name]?.blurb ?? ''; }
@@ -117,6 +117,9 @@ export function setMap(name: string) {
 
   const built = def.build();
   if (currentGroup) disposeGroup(currentGroup);
+  // Bake contact occlusion while the group is still parentless — it renders the
+  // map in isolation, which is only possible before it joins the live scene.
+  bakeContactAO(built.group);
   currentGroup = built.group;
   scene.add(currentGroup);
 

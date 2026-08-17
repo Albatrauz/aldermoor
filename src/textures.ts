@@ -2,7 +2,14 @@
 // Every surface in town is painted procedurally onto a 2D canvas and uploaded
 // as a CanvasTexture. `mr` (texture-only randomness) keeps each bake lively.
 import * as THREE from 'three';
-import { mr } from './core';
+import { mr, renderer } from './core';
+
+// The ground tiles a single canvas 40x34 times across a 320x260 plane, which is
+// the exact case trilinear filtering handles worst: at the grazing angles a
+// first-person camera spends all its time at, the far half of the floor turns
+// into a shimmering mess as mip levels fight. Anisotropic filtering is the fix,
+// and on any GPU that runs this game it is effectively free.
+const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
 
 function makeTex(size, fn){
   const c = document.createElement('canvas'); c.width = c.height = size;
@@ -10,6 +17,7 @@ function makeTex(size, fn){
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = MAX_ANISO;
   return t;
 }
 function speckle(g, s, n, alpha){
@@ -21,61 +29,8 @@ function speckle(g, s, n, alpha){
   g.globalAlpha = 1;
 }
 
-export const cobbleTex = makeTex(512,(g,s)=>{
-  g.fillStyle='#4c4640'; g.fillRect(0,0,s,s);
-  const cols=21, rows=27;
-  for(let y=0;y<rows;y++)for(let x=0;x<=cols;x++){
-    const px=(x+(y%2?0.5:0))*s/cols, py=(y+0.5)*s/rows;
-    const v=mr(82,104);
-    g.fillStyle=`rgb(${v+8|0},${v|0},${v-6|0})`;
-    g.beginPath();
-    g.ellipse(px,py, s/cols*mr(.46,.55), s/rows*mr(.44,.54), mr(-.3,.3), 0, 7);
-    g.fill();
-  }
-  speckle(g,s,3200,.09);
-});
-
-export const grassTex = makeTex(512,(g,s)=>{
-  g.fillStyle='#2e3823'; g.fillRect(0,0,s,s);
-  for(let i=0;i<2400;i++){
-    const v=mr(0,1);
-    g.fillStyle=`rgba(${40+v*30|0},${55+v*34|0},${28+v*20|0},${mr(.15,.5)})`;
-    g.fillRect(mr(0,s),mr(0,s),mr(2,5),mr(2,5));
-  }
-  for(let i=0;i<26;i++){ // mossy patches
-    g.fillStyle=`rgba(${mr(28,44)|0},${mr(40,58)|0},${mr(20,32)|0},.30)`;
-    g.beginPath(); g.ellipse(mr(0,s),mr(0,s),mr(24,70),mr(18,50),mr(0,3),0,7); g.fill();
-  }
-});
-
-export const dirtTex = makeTex(256,(g,s)=>{
-  g.fillStyle='#564330'; g.fillRect(0,0,s,s);
-  speckle(g,s,1600,.14);
-  g.strokeStyle='rgba(30,22,14,.35)'; g.lineWidth=7; // wheel ruts
-  g.beginPath(); g.moveTo(s*.30,0); g.lineTo(s*.32,s); g.stroke();
-  g.beginPath(); g.moveTo(s*.68,0); g.lineTo(s*.66,s); g.stroke();
-});
-
-function stoneMaker(base, courseH){
-  return makeTex(256,(g,s)=>{
-    g.fillStyle='#26211c'; g.fillRect(0,0,s,s);
-    const rows = Math.round(s/courseH);
-    for(let y=0;y<rows;y++){
-      let x = (y%2)*-18;
-      while(x < s){
-        const w = mr(34,64);
-        const v = base + mr(-14,14);
-        g.fillStyle = `rgb(${v+6|0},${v|0},${v-6|0})`;
-        g.fillRect(x+2, y*courseH+2, Math.min(w, s-x)-3, courseH-4);
-        x += w;
-      }
-    }
-    speckle(g,s,1800,.12);
-  });
-}
-export const stoneTex  = stoneMaker(112, 26);
-export const stoneTex2 = stoneMaker(96, 34);
-
+/* --- leftovers from the market town ---
+   The town itself is gone, but the weapon models still wear its timber. */
 export const plankTex = makeTex(256,(g,s)=>{
   g.fillStyle='#4a3424'; g.fillRect(0,0,s,s);
   for(let i=0;i<6;i++){
@@ -93,77 +48,7 @@ export const plankTex = makeTex(256,(g,s)=>{
   }
 });
 
-function timberTex(plaster, beam, variant){
-  return makeTex(256,(g,s)=>{
-    g.fillStyle=plaster; g.fillRect(0,0,s,s);
-    speckle(g,s,1000,.07);
-    g.strokeStyle=beam; g.lineWidth=13; g.lineCap='butt';
-    g.strokeRect(6,6,s-12,s-12);                       // sill / eave / corner beams
-    const v1=s/3, v2=2*s/3;
-    g.beginPath(); g.moveTo(v1,6); g.lineTo(v1,s-6); g.stroke();
-    g.beginPath(); g.moveTo(v2,6); g.lineTo(v2,s-6); g.stroke();
-    g.lineWidth=10;
-    if(variant===0){                                   // X braces in outer cells
-      g.beginPath(); g.moveTo(8,8); g.lineTo(v1,s-8); g.stroke();
-      g.beginPath(); g.moveTo(v1,8); g.lineTo(8,s-8); g.stroke();
-      g.beginPath(); g.moveTo(v2,8); g.lineTo(s-8,s-8); g.stroke();
-      g.beginPath(); g.moveTo(s-8,8); g.lineTo(v2,s-8); g.stroke();
-    }else if(variant===1){                             // mid rail + diagonals
-      g.beginPath(); g.moveTo(6,s/2); g.lineTo(s-6,s/2); g.stroke();
-      g.beginPath(); g.moveTo(v1,s/2); g.lineTo(v2,8); g.stroke();
-      g.beginPath(); g.moveTo(v1,s/2); g.lineTo(v2,s-8); g.stroke();
-    }else{                                             // herringbone-ish
-      g.beginPath(); g.moveTo(8,s-8); g.lineTo(v1,s/2); g.stroke();
-      g.beginPath(); g.moveTo(v1,s/2); g.lineTo(8,8); g.stroke();
-      g.beginPath(); g.moveTo(s-8,s-8); g.lineTo(v2,s/2); g.stroke();
-      g.beginPath(); g.moveTo(v2,s/2); g.lineTo(s-8,8); g.stroke();
-      g.beginPath(); g.moveTo(6,s/2); g.lineTo(s-6,s/2); g.stroke();
-    }
-  });
-}
-export const wallStyles = [
-  timberTex('#cfbf9b','#3d2c1d',0),
-  timberTex('#d6c4a4','#46321f',1),
-  timberTex('#c2ab85','#332417',2),
-  timberTex('#cdb592','#3d2c1d',1),
-  timberTex('#bba887','#2e2013',0),
-];
-
-function tileTex(rgb){
-  return makeTex(256,(g,s)=>{
-    g.fillStyle=`rgb(${rgb[0]*.55|0},${rgb[1]*.55|0},${rgb[2]*.55|0})`; g.fillRect(0,0,s,s);
-    const rows=8, cols=8;
-    for(let y=0;y<rows;y++)for(let x=0;x<=cols;x++){
-      const px=(x+(y%2?.5:0))*s/cols, py=y*s/rows;
-      const f=mr(.78,1.06);
-      g.fillStyle=`rgb(${rgb[0]*f|0},${rgb[1]*f|0},${rgb[2]*f|0})`;
-      g.beginPath(); g.arc(px,py+s/rows, s/cols*.52, Math.PI, 2*Math.PI); g.fill();
-    }
-    speckle(g,s,900,.08);
-  });
-}
-export const thatchTex = makeTex(256,(g,s)=>{
-  g.fillStyle='#6a5631'; g.fillRect(0,0,s,s);
-  for(let i=0;i<1700;i++){
-    const v=mr(0,1);
-    g.strokeStyle=`rgba(${88+v*52|0},${70+v*42|0},${36+v*24|0},${mr(.2,.6)})`;
-    g.lineWidth=1.4;
-    const x=mr(0,s), y=mr(0,s);
-    g.beginPath(); g.moveTo(x,y); g.lineTo(x+mr(-2,2), y+mr(8,22)); g.stroke();
-  }
-  g.strokeStyle='rgba(40,30,12,.4)'; g.lineWidth=3;
-  for(let y=0;y<s;y+=32){ g.beginPath(); g.moveTo(0,y); g.lineTo(s,y); g.stroke(); }
-});
-export const roofTexes = [tileTex([158,74,52]), tileTex([96,100,116]), thatchTex, tileTex([140,86,60])];
-
-export function stripeTex(c){
-  return makeTex(128,(g,s)=>{
-    g.fillStyle='#e3d6ba'; g.fillRect(0,0,s,s);
-    g.fillStyle=c;
-    for(let x=0;x<s;x+=32) g.fillRect(x,0,16,s);
-    speckle(g,s,400,.09);
-  });
-}
+/* --- effect sprites --- */
 export const glowTex = makeTex(128,(g,s)=>{
   const r=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
   r.addColorStop(0,'rgba(255,255,255,1)');
@@ -186,65 +71,6 @@ export const smokeTex = makeTex(128,(g,s)=>{
   r.addColorStop(1,'rgba(160,155,150,0)');
   g.fillStyle=r; g.fillRect(0,0,s,s);
 });
-export const moonTex = makeTex(128,(g,s)=>{
-  const r=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
-  r.addColorStop(0,'#f2ecd9'); r.addColorStop(.82,'#ece4cc');
-  r.addColorStop(.9,'rgba(236,228,204,.4)'); r.addColorStop(1,'rgba(236,228,204,0)');
-  g.fillStyle=r; g.fillRect(0,0,s,s);
-  g.fillStyle='rgba(170,160,140,.35)';
-  g.beginPath(); g.arc(s*.38,s*.42,9,0,7); g.fill();
-  g.beginPath(); g.arc(s*.58,s*.6,6,0,7); g.fill();
-  g.beginPath(); g.arc(s*.5,s*.3,5,0,7); g.fill();
-});
-export const archWinTex = makeTex(128,(g,s)=>{
-  g.clearRect(0,0,s,s);
-  const grd=g.createLinearGradient(0,0,0,s);
-  grd.addColorStop(0,'#ffd98c'); grd.addColorStop(1,'#c75e1e');
-  g.fillStyle=grd;
-  g.beginPath();                                  // pointed gothic arch
-  g.moveTo(s*.18,s); g.lineTo(s*.18,s*.42);
-  g.quadraticCurveTo(s*.18,s*.12, s*.5,s*.06);
-  g.quadraticCurveTo(s*.82,s*.12, s*.82,s*.42);
-  g.lineTo(s*.82,s); g.closePath(); g.fill();
-  g.strokeStyle='rgba(40,20,8,.85)'; g.lineWidth=5;
-  g.beginPath(); g.moveTo(s*.5,s*.06); g.lineTo(s*.5,s); g.stroke();
-  g.beginPath(); g.moveTo(s*.18,s*.55); g.lineTo(s*.82,s*.55); g.stroke();
-});
-export const roseTex = makeTex(128,(g,s)=>{
-  g.clearRect(0,0,s,s);
-  const r=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2*.96);
-  r.addColorStop(0,'#ffd98c'); r.addColorStop(.65,'#d97e2c'); r.addColorStop(1,'#8e4014');
-  g.fillStyle=r; g.beginPath(); g.arc(s/2,s/2,s/2*.96,0,7); g.fill();
-  g.strokeStyle='rgba(38,18,8,.9)'; g.lineWidth=5;
-  for(let i=0;i<6;i++){
-    g.beginPath(); g.moveTo(s/2,s/2);
-    g.lineTo(s/2+Math.cos(i*Math.PI/3)*s/2, s/2+Math.sin(i*Math.PI/3)*s/2);
-    g.stroke();
-  }
-  g.beginPath(); g.arc(s/2,s/2,s*.17,0,7); g.stroke();
-  g.beginPath(); g.arc(s/2,s/2,s/2*.9,0,7); g.stroke();
-});
-export const parchTex = makeTex(128,(g,s)=>{
-  g.fillStyle='#d9c89a'; g.fillRect(0,0,s,s);
-  speckle(g,s,500,.08);
-  g.strokeStyle='rgba(60,40,20,.7)'; g.lineWidth=3;
-  for(let y=28;y<s-12;y+=16){ g.beginPath(); g.moveTo(16,y); g.lineTo(s-mr(14,46),y); g.stroke(); }
-});
-export function signTex(text){
-  return makeTex(256,(g,s)=>{
-    g.fillStyle='#3a2818'; g.fillRect(0,0,s,s);
-    for(let i=0;i<5;i++){ g.strokeStyle='rgba(20,12,6,.5)'; g.lineWidth=2;
-      g.beginPath(); g.moveTo(0,i*s/5+10); g.lineTo(s,i*s/5+10); g.stroke(); }
-    g.strokeStyle='#caa64e'; g.lineWidth=5; g.strokeRect(10,10,s-20,s-20);
-    g.fillStyle='#caa64e'; g.textAlign='center';
-    g.font='italic 600 36px Georgia, serif';
-    const words=text.split(' ');
-    g.fillText(words[0], s/2, s*.42);
-    g.fillText(words.slice(1).join(' '), s/2, s*.66);
-    g.font='34px Georgia, serif';
-    g.fillText('🍺', s/2, s*.9);
-  });
-}
 
 /* ============================ desert (Dust2) textures ============================ */
 export const sandTex = makeTex(512,(g,s)=>{
@@ -401,6 +227,122 @@ function facadeMaker(wall, frame, glassTop, glassLow){
 export const facadeConcreteTex = facadeMaker('#8b8d90', '#5a5c5f', '#39424d', '#212a33');
 export const facadeBrickTex     = facadeMaker('#7c4438', '#43352c', '#39424d', '#202831');
 export const facadeWornTex      = facadeMaker('#9a958c', '#6b6660', '#3c4650', '#242c34');
+
+/* A bullet chip: a dark irregular crater with a bright rim and a few hairline
+   cracks. Deliberately neutral rather than tinted, so one texture reads correctly
+   on sandstone, snow, asphalt and steel alike. Clamped, not repeating — this one
+   is used on a decal quad, and RepeatWrapping would wrap the soft edge. */
+export const impactTex = (() => {
+  const t = makeTex(64, (g, s) => {
+    g.clearRect(0, 0, s, s);
+    const c = s / 2;
+    // soft outer smudge — kept light: a bullet leaves a mark, not a hole
+    const outer = g.createRadialGradient(c, c, 0, c, c, c);
+    outer.addColorStop(0, 'rgba(20,16,11,.50)');
+    outer.addColorStop(.40, 'rgba(26,21,15,.24)');
+    outer.addColorStop(1, 'rgba(30,25,18,0)');
+    g.fillStyle = outer; g.fillRect(0, 0, s, s);
+    // irregular core, so it never reads as a perfect circle
+    g.fillStyle = 'rgba(16,12,9,.72)';
+    g.beginPath();
+    for (let i = 0; i <= 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const r = c * (0.20 + mr(0, .10));
+      const x = c + Math.cos(a) * r, y = c + Math.sin(a) * r;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.closePath(); g.fill();
+    // a bright lip on one side reads as freshly exposed material
+    g.strokeStyle = 'rgba(255,246,230,.30)'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(c, c, c * .26, -2.2, .5); g.stroke();
+    // hairline cracks
+    g.strokeStyle = 'rgba(14,11,8,.55)'; g.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const a = mr(0, Math.PI * 2), r0 = c * .22, r1 = c * mr(.42, .72);
+      g.beginPath();
+      g.moveTo(c + Math.cos(a) * r0, c + Math.sin(a) * r0);
+      g.lineTo(c + Math.cos(a + mr(-.2, .2)) * r1, c + Math.sin(a + mr(-.2, .2)) * r1);
+      g.stroke();
+    }
+  });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+})();
+
+/* ============================ derived normal maps ============================ */
+// Every surface here is a flat painted canvas, so sandstone courses, brickwork
+// and crate planks are lines rather than relief — the sun sweeps across them and
+// nothing changes. There is no three helper for this, so we derive a tangent-space
+// normal map from each texture's own luminance with a Sobel filter: bright reads
+// as high, dark as low, which is exactly how these textures were painted.
+//
+// Two things that are easy to get wrong:
+//   - A normal map is a vector, not a colour. It must NOT be tagged sRGB, or the
+//     transfer curve bends the vectors and the lighting goes subtly wrong.
+//   - The source tiles, so the Sobel has to wrap at the edges. Clamping instead
+//     leaves a visible seam on every repeat.
+const normalCache = new Map<THREE.Texture, THREE.DataTexture>();
+
+export function normalFromTex(tex: THREE.Texture, strength = 2.0) {
+  const hit = normalCache.get(tex);
+  if (hit) return hit;
+
+  const src = tex.image as HTMLCanvasElement;
+  // Cap the working size: relief finer than this is invisible at play distance
+  // and the Sobel is the one genuinely slow thing we do at boot.
+  const s = Math.min(src.width, 256);
+  const work = document.createElement('canvas');
+  work.width = work.height = s;
+  const wg = work.getContext('2d');
+  wg.drawImage(src, 0, 0, s, s);
+  const px = wg.getImageData(0, 0, s, s).data;
+
+  const h = new Float32Array(s * s);
+  for (let i = 0; i < s * s; i++) {
+    h[i] = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255;
+  }
+  const at = (x: number, y: number) => h[(((y % s) + s) % s) * s + (((x % s) + s) % s)];
+
+  const out = new Uint8Array(s * s * 4);
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const dx = (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1))
+               - (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1));
+      const dy = (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1))
+               - (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1));
+      let nx = dx * strength, ny = dy * strength, nz = 1;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      nx /= len; ny /= len; nz /= len;
+      const i = (y * s + x) * 4;
+      out[i]     = (nx * 0.5 + 0.5) * 255;
+      out[i + 1] = (ny * 0.5 + 0.5) * 255;
+      out[i + 2] = (nz * 0.5 + 0.5) * 255;
+      out[i + 3] = 255;
+    }
+  }
+
+  const t = new THREE.DataTexture(out, s, s, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.generateMipmaps = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.anisotropy = MAX_ANISO;
+  t.needsUpdate = true;
+  normalCache.set(tex, t);
+  return t;
+}
+
+/* A normal map that tiles in step with an albedo clone. three gives each texture
+   slot its own UV transform, so a normal map left at repeat 1x1 over a floor
+   tiled 40x34 would smear one enormous bump across the whole map. */
+export function normalFor(tex: THREE.Texture, rx = 1, ry = 1) {
+  const n = normalFromTex(tex);
+  if (rx === 1 && ry === 1) return n;
+  const c = n.clone();
+  c.needsUpdate = true;
+  c.repeat.set(rx, ry);
+  return c;
+}
 
 /* clone a texture with its own repeat — used by materials and the town builder */
 export function clonedTex(t, rx, ry){ const c=t.clone(); c.needsUpdate=true; c.repeat.set(rx,ry); return c; }
