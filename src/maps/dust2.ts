@@ -80,13 +80,13 @@ function build(): BuiltMap {
       const w = mesh(new THREE.CylinderGeometry(.34, .34, .22, 10), matIron, cx + wx, .34, cz + wz, { rx: Math.PI / 2 });
       add(w);
     }
-    addCollider(cx, cz, 2.2, .95, 1.6);
+    addCollider(cx, cz, 2.2, .95, 1.6, 0, matCarRed);
   }
   ramp(-6, 40.5, 8, 9, 1.2, '+x', matSandstone);         // ramp up to A
 
   /* ============================ Bombsite A (raised +1.2) ============================ */
   block(13, 44, 30, 1.2, 26, matConcrete);
-  addCollider(13, 44, 15, 13, 1.2);
+  addCollider(13, 44, 15, 13, 1.2, 0, matConcrete);
   wallX(57, -2, 28);                                     // site north
   wallZ(-2, 31, 57, { gaps: [[36, 45]] });               // site west (open at long ramp)
   wallZ(28, 31, 57, { gaps: [[31, 39]] });               // site east (open to CT ramp)
@@ -101,7 +101,7 @@ function build(): BuiltMap {
   wallZ(8, 5, 31);
   ramp(4, 12, 7.2, 6, 1.4, '+z', matConcrete);
   block(4, 23, 7.2, 1.4, 16, matConcrete);
-  addCollider(4, 23, 3.6, 8, 1.4);
+  addCollider(4, 23, 3.6, 8, 1.4, 0, matConcrete);
 
   /* ============================ Mid ============================ */
   wallX(5, -88, 80, { gaps: [[-57, -52], [0, 8]] });     // north (T-upper entrance, catwalk)
@@ -152,7 +152,7 @@ function build(): BuiltMap {
   block(16, -28, WT, 2.6, 6, matSandstone, 2.4);         // window head
   addCollider(16, -28, WT / 2, 3, 5, 2.4);
   block(11, -43, 10, 1.6, 8, matConcrete);               // back plat (raised 1.6)
-  addCollider(11, -43, 5, 4, 1.6);
+  addCollider(11, -43, 5, 4, 1.6, 0, matConcrete);
   ramp(11, -36.6, 8, 4.8, 1.6, '-z', matConcrete);
   solid(-2, -40, 1.8, .8, 1.8, matCrate);
   solid(-.2, -40, 1.8, 1.6, 1.8, matCrate);
