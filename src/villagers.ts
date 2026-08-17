@@ -33,6 +33,31 @@ const _tagWorld=new THREE.Vector3();   // scratch for re-anchoring a dead body's
 const skinMats=[0xc99a72,0xb98a62,0xa87a55,0xd4a87e]
   .map(c=>new THREE.MeshStandardMaterial({color:c, roughness:.8}));
 
+/* Cloth was built fresh per joining player — two new MeshStandardMaterials each
+   time, which means three compiles a new program the first time that player is
+   drawn, i.e. a hitch exactly when someone walks into the fight. The server only
+   ever hands out colours from a fixed list, so cache by colour and every player
+   wearing the same cloth shares one program. */
+const clothCache = new Map<number, { cloth: THREE.MeshStandardMaterial; clothDark: THREE.MeshStandardMaterial }>();
+function clothFor(color: number){
+  let c = clothCache.get(color);
+  if (!c) {
+    c = {
+      cloth: new THREE.MeshStandardMaterial({ color, roughness:.95 }),
+      clothDark: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color).multiplyScalar(.55), roughness:.95 }),
+    };
+    clothCache.set(color, c);
+  }
+  return c;
+}
+
+/* Whether travellers carry a lit lantern. Both shipped maps are broad daylight,
+   where a burning lamp throwing a warm pool onto the sand looks simply wrong —
+   and costs a real PointLight per player for the privilege. Driven by the map
+   (see MapEnv.lanterns) so a night map can switch them back on. */
+let lanternsOn = false;
+
 function makeNameTag(text){
   const c=document.createElement('canvas'); c.width=512; c.height=96;
   const g=c.getContext('2d');
@@ -76,9 +101,7 @@ function makeBlob(){
 function buildVillager(name, color){
   const g=new THREE.Group();
   const blob=makeBlob(); g.add(blob);
-  const cloth=new THREE.MeshStandardMaterial({color, roughness:.95});
-  const clothDark=new THREE.MeshStandardMaterial({
-    color:new THREE.Color(color).multiplyScalar(.55), roughness:.95});
+  const {cloth, clothDark}=clothFor(color);
   const skin=skinMats[name.length%skinMats.length];
   function limb(w,l,px,py,mat){
     const pivot=new THREE.Group();
@@ -92,21 +115,27 @@ function buildVillager(name, color){
   g.add(mesh(new THREE.CylinderGeometry(.24,.33,.8,10), cloth, 0,.95,0));
   g.add(mesh(new THREE.CylinderGeometry(.27,.27,.07,10), matDarkWood, 0,.74,0));
   g.add(mesh(new THREE.SphereGeometry(.17,10,8), skin, 0,1.52,0));
-  g.add(mesh(new THREE.ConeGeometry(.21,.34,9), clothDark, 0,1.75,0));   // hood
-  g.add(mesh(new THREE.ConeGeometry(.34,.28,9), clothDark, 0,1.32,0));   // mantle
+  // Hood and mantle, both pulled in from where they were. The old cone was tall
+  // and sharp over a wide skirt, which at this scale read as a garden gnome
+  // rather than someone you should be worried about; lower and tighter gives a
+  // hooded-fighter silhouette that still reads instantly at range.
+  g.add(mesh(new THREE.ConeGeometry(.19,.25,9), clothDark, 0,1.70,0));   // hood
+  g.add(mesh(new THREE.ConeGeometry(.31,.22,9), clothDark, 0,1.30,0));   // mantle
   const tag=makeNameTag(name);
   g.add(tag);
-  // hand lantern, swinging with the right arm
+  // Hand lantern, swinging with the right arm. Hidden in daylight — see lanternsOn.
   const lant=new THREE.Group();
   lant.position.set(0,-.56,.06);
+  lant.visible=lanternsOn;
   lant.add(mesh(new THREE.BoxGeometry(.13,.18,.13), matIron, 0,0,0, {cast:false}));
   lant.add(mesh(new THREE.BoxGeometry(.09,.12,.09),
     new THREE.MeshBasicMaterial({color:0xffc46b}), 0,0,0, {cast:false}));
-  // cap how many real lights walk the streets at once
-  if([...remotes.values()].filter(r=>r.hasLamp).length < 6){
-    const pl=new THREE.PointLight(0xffa84e, 5, 9, 2);
-    lant.add(pl);
-    var hasLamp=true;
+  // A real light only when the map actually calls for one, and still capped —
+  // every PointLight in the scene is paid for by every lit material's shader.
+  let hasLamp=false;
+  if(lanternsOn && [...remotes.values()].filter(r=>r.hasLamp).length < 6){
+    lant.add(new THREE.PointLight(0xffa84e, 5, 9, 2));
+    hasLamp=true;
   }
   armR.add(lant);
   // weapon models in the left hand — handgonne (default) and AK-47 (hidden until switched)
@@ -115,7 +144,26 @@ function buildVillager(name, color){
   ak47Group.visible=false;
   armL.add(gonneGroup);
   armL.add(ak47Group);
-  return {group:g, legL, legR, armL, armR, muzzle, akMuzzle, gonneGroup, ak47Group, tag, blob, hasLamp:!!hasLamp};
+  return {group:g, legL, legR, armL, armR, muzzle, akMuzzle, gonneGroup, ak47Group, tag, blob, lant, hasLamp};
+}
+
+/* Turn lanterns on or off for the whole cast. Called on every map change.
+   Existing travellers are updated in place; the light itself is only ever
+   created when a map asks for it, so a daylight map carries none at all. */
+export function setLanterns(on: boolean){
+  if (on === lanternsOn) return;
+  lanternsOn = on;
+  let lit = 0;
+  for (const v of remotes.values()) {
+    v.lant.visible = on;
+    const light = v.lant.children.find((c: any) => c.isPointLight) as THREE.PointLight | undefined;
+    if (on) {
+      if (!light && lit < 6) { v.lant.add(new THREE.PointLight(0xffa84e, 5, 9, 2)); v.hasLamp = true; lit++; }
+      else if (light) lit++;
+    } else if (light) {
+      v.lant.remove(light); light.dispose(); v.hasLamp = false;
+    }
+  }
 }
 
 export function addRemote(d){

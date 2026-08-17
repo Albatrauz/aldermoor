@@ -12,6 +12,7 @@ import { setSky, bakeEnvironment } from './sky';
 import { setFogHeight } from './fog';
 import { bakeContactAO } from './ao';
 import { setWeather } from './weather';
+import { setLanterns } from './villagers';
 import { colliderTopAt, type Collider, type Spawn, type Zone, type MapEnv, type MenuCam, type MapDef } from './mapkit';
 import { dust2 } from './maps/dust2';
 import { skidrow } from './maps/skidrow';
@@ -86,8 +87,8 @@ function applyEnv(env: MapEnv) {
   (scene.fog as THREE.FogExp2).density = env.fogDensity;
   setFogHeight(env.fogHeight, env.fogHeightFalloff);
 
-
   setWeather(env.weather);
+  setLanterns(env.lanterns === true);
 
   renderer.toneMapping = env.toneMapping;
   renderer.toneMappingExposure = env.exposure;
