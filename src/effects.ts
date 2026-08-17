@@ -78,6 +78,9 @@ const chipMat = new THREE.MeshBasicMaterial({
   map: impactTex,
   transparent: true,
   depthWrite: false,
+  // LDR canvas textures, not scene colour. With map exposure at 0.4 these
+  // would be ACES'd into the dirt next to the (correctly lit) world.
+  toneMapped: false,
   // A chip sits flush on the surface it marks, so it z-fights by construction.
   // The positional nudge along the normal handles most of it; polygonOffset
   // covers the grazing angles where the nudge is foreshortened to nothing.
@@ -104,7 +107,7 @@ const tracers = makePool(24, () => {
 const flashes = makePool(12, () => {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({
     map: flameTex, transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false,
+    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
   }));
   s.visible = false;
   scene.add(s);
@@ -113,7 +116,7 @@ const flashes = makePool(12, () => {
 
 const puffs = makePool(24, () => {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: smokeTex, transparent: true, opacity: 0, depthWrite: false,
+    map: smokeTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false,
   }));
   s.visible = false;
   scene.add(s);
@@ -140,7 +143,7 @@ const chips = makePool(48, () => {
 });
 
 const dmgNumbers = makePool(24, () => {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, toneMapped: false }));
   s.renderOrder = 12;   // draw over the world, but still depth-tested
   s.visible = false;
   scene.add(s);
