@@ -151,11 +151,14 @@ function switchWeapon(idx){
 export function remoteShoot(m){
   const v=remotes.get(m.id);
   const o=new THREE.Vector3(m.o[0],m.o[1],m.o[2]);
-  const d=new THREE.Vector3(m.d[0],m.d[1],m.d[2]);
+  const d=new THREE.Vector3(m.d[0],m.d[1],m.d[2]).normalize();
   const len=Math.min(m.l??70,120);
   const end=o.clone().addScaledVector(d, len);
   // Re-trace locally to learn what they hit; the wire only carries the distance.
-  const hit=traceWorld(o,d,len+.01);
+  // `l` is toFixed(1), so it can arrive up to 0.05 short of the real surface, and
+  // origin is toFixed(2). A 0.01 nudge stops short — reach a full tenth past so
+  // wall/ground still register and observers see the impact.
+  const hit=traceWorld(o,d,len+.1);
   if(hit.end<len-.05 || hit.ground || hit.c) impactAt(o.clone().addScaledVector(d,hit.end), hit);
   const rw=m.w===1 ? 1 : 0;
   if(v){
