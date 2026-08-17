@@ -5,12 +5,32 @@ import * as THREE from 'three';
 
 export const EYE = 1.65; // eye height of a standing villager
 
+// Anything that hand-writes gl_Position.z has to know which depth convention is
+// live — the sky does exactly that, so this is exported rather than inlined.
+export const REVERSED_DEPTH = true;
+
 export const canvas = document.getElementById('scene');
-export const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+export const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  // Reverse-Z. A first-person game is the worst case for depth precision: the
+  // viewmodel sits centimetres from the near plane while the sky sits hundreds
+  // of metres out. Reversed depth spends its precision where the geometry
+  // actually is, which is what keeps co-planar procedural boxes — wall seams,
+  // the worn paths laid over the ground, impact decals — from z-fighting.
+  // Unlike logarithmicDepthBuffer it doesn't write gl_FragDepth, so early-Z
+  // survives. Needs EXT_clip_control; three falls back quietly without it.
+  reversedDepthBuffer: REVERSED_DEPTH,
+});
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// r182 replaced the old PCF_SOFT kernel with a 5-tap Vogel disk rotated per
+// pixel by interleaved gradient noise (~20 effective taps, cheaper than the
+// kernel it replaced). PCFSoftShadowMap now just warns and falls back to this
+// anyway, so name it explicitly. shadow.radius is a real penumbra-width knob
+// under this filter, which it never meaningfully was before.
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 

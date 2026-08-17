@@ -11,9 +11,13 @@ import * as combat from './combat';
 import * as villagers from './villagers';
 import { updateFx } from './effects';
 import * as net from './net';
+import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
 import './stats';            // reactive leaderboard + career (no-op without Convex)
 
-const clock=new THREE.Clock();
+// Timer over Clock: Clock warns on construction from r183, and Timer takes the
+// timestamp requestAnimationFrame already hands us instead of calling
+// performance.now() a second time. getDelta() is in seconds either way.
+const clock=new THREE.Timer();
 let time=0;
 
 function frame(dt){
@@ -25,9 +29,11 @@ function frame(dt){
   world.updateAmbient(time);   // ambient animation (a no-op at high noon)
   villagers.updateRemotes(dt); // interpolate fellow travellers
   renderer.render(scene,camera);
+  quality.sample(dt);          // after the render: info.render resets on each render()
 }
-function animate(){
+function animate(ts?: number){
   requestAnimationFrame(animate);
+  clock.update(ts);
   frame(Math.min(clock.getDelta(), .05));
 }
 animate();
@@ -52,6 +58,8 @@ window.__town={
   get pos(){ return [controls.player.x, controls.player.z]; },
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly
+  perf: quality.stats,                    // frame time + draw counts
+  showPerf: quality.showPerf,             // on-screen overlay (also: backquote)
   kill(id){ villagers.killRemote(id); },                 // topple a fellow traveller (death-anim check)
 
   get me(){ return {id:net.myId, name:net.myName, connected:!!net.net}; },
