@@ -42,6 +42,29 @@ function animate(ts?: number){
 }
 animate();
 
+/* ============================ shader pre-warming ============================ */
+// Three compiles a shader program the first time a given material/light/geometry
+// combination is actually drawn. Measured: firing the first shot took the program
+// count from 25 to 27, i.e. two compiles mid-firefight — exactly the wrong moment.
+// The same happens the first time a player joins and their rig is drawn.
+//
+// compileAsync walks the scene and builds everything it can ahead of time, off
+// the critical path. The effect pools already live in the scene (they are just
+// invisible), so briefly revealing them is what lets the compiler see them at all
+// — an invisible object is skipped by the renderer and therefore never compiled.
+async function prewarm(){
+  const hidden: THREE.Object3D[] = [];
+  scene.traverse((o) => {
+    if (!o.visible) { o.visible = true; hidden.push(o); }
+  });
+  try {
+    await renderer.compileAsync(scene, camera);
+  } catch { /* a warm-up failure must never keep the game from starting */ }
+  for (const o of hidden) o.visible = false;
+}
+// After the first frames, so it never competes with getting something on screen.
+setTimeout(prewarm, 400);
+
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
@@ -64,6 +87,7 @@ window.__town={
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly
   perf: quality.stats,                    // frame time + draw counts
   showPerf: quality.showPerf,             // on-screen overlay (also: backquote)
+  renderer, sun: world.sun,               // handles for A/B-ing lighting costs
   kill(id){ villagers.killRemote(id); },                 // topple a fellow traveller (death-anim check)
 
   get me(){ return {id:net.myId, name:net.myName, connected:!!net.net}; },

@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { scene, mesh, EYE } from './core';
 import { matIron, matDarkWood } from './materials';
+import { glowTex } from './textures';
 import { buildHandgonneTP, buildAK47TP } from './weapons';
 
 // A tracked fellow traveller: the visual rig built by buildVillager, plus the
@@ -50,8 +51,31 @@ function makeNameTag(text){
   return s;
 }
 
+/* The sun's shadow map is baked once and frozen (see world.ts), so a walking
+   player casts no real shadow. This is the stand-in: a soft dark disc at the
+   feet. It is not a compromise you notice — the sun sits high enough that a real
+   shadow only reached about a metre from the boots anyway — and it costs one
+   draw per player instead of re-rasterising the whole world every frame.
+   glowTex is a white radial falloff; multiplied by a black colour it becomes a
+   soft dark blob, so no new texture is needed. */
+const blobGeo = new THREE.PlaneGeometry(1, 1);
+const blobMat = new THREE.MeshBasicMaterial({
+  map: glowTex, color: 0x000000, transparent: true, opacity: .34,
+  depthWrite: false, fog: true,
+});
+function makeBlob(){
+  const b = new THREE.Mesh(blobGeo, blobMat);
+  b.rotation.x = -Math.PI / 2;
+  b.position.y = .03;          // just clear of the floor and of the AO overlay
+  b.scale.setScalar(1.15);
+  b.castShadow = b.receiveShadow = false;
+  b.renderOrder = 2;
+  return b;
+}
+
 function buildVillager(name, color){
   const g=new THREE.Group();
+  const blob=makeBlob(); g.add(blob);
   const cloth=new THREE.MeshStandardMaterial({color, roughness:.95});
   const clothDark=new THREE.MeshStandardMaterial({
     color:new THREE.Color(color).multiplyScalar(.55), roughness:.95});
@@ -91,7 +115,7 @@ function buildVillager(name, color){
   ak47Group.visible=false;
   armL.add(gonneGroup);
   armL.add(ak47Group);
-  return {group:g, legL, legR, armL, armR, muzzle, akMuzzle, gonneGroup, ak47Group, tag, hasLamp:!!hasLamp};
+  return {group:g, legL, legR, armL, armR, muzzle, akMuzzle, gonneGroup, ak47Group, tag, blob, hasLamp:!!hasLamp};
 }
 
 export function addRemote(d){
@@ -149,6 +173,7 @@ export function updateRemotes(dt){
         // back on their feet — cut straight to wherever the snapshots have moved
         // them (their fresh spawn), so they don't slide across town as they rise
         v.deadT=0; v.phase=0;
+        v.blob.visible=true;              // upright again: the contact shadow returns
         v.cur.x=v.tgt.x; v.cur.y=v.tgt.y; v.cur.z=v.tgt.z; v.cur.yaw=v.tgt.yaw;
         v.group.rotation.x=0;
         v.group.position.set(v.cur.x, v.cur.y, v.cur.z);
@@ -157,6 +182,7 @@ export function updateRemotes(dt){
       }else{
         // topple onto the ground over FALL_T, then lie still. Stay put where we
         // fell (ignore inbound snapshots) and let the limbs go slack.
+        v.blob.visible=false;             // the group tips 90°; a flat disc must not tip with it
         const f=Math.min(1,(DEAD_T-v.deadT)/FALL_T);
         const e=f*f*(3-2*f);                          // smoothstep the fall
         v.group.rotation.x=e*(Math.PI/2);
