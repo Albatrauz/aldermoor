@@ -21,6 +21,11 @@ import './stats';            // reactive leaderboard + career (no-op without Con
 // performance.now() a second time. getDelta() is in seconds either way.
 const clock=new THREE.Timer();
 let time=0;
+// compileAsync yields back to the event loop. The render loop must not run
+// while pooled meshes are temporarily visible, or they draw at the origin
+// for a frame — and a shot fired in that window would then be hidden again
+// when visibility is restored.
+let prewarming = false;
 
 function frame(dt){
   time+=dt;
@@ -38,6 +43,7 @@ function frame(dt){
 function animate(ts?: number){
   requestAnimationFrame(animate);
   clock.update(ts);
+  if (prewarming) return;
   frame(Math.min(clock.getDelta(), .05));
 }
 animate();
@@ -54,13 +60,17 @@ animate();
 // — an invisible object is skipped by the renderer and therefore never compiled.
 async function prewarm(){
   const hidden: THREE.Object3D[] = [];
-  scene.traverse((o) => {
-    if (!o.visible) { o.visible = true; hidden.push(o); }
-  });
+  prewarming = true;
   try {
+    scene.traverse((o) => {
+      if (!o.visible) { o.visible = true; hidden.push(o); }
+    });
     await renderer.compileAsync(scene, camera);
   } catch { /* a warm-up failure must never keep the game from starting */ }
-  for (const o of hidden) o.visible = false;
+  finally {
+    for (const o of hidden) o.visible = false;
+    prewarming = false;
+  }
 }
 // After the first frames, so it never competes with getting something on screen.
 setTimeout(prewarm, 400);
