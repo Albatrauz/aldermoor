@@ -101,13 +101,16 @@ export const sandPathTex = makeTex(256,(g,s)=>{
 function sandstoneMaker(base, courseH){
   return makeTex(256,(g,s)=>{
     g.fillStyle='#7a6342'; g.fillRect(0,0,s,s);
-    const rows=Math.round(s/courseH);
+    // Even course count, height derived from it: courseH rarely divides s, and
+    // a remainder either clips the last course or leaves a bare mortar band at
+    // the seam. Even, because running bond alternates its offset per course.
+    const rows=Math.max(2, 2*Math.round(s/courseH/2)), ch=s/rows;
     for(let y=0;y<rows;y++){
       let x=(y%2)*-20;
       while(x<s){
         const w=mr(40,72), v=base+mr(-12,12);
         g.fillStyle=`rgb(${v+26|0},${v|0},${v-34|0})`;
-        g.fillRect(x+2, y*courseH+2, Math.min(w,s-x)-3, courseH-4);
+        g.fillRect(x+2, y*ch+2, Math.min(w,s-x)-3, ch-4);
         x+=w;
       }
     }
@@ -189,13 +192,13 @@ export const asphaltTex = makeTex(256,(g,s)=>{
 function brickMaker(base, mortar, courseH){
   return makeTex(256,(g,s)=>{
     g.fillStyle=mortar; g.fillRect(0,0,s,s);
-    const rows=Math.round(s/courseH);
+    const rows=Math.max(2, 2*Math.round(s/courseH/2)), ch=s/rows;   // see sandstoneMaker
     for(let y=0;y<rows;y++){
       let x=(y%2)*-22;
       while(x<s){
         const w=mr(40,52), v=mr(-16,16);
         g.fillStyle=`rgb(${base[0]+v|0},${base[1]+v*.6|0},${base[2]+v*.6|0})`;
-        g.fillRect(x+2, y*courseH+2, Math.min(w,s-x)-4, courseH-4);
+        g.fillRect(x+2, y*ch+2, Math.min(w,s-x)-4, ch-4);
         x+=w;
       }
     }
@@ -310,7 +313,9 @@ export function normalFromTex(tex: THREE.Texture, strength = 2.0) {
                - (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1));
       const dy = (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1))
                - (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1));
-      let nx = dx * strength, ny = dy * strength, nz = 1;
+      // n = (-h_u, -h_v, 1). dx is already the negated u-gradient (left minus
+      // right), but dy comes out of a y-down canvas, so it needs the flip.
+      let nx = dx * strength, ny = -dy * strength, nz = 1;
       const len = Math.hypot(nx, ny, nz) || 1;
       nx /= len; ny /= len; nz /= len;
       const i = (y * s + x) * 4;
@@ -322,6 +327,10 @@ export function normalFromTex(tex: THREE.Texture, strength = 2.0) {
   }
 
   const t = new THREE.DataTexture(out, s, s, THREE.RGBAFormat);
+  // DataTexture defaults to flipY:false while the CanvasTexture albedo is
+  // flipY:true. Leave it and the relief samples the mirrored row: every
+  // mortar joint gets its groove somewhere other than on the joint.
+  t.flipY = true;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.generateMipmaps = true;
   t.minFilter = THREE.LinearMipmapLinearFilter;
