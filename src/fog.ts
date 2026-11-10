@@ -18,6 +18,7 @@
 // MeshStandardMaterials that actually want it and leaves sprites alone.
 import * as THREE from 'three';
 import * as mats from './materials';
+import { addSkyLight } from './voxel/skylight';
 
 // Shared across every patched material, so a map switch is one assignment.
 const fogHeight = { value: 8 };
@@ -60,7 +61,9 @@ function patch(mat: THREE.Material) {
   // Without this three would happily share a compiled program between a patched
   // and an unpatched material with otherwise identical parameters.
   mat.customProgramCacheKey = () => 'heightFog';
-  mat.needsUpdate = true;
+  // These are what the guns and the players' gear are made of. They take the
+  // voxel world's sky light too, so a musket carried into a tunnel dims with it.
+  addSkyLight(mat);
 }
 
 // Applied to every shared world material at import time — before world.ts builds

@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { scene, mesh, EYE } from './core';
 import { matIron, matDarkWood } from './materials';
+import { addSkyLight } from './voxel/skylight';
 import { glowTex } from './textures';
 import { buildHandgonneTP, buildAK47TP } from './weapons';
 import { voxelizeRig } from './voxel/rig';
@@ -32,7 +33,7 @@ const TAG_Y=2.22;   // height of the floating nametag above a traveller's feet
 const _tagWorld=new THREE.Vector3();   // scratch for re-anchoring a dead body's tag
 
 const skinMats=[0xc99a72,0xb98a62,0xa87a55,0xd4a87e]
-  .map(c=>new THREE.MeshStandardMaterial({color:c, roughness:.8}));
+  .map(c=>addSkyLight(new THREE.MeshStandardMaterial({color:c, roughness:.8})));
 
 /* Cloth was built fresh per joining player — two new MeshStandardMaterials each
    time, which means three compiles a new program the first time that player is
@@ -44,9 +45,9 @@ function clothFor(color: number){
   let c = clothCache.get(color);
   if (!c) {
     c = {
-      cloth: new THREE.MeshStandardMaterial({ color, roughness:.95 }),
-      clothDark: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(color).multiplyScalar(.55), roughness:.95 }),
+      cloth: addSkyLight(new THREE.MeshStandardMaterial({ color, roughness:.95 })),
+      clothDark: addSkyLight(new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color).multiplyScalar(.55), roughness:.95 })),
     };
     clothCache.set(color, c);
   }

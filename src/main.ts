@@ -12,7 +12,7 @@ import * as villagers from './villagers';
 import { updateFx } from './effects';
 import { updateParticles } from './particles';
 import { updateWeather } from './weather';
-import { updateVoxels, voxelStats, voxelGrid, shotImpact, replayShots } from './voxel';
+import { updateVoxels, voxelStats, voxelGrid, shotImpact, replayShots, skyAt } from './voxel';
 import * as net from './net';
 import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
 import './stats';            // reactive leaderboard + career (no-op without Convex)
@@ -101,6 +101,7 @@ window.__town={
   voxels: voxelStats,                     // quads, pending re-meshes, live debris / falling islands
   get grid(){ return voxelGrid(); },      // the live voxel grid, for poking at from the console
   blast: shotImpact,                      // blast([x,y,z],[dx,dy,dz],len,weapon): land a shot on the world
+  skyAt,                                  // skyAt(x,y,z): sky light 0–255 at a world position
   replay: replayShots,                    // replay([[w,ox,oy,oz,dx,dy,dz,len],…]): land a list of shots silently
   showPerf: quality.showPerf,             // on-screen overlay (also: backquote)
   renderer, sun: world.sun,               // handles for A/B-ing lighting costs

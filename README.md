@@ -147,12 +147,23 @@ the server) are the same as before; they are simply measured against voxels.
 | `destruction.js` | carving, the support check, falling islands and debris |
 | `rig.js`         | rebuilds the round parts of player and weapon models out of small blocks |
 | `index.js`       | the facade the rest of the game calls: floor/wall queries, shot traces, shot damage |
+| `skylight.js`    | how much sky each voxel sees: dims ambient light indoors, updates as walls come down |
 
 **How destruction works.** A hit removes a ragged sphere of voxels — larger for
 the handgonne than the AK, larger in wood and snow than in steel — and scorches
 the rim. The voxels around the hole are then flood-filled toward the ground; any
 group that can no longer reach it is lifted out of the grid as a rigid *island*
 that falls, tumbles and shatters into debris cubes on impact.
+
+**Light.** Every voxel of air stores how much open sky it can see: full under
+open sky, fading over about 10 m as it floods sideways and down under cover.
+The values live in a 3D texture (one byte per voxel, sharing the grid's memory
+layout) that the shaders sample to scale ambient light, so tunnels and rooms
+are dim and doorways glow. A carve only ever removes voxels, so light only ever
+increases: after each hit the flood is continued from the new hole (a few ms at
+most) and just the changed region of the texture is re-uploaded. Players, guns
+and debris sample the same texture at their own position. If the GPU cannot
+hold a 3D texture the size of the grid, the effect switches itself off.
 
 **Multiplayer.** The server still knows nothing about geometry. Each client
 breaks its own copy of the map from `shoot` messages, using only the values in
@@ -174,7 +185,8 @@ clear the end-of-round overview), and getters `pos`, `me`, `remotes`. For the
 voxel world: `voxels()` (quad count, pending re-meshes, live debris and falling
 islands, shots applied so far), `grid` (the live voxel grid),
 `blast([x,y,z],[dx,dy,dz],len,weapon)` to land a shot on the world without
-firing one, and `replay(shots)` to land a list of them silently.
+firing one, `replay(shots)` to land a list of them silently, and
+`skyAt(x,y,z)` for the sky light (0–255) at a point.
 
 ## Rounds & the lobby
 

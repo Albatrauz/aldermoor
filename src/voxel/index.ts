@@ -15,6 +15,7 @@ import { voxelizeMap, VS, FAR_VS } from './voxelize';
 import { ChunkSet } from './chunks';
 import { makeVoxelMaterial } from './material';
 import { matOf } from './palette';
+import { SkyLight } from './skylight';
 import { carve, initDestruction, updateDestruction, destructionStats, setQuiet } from './destruction';
 import { spawnImpact, clearChips } from '../effects';
 import type { BuiltMap } from '../mapkit';
@@ -26,6 +27,7 @@ const farMat = makeVoxelMaterial(FAR_VS);
 let grid: VoxelGrid | null = null;
 let chunks: ChunkSet | null = null;
 let farChunks: ChunkSet | null = null;
+let sky: SkyLight | null = null;
 let groundSurface: Surface = 'sand';
 let touched = false;   // has a shot landed on this map since it was built?
 let silent = false;    // replaying old shots: damage only, no dust or debris
@@ -44,7 +46,7 @@ export function onGeometryChange(fn: () => void) { onChange = fn; }
 
 /* ============================ build ============================ */
 export function buildVoxelWorld(built: BuiltMap, ground: Surface): THREE.Group {
-  chunks?.dispose(); farChunks?.dispose();
+  chunks?.dispose(); farChunks?.dispose(); sky?.dispose();
   clearChips();
   groundSurface = ground;
 
@@ -60,13 +62,16 @@ export function buildVoxelWorld(built: BuiltMap, ground: Surface): THREE.Group {
   farChunks.buildAll();
   for (const m of farChunks.group.children) m.receiveShadow = true;
   const t2 = performance.now();
+  sky = new SkyLight(fine);
+  sky.bind();
+  const t3 = performance.now();
 
   const group = new THREE.Group();
   group.add(chunks.group, farChunks.group);
-  initDestruction(fine, chunks, fineMat, group);
+  initDestruction(fine, chunks, fineMat, group, sky);
   shadowStale = false; touched = false; applied = 0;
   console.info(`voxel world: ${fine.nx}×${fine.ny}×${fine.nz} @ ${VS}m — voxelize ${(t1 - t0).toFixed(0)}ms, ` +
-    `mesh ${(t2 - t1).toFixed(0)}ms, ${chunks.quads + farChunks.quads} quads`);
+    `mesh ${(t2 - t1).toFixed(0)}ms, light ${(t3 - t2).toFixed(0)}ms, ${chunks.quads + farChunks.quads} quads`);
   return group;
 }
 
@@ -74,6 +79,7 @@ export function buildVoxelWorld(built: BuiltMap, ground: Surface): THREE.Group {
 export function updateVoxels(dt: number) {
   if (!chunks) return;
   updateDestruction(dt);
+  sky?.flush();
   if (chunks.flush(6) > 0) shadowStale = true;
   sinceBake += dt;
   if (shadowStale && sinceBake >= SHADOW_GAP) { shadowStale = false; sinceBake = 0; onChange?.(); }
@@ -215,3 +221,9 @@ export function voxelStats() {
   };
 }
 export const voxelGrid = () => grid;
+/* Sky light (0–255) at a world position — what the shader would look up there. */
+export function skyAt(x: number, y: number, z: number) {
+  if (!grid || !sky || !sky.ok) return 255;
+  const i = grid.ix(x), j = grid.iy(y), k = grid.iz(z);
+  return grid.inside(i, j, k) ? sky.light[grid.idx(i, j, k)] : 255;
+}

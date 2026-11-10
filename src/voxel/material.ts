@@ -18,6 +18,7 @@
 // shimmering noise the moment the camera moves.
 import * as THREE from 'three';
 import { injectHeightFog } from '../fog';
+import { SKY_PARS, skyApply, bindSkyUniforms } from './skylight';
 
 export function makeVoxelMaterial(voxelSize: number): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ roughness: .93, metalness: 0 });
@@ -26,6 +27,7 @@ export function makeVoxelMaterial(voxelSize: number): THREE.MeshStandardMaterial
   mat.onBeforeCompile = (shader) => {
     injectHeightFog(shader);
     shader.uniforms.uVS = uVS;
+    bindSkyUniforms(shader);
 
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
@@ -44,6 +46,7 @@ export function makeVoxelMaterial(voxelSize: number): THREE.MeshStandardMaterial
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform float uVS;
+        ${SKY_PARS}
         varying vec4 vVox;
         varying vec3 vVoxPos;
         varying vec3 vVoxN;
@@ -70,6 +73,9 @@ export function makeVoxelMaterial(voxelSize: number): THREE.MeshStandardMaterial
           base *= 1.0 - .16 * line;
           diffuseColor.rgb *= base;
         }`)
+      // Ambient light scaled by how much sky this spot can see (see skylight.ts),
+      // sampled half a voxel out from the face: in the air, not in the wall.
+      .replace('#include <aomap_fragment>', skyApply('voxSky( vVoxPos + vVoxN * uVS * .5 )'))
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = mix( roughnessFactor, .38, vVox.a );`)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>

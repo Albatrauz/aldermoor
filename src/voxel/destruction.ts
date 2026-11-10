@@ -29,6 +29,7 @@ import { matOf, PAL, h3 } from './palette';
 import { spawnDust } from '../effects';
 import { burst } from '../particles';
 import { rumble } from '../audio';
+import { addSkyLight, type SkyLight } from './skylight';
 
 const GRAVITY = 13;               // matches the player's fall
 const MAX_ISLAND = 60000;         // a loose group bigger than this is left standing
@@ -38,6 +39,8 @@ let grid: VoxelGrid | null = null;
 let chunks: ChunkSet | null = null;
 let material: THREE.Material | null = null;
 let holder: THREE.Group | null = null;
+let sky: SkyLight | null = null;
+const opened: number[] = [];      // storage indices the carve in progress has turned to air
 
 /* ============================ debris pool ============================ */
 // One InstancedMesh for every loose cube in the world: one draw call however
@@ -49,7 +52,7 @@ const F = 16;                     // floats per cube
 const D = new Float32Array(MAXD * F);
 let nd = 0;
 
-const debrisMat = new THREE.MeshStandardMaterial({ roughness: .9 });
+const debrisMat = addSkyLight(new THREE.MeshStandardMaterial({ roughness: .9 }));
 const debris = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), debrisMat, MAXD);
 debris.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 debris.frustumCulled = false;     // instances roam; the unit cube's bounds mean nothing
@@ -166,6 +169,7 @@ function makeIsland(comp: number[]) {
     if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; if (k < k0) k0 = k; if (k > k1) k1 = k;
     si += i; sj += j; sk += k;
     g.data[id] = 0;
+    opened.push(id);
     (chunks as ChunkSet).markVoxel(i, j, k);
   }
   // centre of mass, snapped to the voxel lattice so the shader's per-voxel
@@ -336,6 +340,7 @@ export function carve(
       if (dist <= r) {
         if (g.locked(i, j, k)) continue;
         data[col + j] = 0;
+        opened.push(col + j);
         removed.push(i, j, k, m);
         ch.markVoxel(i, j, k);
       } else {
@@ -375,11 +380,15 @@ export function carve(
     if (data[id - 1]) seeds.push(id - 1);
   }
   checkSupport(seeds);
+  // daylight into whatever the hole and the collapse just opened up
+  sky?.opened(opened);
+  opened.length = 0;
   return count;
 }
 
 /* ============================ lifecycle ============================ */
-export function initDestruction(g: VoxelGrid, c: ChunkSet, mat: THREE.Material, group: THREE.Group) {
+export function initDestruction(g: VoxelGrid, c: ChunkSet, mat: THREE.Material, group: THREE.Group, light: SkyLight | null = null) {
+  sky = light; opened.length = 0;
   for (const isl of islands) isl.mesh.geometry.dispose();
   islands.length = 0;
   nd = 0; debris.count = 0;
