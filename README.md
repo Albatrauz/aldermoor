@@ -1,7 +1,9 @@
 # Aldermoor
 
-A small first-person three.js game — a medieval market town at dusk — with a
-tiny Node WebSocket server for drop-in multiplayer.
+A small first-person three.js shooter with a tiny Node WebSocket server for
+drop-in multiplayer — played in a **destructible voxel world**. Every wall,
+crate, car and patch of ground is made of 25 cm voxels: shots knock real holes
+in them, and anything cut loose from the ground comes down as rubble.
 
 ## Run it
 
@@ -110,7 +112,9 @@ dependency flow runs roughly top-to-bottom:
 | `core.js`       | renderer, scene, camera, seeded RNG, low-level geometry helpers |
 | `textures.js`   | procedurally painted canvas textures |
 | `materials.js`  | shared materials built from those textures |
-| `world.js`      | builds the entire static town (one-time on import) + per-frame ambient animation |
+| `world.js`      | map manager: shared sky/sun/fog, builds the active map and hands it to the voxel engine |
+| `mapkit.js`, `maps/` | the map toolkit and the two maps, described as boxes, ramps and props |
+| `voxel/`        | the voxel engine — see below |
 | `audio.js`      | synthesized black-powder / UI sounds (WebAudio) |
 | `effects.js`    | transient tracers / muzzle flashes / smoke + ray-cast hit tests |
 | `hud.js`        | score tally, health bar, hit/hurt flourishes, death summary |
@@ -124,14 +128,65 @@ dependency flow runs roughly top-to-bottom:
 | `stats.js`      | reactive leaderboard + own-career rendering on the intro screen |
 | `main.js`       | entry point: wires the render loop and the `window.__town` debug hook |
 
-> **Note on `world.js`:** the town is laid out by a seeded RNG, so the order of
-> the build steps is load-bearing — reordering them reshuffles the whole town.
+### The voxel engine (`src/voxel/`)
+
+The maps are still authored as plain boxes, ramps and cylinders. At load the
+engine rasterises that description into voxels and discards the original meshes;
+from then on the voxels are the world — what is drawn, shot, walked on and
+destroyed. The rules of play (speeds, step height, weapons, the wire protocol,
+the server) are the same as before; they are simply measured against voxels.
+
+| Module           | Responsibility |
+|------------------|----------------|
+| `grid.js`        | the voxel array itself, plus ray traversal and the column queries movement uses |
+| `palette.js`     | voxel materials, and the patterns that stand in for the old textures (masonry courses, window grids, crate frames) |
+| `voxelize.js`    | map → voxels: a fine 0.25 m grid for the playable block, a coarse 1 m backdrop beyond the walls |
+| `mesher.js`      | greedy meshing with baked ambient occlusion |
+| `chunks.js`      | 32³ chunk meshes; only the chunks a hit touches are re-meshed |
+| `material.js`    | the one shader that draws every voxel (per-voxel tint and outlines, computed per pixel) |
+| `destruction.js` | carving, the support check, falling islands and debris |
+| `rig.js`         | rebuilds the round parts of player and weapon models out of small blocks |
+| `index.js`       | the facade the rest of the game calls: floor/wall queries, shot traces, shot damage |
+| `skylight.js`    | how much sky each voxel sees: dims ambient light indoors, updates as walls come down |
+
+**How destruction works.** A hit removes a ragged sphere of voxels — larger for
+the handgonne than the AK, larger in wood and snow than in steel — and scorches
+the rim. The voxels around the hole are then flood-filled toward the ground; any
+group that can no longer reach it is lifted out of the grid as a rigid *island*
+that falls, tumbles and shatters into debris cubes on impact.
+
+**Light.** Every voxel of air stores how much open sky it can see: full under
+open sky, fading over about 10 m as it floods sideways and down under cover.
+The values live in a 3D texture (one byte per voxel, sharing the grid's memory
+layout) that the shaders sample to scale ambient light, so tunnels and rooms
+are dim and doorways glow. A carve only ever removes voxels, so light only ever
+increases: after each hit the flood is continued from the new hole (a few ms at
+most) and just the changed region of the texture is re-uploaded. Players, guns
+and debris sample the same texture at their own position. If the GPU cannot
+hold a 3D texture the size of the grid, the effect switches itself off.
+
+**Multiplayer.** The server still knows nothing about geometry. Each client
+breaks its own copy of the map from `shoot` messages, using only the values in
+the message, so the damage is a pure function of the shots and the order they
+arrive in. The server fixes that order: it relays every shot it accepts to
+everyone, the shooter included, and a client knocks the hole only when the shot
+comes back (offline it lands at once). The server also keeps the round's
+accepted shots in a list (`shotLog`, capped at 20,000) and sends it in
+`welcome`; a client that joins or reconnects mid-round rebuilds the map
+undamaged and replays the list silently — about 0.2 s for 5,000 shots — to
+arrive at the map everyone else is looking at. The list is cleared, and the
+damage with it, when the map rotates at the end of a round.
 
 ## Debug hook
 
 The client exposes `window.__town` for automated checks: `hideIntro()`,
 `fire()`, `teleport(x, z, yaw, pitch)`, `over(stats)` / `restart()` (raise and
-clear the end-of-round overview), and getters `pos`, `me`, `remotes`.
+clear the end-of-round overview), and getters `pos`, `me`, `remotes`. For the
+voxel world: `voxels()` (quad count, pending re-meshes, live debris and falling
+islands, shots applied so far), `grid` (the live voxel grid),
+`blast([x,y,z],[dx,dy,dz],len,weapon)` to land a shot on the world without
+firing one, `replay(shots)` to land a list of them silently, and
+`skyAt(x,y,z)` for the sky light (0–255) at a point.
 
 ## Rounds & the lobby
 

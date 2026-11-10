@@ -186,6 +186,23 @@ let phase = 'play';
 let overInfo = null;
 let restartTimer = null;
 
+// Every shot the server let through this round, in the order it let them
+// through: [weapon, ox,oy,oz, dx,dy,dz, length]. The server still knows nothing
+// about geometry — but the clients break their maps from exactly these numbers,
+// so handing a newcomer the list lets them rebuild the damage they missed.
+// Capped so a marathon round can't grow it without bound; past the cap a late
+// joiner simply misses the newest holes.
+const MAX_SHOT_LOG = 20000;
+let shotLog = [];
+
+// Relay one accepted shot to everyone — the shooter included. Clients apply
+// world damage only when the shot comes back from here, which gives every copy
+// of the map the same shots in the same order.
+function relayShot(id, w, o, d, l) {
+  if (shotLog.length < MAX_SHOT_LOG) shotLog.push([w, o[0], o[1], o[2], d[0], d[1], d[2], l]);
+  broadcast({ t: 'shoot', id, w, o, d, l });
+}
+
 function pickName() {
   for (let i = 0; i < 50; i++) {
     const n = FIRST[Math.floor(Math.random() * FIRST.length)] + ' ' +
@@ -272,6 +289,7 @@ function resetRound() {
   phase = 'play';
   overInfo = null;
   applyMap(mapIndex + 1);                              // rotate to the next map for the fresh round
+  shotLog = [];                                        // fresh map, no holes in it yet
   const now = Date.now();
   for (const [id, p] of players) {
     p.score = 0; p.deaths = 0; p.hp = MAX_HP; p.alive = true;
@@ -442,6 +460,7 @@ function attachGame(httpServer, opts = {}) {
     ws.send(JSON.stringify({
       t: 'welcome', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
       map: activeMapName(),
+      shots: shotLog,                                 // the round's damage so far, for the client to replay
       players: [...players.entries()]
         .filter(([pid, q]) => pid !== id && q.active)
         .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, deaths: q.deaths, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
@@ -467,10 +486,10 @@ function attachGame(httpServer, opts = {}) {
         if (!Array.isArray(msg.o) || !Array.isArray(msg.d)) return;
         p.lastShot = now;
         p.hitUsed = false;
-        broadcast({ t: 'shoot', id, w: sw,
-          o: msg.o.slice(0, 3).map(v => num(v, -200, 200, 0)),
-          d: msg.d.slice(0, 3).map(v => num(v, -1, 1, 0)),
-          l: num(msg.l, 0, 120, 70) }, id);
+        relayShot(id, sw,
+          [0, 1, 2].map(n => num(msg.o[n], -200, 200, 0)),
+          [0, 1, 2].map(n => num(msg.d[n], -1, 1, 0)),
+          num(msg.l, 0, 120, 70));
       } else if (msg.t === 'name') {
         if (p.authUserId) return;                          // signed-in players keep their fixed account name
         const now = Date.now();
@@ -596,10 +615,10 @@ function attachGame(httpServer, opts = {}) {
         const len = Math.hypot(dx, dy, dz) || 1;
         dx /= len; dy /= len; dz /= len;
         b.yaw = Math.atan2(-(target.x - b.x), -(target.z - b.z));   // face the target
-        broadcast({ t: 'shoot', id: bid,
-          o: [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2)],
-          d: [+dx.toFixed(3), +dy.toFixed(3), +dz.toFixed(3)],
-          l: +Math.min(len, 120).toFixed(1) });
+        relayShot(bid, 0,
+          [+b.x.toFixed(2), +b.y.toFixed(2), +b.z.toFixed(2)],
+          [+dx.toFixed(3), +dy.toFixed(3), +dz.toFixed(3)],
+          +Math.min(len, 120).toFixed(1));
         resolveHit(bid, targetId, Math.random() < BOT_HEADSHOT);
         b.nextShot = now + BOT_FIRE_CD + Math.random() * BOT_FIRE_JITTER;  // stagger the next volley
       }

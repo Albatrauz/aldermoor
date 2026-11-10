@@ -68,6 +68,11 @@ export function uvBox(geo, scale){
     }
   }
   g.setAttribute('uv', new THREE.BufferAttribute(uv,2));
+  // toNonIndexed() hands back a bare BufferGeometry: the fact that this was a
+  // 2×3×4 box is gone. The voxelizer rasterises primitives from exactly that
+  // description, so keep it.
+  const src=geo as any;
+  if(src.parameters && !g.userData.shape) g.userData.shape={type:geo.type, ...src.parameters};
   return g;
 }
 export function prismGeo(w,h,d,uvScale=0.45){

@@ -1,10 +1,14 @@
 /* ============================ player & controls ============================ */
 // First-person movement, look, jumping and the intro/menu gate. Owns the player
-// state and the circle-vs-AABB collision against the town's colliders.
+// state. Collision is a circle against the voxel world: the same rules the old
+// box colliders enforced (step up anything knee-high, be stopped by anything
+// taller, walk under anything above head height), now asked of whatever voxels
+// are actually still standing — so a breach shot through a wall is a doorway.
 // `walkPhase` and `introVisible` are exported as live bindings so the gun
 // viewmodel (combat) and zone/toast logic can read them without owning them.
 import { canvas, camera, EYE } from './core';
-import { colliders, colliderTopAt, SPAWNS, menuCam } from './world';
+import { SPAWNS, menuCam } from './world';
+import { floorUnder, standHeight, resolveCircle, solidAt } from './voxel';
 import { ac } from './audio';
 
 // player.y is the eye height that travels over the wire; player.feet is the
@@ -92,22 +96,29 @@ addEventListener('mousemove',e=>{
   }
 });
 
-/* floor height under (px,pz): highest collider top that is within step reach */
+/* floor height under (px,pz): the highest surface that is within step reach */
 function groundAt(px,pz,feet){
-  let g=0;
-  for(const c of colliders){
-    if(px<c.x-c.hx||px>c.x+c.hx||pz<c.z-c.hz||pz>c.z+c.hz) continue;
-    const t=colliderTopAt(c,px,pz);
-    if(t<=feet+STEP_UP && t>g) g=t;
-  }
-  return g;
+  return floorUnder(px,pz,feet+STEP_UP);
 }
+
+// The eye height the camera actually sits at. Voxel floors come in quarter-metre
+// steps — a ramp is a staircase now — and snapping the view up each one would
+// judder. The player's real height (what collides, what goes on the wire) still
+// snaps; only the view eases after it.
+let eyeY=EYE;
 
 /* place the player at a random spawn point, facing into play */
 export function respawn(){
   const s=SPAWNS[Math.floor(Math.random()*SPAWNS.length)];
-  player.x=s.x+Math.random()*2-1;
-  player.z=s.z+Math.random()*2-1;
+  // Scatter a metre around the spot — but try a few scatters and keep the one
+  // that lands lowest, stopping at the first on open ground. A spawn point that
+  // grazes a wall or a crate would otherwise sometimes put you ON it; and on top
+  // of an interior wall is above the ceiling, which is a room with no door.
+  let low=Infinity;
+  for(let n=0;n<12 && low>0;n++){
+    const x=s.x+Math.random()*2-1, z=s.z+Math.random()*2-1, h=standHeight(x,z,PLAYER_H);
+    if(h<low){ low=h; player.x=x; player.z=z; }
+  }
   player.yaw=s.yaw; player.pitch=0;
   vel.x=vel.z=0;
   walkPhase=0;                          // a fresh stride, not the one we died mid-step of
@@ -115,43 +126,21 @@ export function respawn(){
   snapDown();
 }
 
-/* drop the player onto whatever surface is under (x,z) — used by debug teleport */
+/* drop the player onto whatever surface is under (x,z) — used by debug teleport.
+   Picks the lowest spot with standing room, so a spawn under a roof lands on the
+   floor rather than on the roof. */
 export function snapDown(){
-  let g=0;
-  for(const c of colliders){
-    if(c.base>0) continue; // skip ceilings/lintels — snap to the floor below them
-    if(player.x<c.x-c.hx||player.x>c.x+c.hx||player.z<c.z-c.hz||player.z>c.z+c.hz) continue;
-    const t=colliderTopAt(c,player.x,player.z);
-    if(t>g) g=t;
-  }
+  const g=standHeight(player.x, player.z, PLAYER_H);
   player.feet=g; player.y=g+EYE; player.vy=0; player.grounded=true;
+  eyeY=player.y;
 }
 
 respawn(); // first life starts somewhere random too
 
-/* circle-vs-AABB collision, gated by the player's vertical span */
+/* circle-vs-voxel collision, gated by the player's vertical span: anything
+   solid above step height and below head height is a wall */
 function collide(){
-  const r=R_PLAYER;
-  for(let pass=0;pass<2;pass++){
-    for(const c of colliders){
-      const topHere=colliderTopAt(c, player.x, player.z);
-      if(topHere<=player.feet+STEP_UP) continue;   // low enough → step onto it
-      if(c.base>=player.feet+PLAYER_H) continue;   // overhang → walk under it
-      const cx=Math.max(c.x-c.hx, Math.min(player.x, c.x+c.hx));
-      const cz=Math.max(c.z-c.hz, Math.min(player.z, c.z+c.hz));
-      let dx=player.x-cx, dz=player.z-cz;
-      const d2=dx*dx+dz*dz;
-      if(d2 < r*r){
-        if(d2<1e-9){ dx=player.x-c.x; dz=player.z-c.z;
-          if(Math.abs(dx)>Math.abs(dz)){ player.x=c.x+Math.sign(dx||1)*(c.hx+r); }
-          else { player.z=c.z+Math.sign(dz||1)*(c.hz+r); }
-        }else{
-          const d=Math.sqrt(d2), push=(r-d)/d;
-          player.x+=dx*push; player.z+=dz*push;
-        }
-      }
-    }
-  }
+  resolveCircle(player, R_PLAYER, player.feet+STEP_UP, player.feet+PLAYER_H);
   player.x=Math.max(-118,Math.min(118,player.x));
   player.z=Math.max(-92,Math.min(92,player.z));
 }
@@ -182,9 +171,14 @@ export function update(dt, time){
     const wz=(fz*-iz + rz*ix)/len*speed*( (iz!==0||ix!==0)?2:0 );
     vel.x += (wx-vel.x)*Math.min(1,dt*10);
     vel.z += (wz-vel.z)*Math.min(1,dt*10);
-    player.x += vel.x*dt;
-    player.z += vel.z*dt;
-    collide();
+    // Walls can be a single voxel thick once they've been shot at, so a long
+    // frame is walked in short strides rather than one leap that could clear one.
+    const strides=Math.max(1, Math.min(6, Math.ceil(Math.hypot(vel.x,vel.z)*dt/.2)));
+    for(let s=0;s<strides;s++){
+      player.x += vel.x*dt/strides;
+      player.z += vel.z*dt/strides;
+      collide();
+    }
 
     // vertical: glue to the floor, step up/down small heights, otherwise fall
     const ground=groundAt(player.x, player.z, player.feet);
@@ -193,6 +187,8 @@ export function update(dt, time){
       else { player.grounded=false; player.vy=0; }            // walked off an edge
     }else{
       player.vy -= 13*dt;
+      // bumping the head on whatever is overhead ends the rise
+      if(player.vy>0 && solidAt(player.x, player.feet+PLAYER_H+player.vy*dt, player.z)) player.vy=0;
       player.feet += player.vy*dt;
       if(player.feet<=ground){ player.feet=ground; player.vy=0; player.grounded=true; }
     }
@@ -202,7 +198,11 @@ export function update(dt, time){
       walkPhase += dt*(run?11:7.5);
     }
     const bob=moving&&player.grounded ? Math.sin(walkPhase)*.045 : 0;
-    camera.position.set(player.x, player.y+bob, player.z);
+    // ease the view over voxel steps while walking; in the air (or after a real
+    // drop) it simply follows
+    if(player.grounded && Math.abs(player.y-eyeY)<.6) eyeY += (player.y-eyeY)*Math.min(1,dt*18);
+    else eyeY=player.y;
+    camera.position.set(player.x, eyeY+bob, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
     const targetFov=run&&moving?75:70;
     camera.fov += (targetFov-camera.fov)*Math.min(1,dt*5);

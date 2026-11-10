@@ -18,6 +18,7 @@
 // MeshStandardMaterials that actually want it and leaves sprites alone.
 import * as THREE from 'three';
 import * as mats from './materials';
+import { addSkyLight } from './voxel/skylight';
 
 // Shared across every patched material, so a map switch is one assignment.
 const fogHeight = { value: 8 };
@@ -37,26 +38,32 @@ const FOG_FRAGMENT = /* glsl */`
 #endif
 `;
 
+/* The shader edit itself, exported so a material that already has its own
+   onBeforeCompile (the voxel material) can fold the height fog into it. */
+export function injectHeightFog(shader: { uniforms: Record<string, any>; vertexShader: string; fragmentShader: string }) {
+  shader.uniforms.fogHeight = fogHeight;
+  shader.uniforms.fogHeightFalloff = fogHeightFalloff;
+
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <fog_pars_vertex>', '#include <fog_pars_vertex>\nvarying float vFogWorldY;')
+    // `transformed` is in scope here for every mesh shader, and already
+    // carries any instancing/skinning transform.
+    .replace('#include <fog_vertex>', '#include <fog_vertex>\nvFogWorldY = ( modelMatrix * vec4( transformed, 1.0 ) ).y;');
+
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <fog_pars_fragment>',
+      '#include <fog_pars_fragment>\nuniform float fogHeight;\nuniform float fogHeightFalloff;\nvarying float vFogWorldY;')
+    .replace('#include <fog_fragment>', FOG_FRAGMENT);
+}
+
 function patch(mat: THREE.Material) {
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.fogHeight = fogHeight;
-    shader.uniforms.fogHeightFalloff = fogHeightFalloff;
-
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <fog_pars_vertex>', '#include <fog_pars_vertex>\nvarying float vFogWorldY;')
-      // `transformed` is in scope here for every mesh shader, and already
-      // carries any instancing/skinning transform.
-      .replace('#include <fog_vertex>', '#include <fog_vertex>\nvFogWorldY = ( modelMatrix * vec4( transformed, 1.0 ) ).y;');
-
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <fog_pars_fragment>',
-        '#include <fog_pars_fragment>\nuniform float fogHeight;\nuniform float fogHeightFalloff;\nvarying float vFogWorldY;')
-      .replace('#include <fog_fragment>', FOG_FRAGMENT);
-  };
+  mat.onBeforeCompile = injectHeightFog;
   // Without this three would happily share a compiled program between a patched
   // and an unpatched material with otherwise identical parameters.
   mat.customProgramCacheKey = () => 'heightFog';
-  mat.needsUpdate = true;
+  // These are what the guns and the players' gear are made of. They take the
+  // voxel world's sky light too, so a musket carried into a tunnel dims with it.
+  addSkyLight(mat);
 }
 
 // Applied to every shared world material at import time — before world.ts builds

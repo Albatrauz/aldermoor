@@ -4,6 +4,12 @@
 import * as THREE from 'three';
 import { mesh } from './core';
 import { matPlank, matIron, matGoldTrim, matDarkWood } from './materials';
+import { voxelizeRig } from './voxel/rig';
+
+// Voxel size for the guns' round parts (barrels, magazines). Small enough that a
+// barrel is still recognisably a barrel a few voxels across; the first-person
+// model sits inches from the eye, so it gets the finer of the two.
+const FP_VOX = .011, TP_VOX = .013;
 
 // `spread` is the shot-scatter cone (half-angle in radians) read by combat.js:
 //   base — idle floor (even a settled shot isn't a guaranteed headshot at range)
@@ -40,6 +46,7 @@ export function buildHandgonneFP() {
   g.add(muzzle);
   const base = {x:.34, y:-.3, z:-.5};
   g.position.set(base.x, base.y, base.z);
+  voxelizeRig(g, FP_VOX);
   return {group:g, muzzle, base};
 }
 
@@ -73,6 +80,7 @@ export function buildAK47FP() {
   g.add(muzzle);
   const base = {x:.3, y:-.28, z:-.44};
   g.position.set(base.x, base.y, base.z);
+  voxelizeRig(g, FP_VOX);
   return {group:g, muzzle, base};
 }
 
@@ -85,6 +93,7 @@ export function buildHandgonneTP() {
   g.add(mesh(new THREE.CylinderGeometry(.022,.027,.42,7), matIron, 0,.02,.28, {rx:Math.PI/2, cast:false}));
   muzzle.position.set(0,.02,.5);
   g.add(muzzle);
+  voxelizeRig(g, TP_VOX);
   return {group:g, muzzle};
 }
 
@@ -111,5 +120,6 @@ export function buildAK47TP() {
   g.add(mag);
   muzzle.position.set(0,.01,.58);
   g.add(muzzle);
+  voxelizeRig(g, TP_VOX);
   return {group:g, muzzle};
 }

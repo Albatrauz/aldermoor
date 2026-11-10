@@ -52,3 +52,27 @@ export function crack(vol){
   src.connect(f); f.connect(g); g.connect(a.destination);
   src.start(t);
 }
+/* Masonry coming down: a longer, darker noise burst than the guns, with a slow
+   filter sweep so it reads as weight settling rather than as another shot. */
+export function rumble(vol, len=.6){
+  const a=ac(); if(!a || vol<.01) return;
+  const t=a.currentTime;
+  const buf=a.createBuffer(1, Math.floor(a.sampleRate*len), a.sampleRate);
+  const ch=buf.getChannelData(0);
+  let last=0;
+  for(let i=0;i<ch.length;i++){
+    // brown-ish noise: integrate white noise, with a lumpy envelope for the clatter
+    last=(last+(Math.random()*2-1)*.22)*.96;
+    const k=i/ch.length;
+    ch[i]=last*3*Math.pow(1-k,1.6)*(.65+.35*Math.sin(k*46+Math.sin(k*13)*3));
+  }
+  const src=a.createBufferSource(); src.buffer=buf;
+  const f=a.createBiquadFilter(); f.type='lowpass';
+  f.frequency.setValueAtTime(900,t);
+  f.frequency.exponentialRampToValueAtTime(90,t+len);
+  const g=a.createGain();
+  g.gain.setValueAtTime(Math.min(1,vol),t);
+  g.gain.exponentialRampToValueAtTime(.001,t+len);
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start(t);
+}
