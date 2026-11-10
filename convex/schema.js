@@ -34,7 +34,8 @@ export default defineSchema({
     expiresAt: v.number(),
   })
     .index("by_token", ["token"])
-    .index("by_expiresAt", ["expiresAt"]), // lets the cleanup cron find expired sessions cheaply
+    .index("by_expiresAt", ["expiresAt"]) // lets the cleanup cron find expired sessions cheaply
+    .index("by_userId", ["userId"]), // lets a password reset sign an account out everywhere
 
   // Lifetime aggregates, written server-authoritatively by server.js. K/D and
   // headshot % are derived on read, never stored, so they can't drift.
