@@ -73,6 +73,23 @@ Sign up on the intro screen to claim a fixed username; play a round and your
 stats persist and climb the leaderboard. Guests can still jump in with a free
 name — they just aren't tracked. Set `ALLOW_GUESTS=false` to require an account.
 
+### Resetting a player's password
+
+Accounts have no e-mail on file, so players can't reset their own password — the
+operator does, with an internal action that the browser cannot call:
+
+```sh
+npx convex run auth:adminResetPassword '{"username":"Wat the Cooper","newPassword":"a-new-one"}'
+# against production: add --prod
+```
+
+(or Functions → `auth:adminResetPassword` → Run function in the Convex dashboard.)
+It hashes the new password exactly as sign-up does and signs the account out
+everywhere, so any session opened with the old password stops working. Tell the
+player the new password yourself; they can sign in with it straight away. The
+first deploy after this change adds a `by_userId` index on `sessions`, which
+Convex builds on its own.
+
 ### Production (Convex Cloud)
 
 Deploy the functions once per release, then build/run the game as usual:

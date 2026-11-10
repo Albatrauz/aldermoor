@@ -11,6 +11,7 @@ import {
   action,
   mutation,
   query,
+  internalAction,
   internalMutation,
   internalQuery,
 } from "./_generated/server";
@@ -101,6 +102,35 @@ export const signIn = action({
     const token = randomHex(32);
     await ctx.runMutation(internal.auth.createSession, { userId: user._id, token });
     return { token, username: user.displayUsername };
+  },
+});
+
+/* ---- admin: reset a player's password ---- */
+// There is no e-mail on file, so players cannot reset their own password; the
+// operator does it. This is an INTERNAL action — the browser cannot call it, it
+// is reachable only from the Convex dashboard (Functions → Run function) or the
+// CLI:
+//   npx convex run auth:adminResetPassword '{"username":"Name","newPassword":"…"}'
+// It hashes the new password exactly as signUp does, then signs the account out
+// everywhere (see setPassword), so a stolen session dies with the old password.
+// The player is then given the new password out of band and can sign in at once.
+export const adminResetPassword = internalAction({
+  args: { username: v.string(), newPassword: v.string() },
+  handler: async (ctx, { username, newPassword }) => {
+    if (newPassword.length < 6) throw new Error("Password must be at least 6 characters.");
+    const { key } = normalizeUsername(username);
+    const user = await ctx.runQuery(internal.auth.userByUsernameKey, { key });
+    if (!user) throw new Error(`No account named "${username}".`);
+
+    const salt = randomHex(16);
+    const passwordHash = await derive(newPassword, salt);
+    const signedOut = await ctx.runMutation(internal.auth.setPassword, {
+      userId: user._id,
+      passwordHash,
+      salt,
+    });
+    // The result is printed to whoever ran it — never the password or the hash.
+    return { username: user.displayUsername, sessionsEnded: signedOut };
   },
 });
 
@@ -207,6 +237,27 @@ export const createUserAndSession = internalMutation({
       weaponHeadshots: [],
       lastSeen: now,
     });
+  },
+});
+
+// Swap in a new hash and end every session the account has. Sessions are
+// deleted in bounded batches (like the cron cleanup) so a pile of them can
+// never blow the per-transaction limits; the loop runs until none are left.
+export const setPassword = internalMutation({
+  args: { userId: v.id("users"), passwordHash: v.string(), salt: v.string() },
+  handler: async (ctx, { userId, passwordHash, salt }) => {
+    await ctx.db.patch(userId, { passwordHash, salt });
+    let ended = 0;
+    for (;;) {
+      const batch = await ctx.db
+        .query("sessions")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .take(500);
+      for (const s of batch) await ctx.db.delete(s._id);
+      ended += batch.length;
+      if (batch.length < 500) break;
+    }
+    return ended;
   },
 });
 
