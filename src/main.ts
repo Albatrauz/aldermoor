@@ -12,6 +12,7 @@ import * as villagers from './villagers';
 import { updateFx } from './effects';
 import { updateParticles } from './particles';
 import { updateWeather } from './weather';
+import { updateVoxels, voxelStats, voxelGrid, shotImpact, replayShots } from './voxel';
 import * as net from './net';
 import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
 import './stats';            // reactive leaderboard + career (no-op without Convex)
@@ -32,6 +33,7 @@ function frame(dt){
   controls.update(dt, time);   // movement / menu drift + camera
   zones.update(dt);            // zone toasts
   combat.update(dt);           // handgonne viewmodel
+  updateVoxels(dt);            // falling masonry, debris, re-meshing what was shot
   updateFx(dt);                // tracers, flashes, smoke puffs, impacts
   updateParticles(dt);         // GPU debris — just advances the shader's clock
   updateWeather(dt);           // snow / dust, box snapped to the camera
@@ -96,6 +98,10 @@ window.__town={
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly
   perf: quality.stats,                    // frame time + draw counts
+  voxels: voxelStats,                     // quads, pending re-meshes, live debris / falling islands
+  get grid(){ return voxelGrid(); },      // the live voxel grid, for poking at from the console
+  blast: shotImpact,                      // blast([x,y,z],[dx,dy,dz],len,weapon): land a shot on the world
+  replay: replayShots,                    // replay([[w,ox,oy,oz,dx,dy,dz,len],…]): land a list of shots silently
   showPerf: quality.showPerf,             // on-screen overlay (also: backquote)
   renderer, sun: world.sun,               // handles for A/B-ing lighting costs
   kill(id){ villagers.killRemote(id); },                 // topple a fellow traveller (death-anim check)

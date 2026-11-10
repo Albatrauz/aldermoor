@@ -12,6 +12,7 @@ import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, enterF
 import { player, vel, keys, introVisible } from './controls';
 import { getToken, getSession, onAuthChange } from './auth';
 import { setMap, mapLabel, mapBlurb, onMapChange } from './world';
+import { replayShots } from './voxel';
 
 // Keep the lobby's map nameplate in step with whatever map is live.
 const introTitleEl=document.getElementById('introMapTitle');
@@ -55,9 +56,11 @@ document.getElementById('enter').addEventListener('click',()=>{
   enterField();
 });
 
-/* send a JSON message if the socket is open */
+/* send a JSON message if the socket is open; says whether it went */
 export function sendNet(obj){
-  if(net && net.readyState===1) net.send(JSON.stringify(obj));
+  if(!(net && net.readyState===1)) return false;
+  net.send(JSON.stringify(obj));
+  return true;
 }
 
 function updatePresence(){
@@ -85,7 +88,11 @@ function connect(){
     let m; try{ m=JSON.parse(e.data); }catch{ return; }
     if(m.t==='welcome'){
       myId=m.id; myName=m.name; net=ws;
-      if(m.map) setMap(m.map);           // build the map the server has live right now
+      // Build the map the server has live right now — from scratch if ours has
+      // been shot at, because the round's shots are about to be replayed onto it
+      // and they only add up to the right holes on an undamaged map.
+      if(m.map) setMap(m.map, true);
+      if(Array.isArray(m.shots)) replayShots(m.shots);
       resetFieldState();                 // a fresh socket starts as a lobby spectator
       scoresMap.clear();
       scoresMap.set(myId,{name:myName, score:m.score||0, deaths:m.deaths||0});
@@ -133,7 +140,7 @@ function connect(){
     }else if(m.t==='restart'){
       handleRestart(m);
     }else if(m.t==='lobby'){
-      if(m.map) setMap(m.map);           // the new round rotates the map — swap it in before the menu
+      if(m.map) setMap(m.map, true);     // the new round rotates the map — swap it in, undamaged, before the menu
       handleLobby();                     // round over — back to the menu + leaderboard, safe
     }else if(m.t==='denied'){
       // tried to take the field while a contest was wrapping up — bounce to the menu

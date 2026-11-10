@@ -100,7 +100,11 @@ export function wedgeGeo(w: number, h: number, d: number, uvScale = .25) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
   g.computeVertexNormals();
-  return uvBox(g, uvScale);
+  const out = uvBox(g, uvScale);
+  // The voxelizer rasterises primitives from their parameters, not their
+  // triangles; a hand-built wedge has none, so it carries its dimensions here.
+  out.userData.shape = { type: 'Wedge', w, h, d };
+  return out;
 }
 
 export interface BuilderOpts {

@@ -1,16 +1,23 @@
 /* ============================ world — the map manager ============================ */
 // The game can be played on more than one map, and the server rotates them
-// between rounds. This module owns the shared sky/sun/fog and the *active* map:
-// it builds a map's geometry into a group, swaps that group on demand, and keeps
-// the live `colliders`, `SPAWNS` and `ZONES` arrays (which controls/combat/zones
-// read every frame) pointing at the current map's data. The exported arrays keep
-// a stable identity — they're refilled in place — so importers never re-bind.
+// between rounds. This module owns the shared sky/sun/fog and the *active* map.
+//
+// A map still describes itself the way it always did — build() lays out boxes,
+// ramps and props with the map toolkit — but that description is no longer what
+// gets drawn. It is handed to the voxel engine, which rasterises it into a
+// destructible voxel world and returns the group that goes in the scene; the
+// toolkit meshes are discarded. Shots and movement are resolved against those
+// voxels (see ./voxel), so `colliders` survives only as build-time data: it
+// tells the voxelizer where the playable block ends.
+//
+// The exported `SPAWNS` and `ZONES` arrays keep a stable identity — they're
+// refilled in place — so importers never re-bind.
 import * as THREE from 'three';
 import { scene, renderer } from './core';
 import { glowTex } from './textures';
 import { setSky, bakeEnvironment } from './sky';
 import { setFogHeight } from './fog';
-import { bakeContactAO } from './ao';
+import { buildVoxelWorld, onGeometryChange, voxelsTouched } from './voxel';
 import { setWeather } from './weather';
 import { setLanterns } from './villagers';
 import { colliderTopAt, type Collider, type Spawn, type Zone, type MapEnv, type MenuCam, type MapDef } from './mapkit';
@@ -40,12 +47,14 @@ sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
 sun.shadow.camera.top = 150; sun.shadow.camera.bottom = -150;
 sun.shadow.camera.near = 10; sun.shadow.camera.far = 460;
 sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
-// The world is completely static and the sun never moves during a round, so the
-// shadow map is the same 16.7 million depth texels every frame. Baking it once
+// The world only changes when something is shot, and the sun never moves during
+// a round, so between hits the shadow map is the same 16.7 million depth texels
+// every frame. Baking it — and re-baking only when voxels actually go — still
 // removes ~214 draw calls and, measured at DPR 2, about 0.6ms of every frame on
 // a fast desktop GPU — proportionally far more on the integrated laptop GPUs this
 // has to hold 60fps on. Re-bake explicitly whenever the geometry or the sun
-// changes (see setMap / applyEnv).
+// changes (see setMap / applyEnv, and the voxel engine's change signal below,
+// which coalesces a firefight's worth of holes into a few re-bakes a second).
 //
 // Per-light rather than renderer-wide (`WebGLShadowMap` checks each light's own
 // autoUpdate/needsUpdate), so any future genuinely-dynamic shadow caster can
@@ -57,6 +66,7 @@ sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
 sun.shadow.autoUpdate = false;
 sun.shadow.needsUpdate = true;
 scene.add(sun);
+onGeometryChange(() => { sun.shadow.needsUpdate = true; });
 const fill = new THREE.DirectionalLight(0xb9c9de, 0.4);
 fill.position.set(-60, 40, -45);
 scene.add(fill);
@@ -119,8 +129,8 @@ export function groundSurface() { return MAPS[currentMapName].env.groundSurface;
 export function mapLabel(name = currentMapName) { return MAPS[name]?.label ?? name; }
 export function mapBlurb(name = currentMapName) { return MAPS[name]?.blurb ?? ''; }
 
-// Drop the active map's geometry (freeing its per-instance geometries; shared
-// materials are left alone) so a swap doesn't leak GPU memory over a long match.
+// Free a group's per-instance geometries (shared materials are left alone) so a
+// swap doesn't leak GPU memory over a long match.
 function disposeGroup(g: THREE.Group) {
   g.traverse((o) => {
     const m = o as THREE.Mesh;
@@ -131,17 +141,21 @@ function disposeGroup(g: THREE.Group) {
 
 /* Build and show the named map. Idempotent: re-selecting the live map is a no-op,
    so a stray duplicate `lobby`/`welcome` won't rebuild the world mid-look. */
-export function setMap(name: string) {
+// `fresh` asks for an undamaged map: the one already standing is kept only if
+// nobody has shot a hole in it yet.
+export function setMap(name: string, fresh = false) {
   const def = MAPS[name];
   if (!def) { console.warn('unknown map', name); return; }
-  if (currentGroup && name === currentMapName) return;
+  if (currentGroup && name === currentMapName && !(fresh && voxelsTouched())) return;
 
   const built = def.build();
   if (currentGroup) disposeGroup(currentGroup);
-  // Bake contact occlusion while the group is still parentless — it renders the
-  // map in isolation, which is only possible before it joins the live scene.
-  bakeContactAO(built.group);
-  currentGroup = built.group;
+  // Rasterise the toolkit's boxes into voxels. From here on the toolkit meshes
+  // are spent — nothing draws them — so they are freed straight away. Contact
+  // occlusion needs no separate bake any more: the voxel mesher shades every
+  // crease as it builds, and keeps doing so as the map is shot to pieces.
+  currentGroup = buildVoxelWorld(built, def.env.groundSurface);
+  disposeGroup(built.group);
   scene.add(currentGroup);
   sun.shadow.needsUpdate = true;    // new geometry: rebake the frozen shadow map
 

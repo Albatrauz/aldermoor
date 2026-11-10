@@ -222,7 +222,7 @@ export function aabbNormal(p: THREE.Vector3, c: any, out = _n) {
 
 /* `surface` may be passed directly (ground hits) or resolved from the collider's
    material (everything else). */
-export function spawnImpact(point: THREE.Vector3, normal: THREE.Vector3, surface: Surface) {
+export function spawnImpact(point: THREE.Vector3, normal: THREE.Vector3, surface: Surface, chip = true) {
   const spec = IMPACT[surface];
   _col.setHex(spec.dust);
 
@@ -238,7 +238,10 @@ export function spawnImpact(point: THREE.Vector3, normal: THREE.Vector3, surface
   // specks flying back out of the hit
   burst(point, normal, _col, spec.specks);
 
-  // the mark it leaves
+  // The mark it leaves — but only on something that stays put. A voxel that can
+  // be shot away takes its own damage (a real hole, a scorched rim); a painted
+  // chip on it would be left hanging in the air the moment the wall went.
+  if (!chip) return;
   const m = chips.take();
   m.position.copy(point).addScaledVector(normal, .014);
   m.quaternion.copy(_chipQ.setFromUnitVectors(_zAxis, normal));
@@ -251,6 +254,20 @@ export function spawnImpact(point: THREE.Vector3, normal: THREE.Vector3, surface
   // Chips are not on the fx list: they persist until the pool wraps around, which
   // is what makes a firefight leave a readable history on the walls.
 }
+
+/* A free-standing cloud of dust, for things bigger than one bullet — a section
+   of wall coming down. Shares the impact-puff pool. */
+export function spawnDust(point: THREE.Vector3, hex: number, scale = 1, ttl = .9) {
+  const p = puffs.take();
+  p.position.copy(point);
+  p.material.color.setHex(hex).lerp(_white, .35);
+  p.scale.setScalar(scale);
+  activate(p, ttl, 'puff');
+}
+const _white = new THREE.Color(1, 1, 1);
+
+/* Clear every chip off the walls — the walls themselves are about to be replaced. */
+export function clearChips() { for (const c of chips.items) c.visible = false; }
 
 export function impactSurfaceOf(collider: any): Surface {
   return surfaceOf(collider?.mat);

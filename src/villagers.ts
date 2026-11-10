@@ -7,6 +7,7 @@ import { scene, mesh, EYE } from './core';
 import { matIron, matDarkWood } from './materials';
 import { glowTex } from './textures';
 import { buildHandgonneTP, buildAK47TP } from './weapons';
+import { voxelizeRig } from './voxel/rig';
 
 // A tracked fellow traveller: the visual rig built by buildVillager, plus the
 // interpolation/animation state that addRemote attaches and updateRemotes drives.
@@ -121,6 +122,9 @@ function buildVillager(name, color){
   // hooded-fighter silhouette that still reads instantly at range.
   g.add(mesh(new THREE.ConeGeometry(.19,.25,9), clothDark, 0,1.70,0));   // hood
   g.add(mesh(new THREE.ConeGeometry(.31,.22,9), clothDark, 0,1.30,0));   // mantle
+  // Torso, belt, head and hood are round primitives; in a voxel world they are
+  // rebuilt out of 7 cm blocks (cached, so every traveller shares the result).
+  voxelizeRig(g, .07);
   const tag=makeNameTag(name);
   g.add(tag);
   // Hand lantern, swinging with the right arm. Hidden in daylight — see lanternsOn.

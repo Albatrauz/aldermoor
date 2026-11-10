@@ -37,22 +37,26 @@ const FOG_FRAGMENT = /* glsl */`
 #endif
 `;
 
+/* The shader edit itself, exported so a material that already has its own
+   onBeforeCompile (the voxel material) can fold the height fog into it. */
+export function injectHeightFog(shader: { uniforms: Record<string, any>; vertexShader: string; fragmentShader: string }) {
+  shader.uniforms.fogHeight = fogHeight;
+  shader.uniforms.fogHeightFalloff = fogHeightFalloff;
+
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <fog_pars_vertex>', '#include <fog_pars_vertex>\nvarying float vFogWorldY;')
+    // `transformed` is in scope here for every mesh shader, and already
+    // carries any instancing/skinning transform.
+    .replace('#include <fog_vertex>', '#include <fog_vertex>\nvFogWorldY = ( modelMatrix * vec4( transformed, 1.0 ) ).y;');
+
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <fog_pars_fragment>',
+      '#include <fog_pars_fragment>\nuniform float fogHeight;\nuniform float fogHeightFalloff;\nvarying float vFogWorldY;')
+    .replace('#include <fog_fragment>', FOG_FRAGMENT);
+}
+
 function patch(mat: THREE.Material) {
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.fogHeight = fogHeight;
-    shader.uniforms.fogHeightFalloff = fogHeightFalloff;
-
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <fog_pars_vertex>', '#include <fog_pars_vertex>\nvarying float vFogWorldY;')
-      // `transformed` is in scope here for every mesh shader, and already
-      // carries any instancing/skinning transform.
-      .replace('#include <fog_vertex>', '#include <fog_vertex>\nvFogWorldY = ( modelMatrix * vec4( transformed, 1.0 ) ).y;');
-
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <fog_pars_fragment>',
-        '#include <fog_pars_fragment>\nuniform float fogHeight;\nuniform float fogHeightFalloff;\nvarying float vFogWorldY;')
-      .replace('#include <fog_fragment>', FOG_FRAGMENT);
-  };
+  mat.onBeforeCompile = injectHeightFog;
   // Without this three would happily share a compiled program between a patched
   // and an unpatched material with otherwise identical parameters.
   mat.customProgramCacheKey = () => 'heightFog';
