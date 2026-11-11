@@ -1,5 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { createRequire } from 'module';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 // server.js is CommonJS (it's also the production server). Load it through
 // createRequire so Vite's config bundler doesn't try to inline its Node
@@ -33,8 +35,61 @@ function gameServer(): Plugin {
   };
 }
 
+// Dev only: the game POSTs a PNG of the current view here (P in play, see
+// src/screenshot.ts) and it lands in ./screenshots. The server picks the file
+// name — the client only suggests the map — so nothing outside that folder can
+// be written, and anything that isn't a PNG is refused.
+const SHOT_DIR = 'screenshots';
+const SHOT_MAX = 64 * 1024 * 1024;
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function screenshotSink(): Plugin {
+  return {
+    name: 'aldermoor-screenshot-sink',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__screenshot', (req, res) => {
+        const reply = (status: number, body: object) => {
+          res.statusCode = status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(body));
+        };
+        if (req.method !== 'POST') return reply(405, { error: 'POST a PNG' });
+
+        const chunks: Buffer[] = [];
+        let size = 0, refused = false;
+        req.on('data', (chunk: Buffer) => {
+          if (refused) return;
+          size += chunk.length;
+          if (size > SHOT_MAX) { refused = true; reply(413, { error: 'too large' }); return; }
+          chunks.push(chunk);
+        });
+        req.on('end', async () => {
+          if (refused) return;
+          const png = Buffer.concat(chunks);
+          if (!png.subarray(0, 8).equals(PNG_MAGIC)) return reply(400, { error: 'not a PNG' });
+
+          const query = new URL(req.url ?? '', 'http://localhost').searchParams;
+          const map = (query.get('map') ?? '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32) || 'shot';
+          const d = new Date(), p2 = (n: number, w = 2) => String(n).padStart(w, '0');
+          const stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-` +
+            `${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}-${p2(d.getMilliseconds(), 3)}`;
+          const file = path.join(SHOT_DIR, `${map}-${stamp}.png`);
+          try {
+            await mkdir(path.join(server.config.root, SHOT_DIR), { recursive: true });
+            await writeFile(path.join(server.config.root, file), png);
+            reply(200, { path: file });
+          } catch (err) {
+            reply(500, { error: String(err) });
+          }
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [gameServer()],
+  plugins: [gameServer(), screenshotSink()],
   server: {
     port: Number(process.env.PORT) || 5173,
   },

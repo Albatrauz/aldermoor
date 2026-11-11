@@ -153,3 +153,9 @@ window.__town={
     deadT:+(v.deadT||0).toFixed(2), rotX:+v.group.rotation.x.toFixed(2),
     tagWorld:v.tag.matrixWorld.elements.slice(12,15).map(n=>+n.toFixed(2))})); },
 };
+
+// Dev only: P saves the current view as a PNG under ./screenshots (see
+// screenshot.ts). Behind the DEV flag so the module never reaches a build.
+if (import.meta.env.DEV) {
+  import('./screenshot').then((m) => { (window.__town as any).screenshot = m.takeScreenshot; });
+}

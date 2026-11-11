@@ -258,6 +258,16 @@ is `visitor`, aimed by `frameVisitor(width, height)` — an orthographic view of
 the whole voxel world, kept off the first-person camera so a later map overlay
 can render it without moving the player.
 
+### Screenshots (dev server only)
+
+Press **P** while playing under `npm run dev` to save the current view as
+`screenshots/<map>-<timestamp>.png` (git-ignored). The HUD is never in the
+frame and the gun is hidden for the shot, so the picture is usable as a style
+reference — e.g. as input for an image-to-3D tool. From the console,
+`__town.screenshot()` does the same and `__town.screenshot({ viewmodel: true })`
+keeps the gun in. The PNG is written by the Vite dev server, so neither the key
+nor the hook exists in a production build.
+
 ## Rounds & the lobby
 
 Connecting puts you in the **lobby** — the intro screen, where the leaderboard

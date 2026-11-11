@@ -5,3 +5,4 @@ dist/
 .env
 convex/_generated
 .DS_Store
+screenshots/
