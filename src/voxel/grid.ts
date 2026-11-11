@@ -44,6 +44,13 @@ export class VoxelGrid {
   // planes a few layers into the boundary walls (lockBounds in voxelize.ts); by default the
   // box is the whole grid and nothing but bedrock is locked.
   lockI0 = 0; lockI1: number; lockK0 = 0; lockK1: number;
+  // Where a player may stand, which is not the same question. Below wallTop the
+  // lock planes, so a hole shot into the wall can be walked into; from wallTop up
+  // the walls' inner faces (faceI0 is the first open column inside the west wall,
+  // faceI1 the first column of the east wall; likewise in k), so the top of the
+  // wall is no ledge. setLock puts them on the lock planes, which is where they
+  // stay on a side with no known wall. Player-only: they change nothing a shot can dig.
+  faceI0 = 0; faceI1: number; faceK0 = 0; faceK1: number; wallTop = Infinity;
 
   constructor(nx: number, ny: number, nz: number, vs: number, ox: number, oy: number, oz: number) {
     this.nx = nx; this.ny = ny; this.nz = nz;
@@ -52,7 +59,7 @@ export class VoxelGrid {
     this.SX = nx + 2; this.SY = ny + 2; this.SZ = nz + 2;
     this.si = this.SY; this.sk = this.SY * this.SX;
     this.data = new Uint8Array(this.SX * this.SY * this.SZ);
-    this.lockI1 = nx; this.lockK1 = nz;
+    this.lockI1 = this.faceI1 = nx; this.lockK1 = this.faceK1 = nz;
   }
 
   idx(i: number, j: number, k: number) { return (j + 1) + this.SY * ((i + 1) + this.SX * (k + 1)); }
@@ -74,6 +81,7 @@ export class VoxelGrid {
     const c = (v: number, n: number) => Math.max(0, Math.min(n, v));
     this.lockI0 = c(i0, this.nx); this.lockI1 = c(i1, this.nx);
     this.lockK0 = c(k0, this.nz); this.lockK1 = c(k1, this.nz);
+    this.faceI0 = this.lockI0; this.faceI1 = this.lockI1; this.faceK0 = this.lockK0; this.faceK1 = this.lockK1;
   }
 
   /* Fill the padding shell: solid under the floor and beside the ground slab,

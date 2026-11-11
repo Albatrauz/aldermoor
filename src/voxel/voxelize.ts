@@ -179,16 +179,30 @@ function paintPlane(g: VoxelGrid, m: THREE.Mesh, pat: Pattern) {
 // where a wall stands back from the grid edge (dust2's east and west walls sit a
 // metre in, behind the ends of the north and south walls) a rim counted from the
 // edge locks only the empty air outside and leaves the wall diggable end to end.
+// Each side stands alone: one whose wall the map didn't mark gets the edge rim,
+// and only that side does. The faces are kept too, for the player clamp (grid.ts).
 function lockBounds(g: VoxelGrid, b: Bounds | undefined) {
   if (!b) {
     // Not silent: a rim at the grid edge only holds where the walls happen to stand on it.
     console.warn('voxelizer: map declares no outer walls (boundary: true on all four) — locking a rim at the grid edge instead');
     g.setLock(LOCK, g.nx - LOCK, LOCK, g.nz - LOCK); return;
   }
-  // the wall voxel touching the face: low side's last centre ≤ face, high side's first ≥ it
-  const lo = (f: number, o: number) => Math.floor((f - o) * g.inv - .5 + 1e-6) - WALL_LAYERS + 1;
-  const hi = (f: number, o: number) => Math.ceil((f - o) * g.inv - .5 - 1e-6) + WALL_LAYERS;
-  g.setLock(lo(b.x0, g.ox), hi(b.x1, g.ox), lo(b.z0, g.oz), hi(b.z1, g.oz));
+  // The face column on the lattice, by the centre rule: past a low-side wall the
+  // first column whose centre is > face, of a high-side wall the first whose centre
+  // is ≥ it. Undefined (no wall that side) → undefined.
+  const lo = (f: number | undefined, o: number) => f === undefined ? f : Math.floor((f - o) * g.inv - .5 + 1e-6) + 1;
+  const hi = (f: number | undefined, o: number) => f === undefined ? f : Math.ceil((f - o) * g.inv - .5 - 1e-6);
+  const fi0 = lo(b.x0, g.ox), fi1 = hi(b.x1, g.ox), fk0 = lo(b.z0, g.oz), fk1 = hi(b.z1, g.oz);
+  const L = WALL_LAYERS;
+  g.setLock(fi0 === undefined ? LOCK : fi0 - L, fi1 === undefined ? g.nx - LOCK : fi1 + L,
+    fk0 === undefined ? LOCK : fk0 - L, fk1 === undefined ? g.nz - LOCK : fk1 + L);
+  g.faceI0 = fi0 ?? g.lockI0; g.faceI1 = fi1 ?? g.lockI1;
+  g.faceK0 = fk0 ?? g.lockK0; g.faceK1 = fk1 ?? g.lockK1;
+  g.wallTop = b.top;
+  const missing = [fi0 === undefined && 'west', fi1 === undefined && 'east', fk0 === undefined && 'south', fk1 === undefined && 'north']
+    .filter(Boolean);
+  if (missing.length) console.warn(`voxelizer: no outer wall marked boundary: true on the ${missing.join(', ')} side — ` +
+    'locking a rim at the grid edge there instead');
 }
 
 /* The ring of columns just inside the locked zone must be one unbroken wall,
