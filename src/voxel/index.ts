@@ -131,6 +131,29 @@ export function resolveCircle(p: { x: number; z: number }, r: number, yLo: numbe
   }
 }
 
+/* Keep a circle (the player) out of the locked columns — the outer walls behind
+   their diggable face, and everything beyond them. The walls themselves already
+   do this at ground level; this is the same wall carried up past its top, so a
+   staircase shot into the diggable face leads onto nothing. Measured from the
+   live grid's lock planes, so it fits whichever map is loaded.
+   Once `reach` (the top of what the player can step onto: feet + step height,
+   the yLo resolveCircle is given) gets to the wall top, the barrier moves in to
+   the walls' inner faces: otherwise the top of the diggable strip, lock plane
+   deep, is a ledge to run along. Switching at the step reach, not the feet,
+   leaves no gap: while the wall top is out of step reach resolveCircle treats
+   the wall as a wall, and the moment it comes within reach — when the player
+   could step up onto it — the clamp is already at the face. Holes shot lower in
+   the wall can still be walked into, lock plane deep. */
+export function confine(p: { x: number; z: number }, r: number, reach: number) {
+  const g = grid;
+  if (!g) return;
+  const vs = g.vs, up = reach >= g.wallTop - 1e-3;
+  const i0 = up ? g.faceI0 : g.lockI0, i1 = up ? g.faceI1 : g.lockI1;
+  const k0 = up ? g.faceK0 : g.lockK0, k1 = up ? g.faceK1 : g.lockK1;
+  p.x = Math.max(g.ox + i0 * vs + r, Math.min(g.ox + i1 * vs - r, p.x));
+  p.z = Math.max(g.oz + k0 * vs + r, Math.min(g.oz + k1 * vs - r, p.z));
+}
+
 /* ============================ shots ============================ */
 export interface ShotHit { end: number; hit: boolean; outside: boolean; ray: RayHit; }
 const _shot: ShotHit = { end: 0, hit: false, outside: false, ray: makeHit() };

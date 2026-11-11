@@ -60,11 +60,20 @@ export interface MapEnv {
 // Where the lobby camera drifts while the menu is up (a gentle establishing shot).
 export interface MenuCam { x: number; y: number; z: number; yaw: number; pitch: number; }
 
+// The playable floor as the outer walls enclose it: the rectangle between their
+// inner faces (x0 west, x1 east, z0 south, z1 north), and the height of the
+// lowest of them. The voxelizer locks everything a few layers behind these faces,
+// so it must be where the walls really are — not merely where the map happens to
+// end. A side whose wall wasn't marked `boundary` is undefined, and the voxelizer
+// falls back to a rim at the grid edge on that side alone.
+export interface Bounds { x0?: number; x1?: number; z0?: number; z1?: number; top: number; }
+
 export interface BuiltMap {
   group: THREE.Group;
   colliders: Collider[];
   spawns: Spawn[];
   zones: Zone[];
+  bounds?: Bounds;     // from B.bounds(); without it the voxelizer locks a rim at the grid edge
 }
 
 export interface MapDef {
@@ -128,9 +137,11 @@ export interface Builder {
   wallZ(x: number, z1: number, z2: number, opts?: WallOpts): void;
   lintel(cx: number, cz: number, sx: number, sz: number, under?: number, top?: number, mat?: THREE.Material): void;
   ramp(cx: number, cz: number, sx: number, sz: number, h: number, facing: '+x' | '-x' | '+z' | '-z', mat?: THREE.Material): void;
+  bounds(): Bounds | undefined;
 }
 
-interface WallOpts { h?: number; t?: number; gaps?: [number, number][]; mat?: THREE.Material; base?: number; }
+// `boundary` marks one of the four outer walls (see Bounds).
+interface WallOpts { h?: number; t?: number; gaps?: [number, number][]; mat?: THREE.Material; base?: number; boundary?: boolean; }
 
 // split [a,b] by sorted gap intervals → the solid spans between the gaps
 function spans(a: number, b: number, gaps: [number, number][]): [number, number][] {
@@ -171,13 +182,43 @@ export function createBuilder(opts: BuilderOpts): Builder {
     addCollider(cx, cz, sx / 2, sz / 2, base + sy, base, mat);
   };
 
+  // outer walls, as [position across, thickness, height]: walls along X, along Z
+  const outerX: number[][] = [], outerZ: number[][] = [];
+
   // wall running along X at fixed z, with optional doorway gaps
-  const wallX: Builder['wallX'] = (z, x1, x2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0 } = {}) => {
+  const wallX: Builder['wallX'] = (z, x1, x2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false } = {}) => {
     for (const [a, b] of spans(x1, x2, gaps)) solid((a + b) / 2, z, b - a, h - base, t, mat, base);
+    if (boundary) outerX.push([z, t, h]);
   };
   // wall running along Z at fixed x
-  const wallZ: Builder['wallZ'] = (x, z1, z2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0 } = {}) => {
+  const wallZ: Builder['wallZ'] = (x, z1, z2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false } = {}) => {
     for (const [a, b] of spans(z1, z2, gaps)) solid(x, (a + b) / 2, t, h - base, b - a, mat, base);
+    if (boundary) outerZ.push([x, t, h]);
+  };
+
+  // The rectangle the outer walls enclose, one side at a time, so a wall that
+  // forgot its `boundary: true` costs only its own side. A marked wall belongs to
+  // the side of the map it stands on, measured from the middle of everything
+  // built; the outermost one there wins, and its inner face is the one facing in.
+  // A side with no marked wall is left undefined; no marked wall at all, no bounds.
+  const bounds: Builder['bounds'] = () => {
+    if (!outerX.length && !outerZ.length) return undefined;
+    let ax = Infinity, bx = -Infinity, az = Infinity, bz = -Infinity;
+    for (const c of colliders) {
+      ax = Math.min(ax, c.x - c.hx); bx = Math.max(bx, c.x + c.hx);
+      az = Math.min(az, c.z - c.hz); bz = Math.max(bz, c.z + c.hz);
+    }
+    // inner face of the outermost wall on the low (s = −1) or high (s = 1) side of `mid`
+    const face = (ws: number[][], mid: number, s: number) => {
+      let w: number[] | undefined;
+      for (const q of ws) if ((q[0] - mid) * s > 0 && (!w || (q[0] - w[0]) * s > 0)) w = q;
+      return w && w[0] - s * w[1] / 2;
+    };
+    const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+    return {
+      x0: face(outerZ, mx, -1), x1: face(outerZ, mx, 1), z0: face(outerX, mz, -1), z1: face(outerX, mz, 1),
+      top: Math.min(...outerX.map((o) => o[2]), ...outerZ.map((o) => o[2])),
+    };
   };
 
   // overhead beam across a doorway: passable below `under`, blocks shots above
@@ -198,5 +239,5 @@ export function createBuilder(opts: BuilderOpts): Builder {
     else addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'z', mat);
   };
 
-  return { group, colliders, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp };
+  return { group, colliders, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp, bounds };
 }

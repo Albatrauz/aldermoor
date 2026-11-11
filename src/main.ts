@@ -28,12 +28,32 @@ let time=0;
 // when visibility is restored.
 let prewarming = false;
 
+// The game rules must keep real time whatever the frame rate — a player on a slow
+// machine must not walk, reload or fire slower than everyone else — yet no single
+// update may see more than STEP, or the player strides through a one-voxel wall
+// or drops through a floor. So a long frame is simulated in equal sub-steps of at
+// most STEP. At 20 fps and up that is one step with the real dt, as it always was.
+// CATCH_UP bounds what one frame may consume (5 steps): a tab back from the
+// background resumes rather than fast-forwarding, and a frame the simulation
+// itself made slow can't snowball into ever more steps.
+const STEP=.05, CATCH_UP=.25;
+
+// Advance the game by dt seconds of real time and draw it once.
 function frame(dt){
-  time+=dt;
-  controls.update(dt, time);   // movement / menu drift + camera
+  const n=Math.max(1, Math.ceil(dt/STEP)), h=dt/n;
+  for(let i=0;i<n;i++){
+    time+=h;
+    controls.update(h, time);  // movement / menu drift + camera
+    combat.update(h);          // cooldown, reload, full-auto, viewmodel
+  }
+  // Once per drawn frame. Voxels re-mesh on a per-call budget (flush) and their
+  // debris and falling islands collide by point samples, so they get one call
+  // with the old clamp: at < 20 fps the rubble still falls in slow motion, as
+  // before, rather than through the floor.
+  updateVoxels(Math.min(dt, STEP)); // falling masonry, debris, re-meshing what was shot
+  // The rest is presentation and takes any dt up to CATCH_UP: closed-form or
+  // clamped/exponential easing, nothing that collides.
   zones.update(dt);            // zone toasts
-  combat.update(dt);           // handgonne viewmodel
-  updateVoxels(dt);            // falling masonry, debris, re-meshing what was shot
   updateFx(dt);                // tracers, flashes, smoke puffs, impacts
   updateParticles(dt);         // GPU debris — just advances the shader's clock
   updateWeather(dt);           // snow / dust, box snapped to the camera
@@ -46,7 +66,7 @@ function animate(ts?: number){
   requestAnimationFrame(animate);
   clock.update(ts);
   if (prewarming) return;
-  frame(Math.min(clock.getDelta(), .05));
+  frame(Math.min(clock.getDelta(), CATCH_UP));
 }
 animate();
 

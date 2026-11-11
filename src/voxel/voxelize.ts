@@ -19,13 +19,14 @@
 import * as THREE from 'three';
 import { VoxelGrid } from './grid';
 import { patternFor, subsoil, type Ctx, type Pattern } from './palette';
-import type { BuiltMap } from '../mapkit';
+import type { BuiltMap, Bounds } from '../mapkit';
 import type { Surface } from '../materials';
 
 export const VS = 0.25;            // fine voxel edge, metres
 export const FAR_VS = 1;           // backdrop voxel edge
 const GROUND_LAYERS = 3;           // fine ground slab: bedrock + two diggable layers
-const LOCK = 4;                    // indestructible rim, in fine voxels (1 m)
+const WALL_LAYERS = 3;             // outer walls: diggable this deep from the inner face, locked behind
+const LOCK = 4;                    // fallback rim at the grid edge (1 m), for a map that declares no bounds
 
 const ctx: Ctx = { x: 0, y: 0, z: 0, vs: VS, box: false, li: 0, lj: 0, lk: 0, ni: 0, nj: 0, nk: 0, top: 0 };
 
@@ -169,6 +170,59 @@ function paintPlane(g: VoxelGrid, m: THREE.Mesh, pat: Pattern) {
   }
 }
 
+/* ============================ the locked ring ============================ */
+// Where shots stop for good. Each outer wall's inner face is found on the lattice
+// by the same centre rule the wall was filled with; WALL_LAYERS voxels behind it
+// may be dug, and every column beyond that — at every height, the wall's top and
+// the stubs past its corners included, out to the grid edge — is locked, exactly
+// as the bottom of the ground slab is. Measured from the walls, not the grid:
+// where a wall stands back from the grid edge (dust2's east and west walls sit a
+// metre in, behind the ends of the north and south walls) a rim counted from the
+// edge locks only the empty air outside and leaves the wall diggable end to end.
+// Each side stands alone: one whose wall the map didn't mark gets the edge rim,
+// and only that side does. The faces are kept too, for the player clamp (grid.ts).
+function lockBounds(g: VoxelGrid, b: Bounds | undefined) {
+  if (!b) {
+    // Not silent: a rim at the grid edge only holds where the walls happen to stand on it.
+    console.warn('voxelizer: map declares no outer walls (boundary: true on all four) — locking a rim at the grid edge instead');
+    g.setLock(LOCK, g.nx - LOCK, LOCK, g.nz - LOCK); return;
+  }
+  // The face column on the lattice, by the centre rule: past a low-side wall the
+  // first column whose centre is > face, of a high-side wall the first whose centre
+  // is ≥ it. Undefined (no wall that side) → undefined.
+  const lo = (f: number | undefined, o: number) => f === undefined ? f : Math.floor((f - o) * g.inv - .5 + 1e-6) + 1;
+  const hi = (f: number | undefined, o: number) => f === undefined ? f : Math.ceil((f - o) * g.inv - .5 - 1e-6);
+  const fi0 = lo(b.x0, g.ox), fi1 = hi(b.x1, g.ox), fk0 = lo(b.z0, g.oz), fk1 = hi(b.z1, g.oz);
+  const L = WALL_LAYERS;
+  g.setLock(fi0 === undefined ? LOCK : fi0 - L, fi1 === undefined ? g.nx - LOCK : fi1 + L,
+    fk0 === undefined ? LOCK : fk0 - L, fk1 === undefined ? g.nz - LOCK : fk1 + L);
+  g.faceI0 = fi0 ?? g.lockI0; g.faceI1 = fi1 ?? g.lockI1;
+  g.faceK0 = fk0 ?? g.lockK0; g.faceK1 = fk1 ?? g.lockK1;
+  g.wallTop = b.top;
+  const missing = [fi0 === undefined && 'west', fi1 === undefined && 'east', fk0 === undefined && 'south', fk1 === undefined && 'north']
+    .filter(Boolean);
+  if (missing.length) console.warn(`voxelizer: no outer wall marked boundary: true on the ${missing.join(', ')} side — ` +
+    'locking a rim at the grid edge there instead');
+}
+
+/* The ring of columns just inside the locked zone must be one unbroken wall,
+   solid from the ground to the wall top: nothing locked can be dug, so that ring
+   is what nobody gets past. A column of it that isn't solid is a way out of the
+   map — a map bug, so say so once, at load. */
+function checkRing(g: VoxelGrid, top: number) {
+  const j1 = Math.min(g.ny, Math.round((top - g.oy) * g.inv));
+  const { lockI0: a, lockI1: b, lockK0: c, lockK1: d } = g;
+  let open = 0, at = '';
+  const col = (i: number, k: number) => {
+    let ok = g.inside(i, 0, k);
+    for (let j = g.groundJ; ok && j < j1; j++) ok = g.data[g.idx(i, j, k)] !== 0;
+    if (!ok && open++ === 0) at = `x ${(g.ox + (i + .5) * g.vs).toFixed(2)}, z ${(g.oz + (k + .5) * g.vs).toFixed(2)}`;
+  };
+  for (let i = a - 1; i <= b; i++) { col(i, c - 1); col(i, d); }   // corners included
+  for (let k = c; k < d; k++) { col(a - 1, k); col(b, k); }
+  if (open) console.warn(`voxelizer: locked ring has ${open} open column(s), first at ${at}: players can get out of the map there`);
+}
+
 export interface VoxelMap { fine: VoxelGrid; far: VoxelGrid; }
 
 export function voxelizeMap(built: BuiltMap, ground: Surface): VoxelMap {
@@ -202,7 +256,7 @@ export function voxelizeMap(built: BuiltMap, ground: Surface): VoxelMap {
   const oy = -GROUND_LAYERS * VS;
   const fine = new VoxelGrid(
     Math.round((x1 - x0) / VS), Math.ceil((nearTop + 1 - oy) / VS), Math.round((z1 - z0) / VS), VS, x0, oy, z0);
-  fine.groundJ = GROUND_LAYERS; fine.lock = LOCK;
+  fine.groundJ = GROUND_LAYERS; lockBounds(fine, built.bounds);
 
   const fx0 = Math.floor(all.min.x), fz0 = Math.floor(all.min.z);
   const far = new VoxelGrid(
@@ -226,6 +280,7 @@ export function voxelizeMap(built: BuiltMap, ground: Surface): VoxelMap {
   // never draw the same patch of floor twice
   for (let k = z0 - fz0; k < z1 - fz0; k++) for (let i = x0 - fx0; i < x1 - fx0; i++) far.set(i, 0, k, 0);
 
+  if (built.bounds) checkRing(fine, built.bounds.top);
   fine.sealPadding(); far.sealPadding();
   return { fine, far };
 }

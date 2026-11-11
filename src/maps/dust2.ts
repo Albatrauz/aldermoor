@@ -35,10 +35,10 @@ function build(): BuiltMap {
   }
 
   /* ============================ outer boundary ============================ */
-  wallX(94, -122, 122, { h: 7, t: 2, mat: matSandstoneDark });
-  wallX(-94, -122, 122, { h: 7, t: 2, mat: matSandstoneDark });
-  wallZ(-120, -94, 94, { h: 7, t: 2, mat: matSandstoneDark });
-  wallZ(120, -94, 94, { h: 7, t: 2, mat: matSandstoneDark });
+  wallX(94, -122, 122, { h: 7, t: 2, mat: matSandstoneDark, boundary: true });
+  wallX(-94, -122, 122, { h: 7, t: 2, mat: matSandstoneDark, boundary: true });
+  wallZ(-120, -94, 94, { h: 7, t: 2, mat: matSandstoneDark, boundary: true });
+  wallZ(120, -94, 94, { h: 7, t: 2, mat: matSandstoneDark, boundary: true });
 
   /* ============================ T spawn (west plaza) ============================ */
   wallX(20, -120, -88);                                  // plaza north
@@ -245,7 +245,7 @@ function build(): BuiltMap {
     { x: 95, z: 2, r: 17, name: 'CT Spawn' },
   ];
 
-  return { group: B.group, colliders: B.colliders, spawns, zones };
+  return { group: B.group, colliders: B.colliders, spawns, zones, bounds: B.bounds() };
 }
 
 export const dust2: MapDef = {

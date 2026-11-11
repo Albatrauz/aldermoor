@@ -8,6 +8,8 @@
 //      ground. After a carve, the voxels bordering the hole are flood-filled
 //      toward the ground; any group that can no longer reach it has been cut
 //      loose. Shoot the foot out from under a pillar and the top is such a group.
+//      The locked shell (bedrock, and the outer walls behind their diggable
+//      face) counts as ground: it never moves, and nothing anchored to it falls.
 //
 //   3. COLLAPSE — a loose group is lifted out of the grid and becomes an ISLAND:
 //      a rigid body with its own mesh that falls and tumbles under gravity. When
@@ -278,7 +280,10 @@ const marks = new Map<number, number>();   // storage index → 1 (known support
 const stack: number[] = [];
 
 function checkSupport(seeds: number[]) {
-  const g = grid as VoxelGrid, data = g.data, SY = g.SY, si = g.si, sk = g.sk, gj = g.groundJ;
+  const g = grid as VoxelGrid, data = g.data, SY = g.SY, SX = g.SX, si = g.si, sk = g.sk, gj = g.groundJ;
+  // the lock box in padded column coordinates (see grid.ts), so the test below
+  // needs no unpadding
+  const li0 = g.lockI0 + 1, li1 = g.lockI1 + 1, lk0 = g.lockK0 + 1, lk1 = g.lockK1 + 1;
   marks.clear();
   for (const seed of seeds) {
     if (data[seed] === 0 || marks.has(seed)) continue;
@@ -289,6 +294,11 @@ function checkSupport(seeds: number[]) {
     while (stack.length) {
       const id = stack.pop() as number;
       if (id % SY <= gj) { marks.set(id, 1); supported = true; break; }   // reached the ground slab
+      // Reached a locked column: it can never be dug, so it is as good as ground.
+      // This is what guarantees a locked voxel is never lifted out as part of an
+      // island — not merely the luck of its column still reaching the floor.
+      const c = (id / SY) | 0, pi = c % SX, pk = (c / SX) | 0;
+      if (pi < li0 || pi >= li1 || pk < lk0 || pk >= lk1) { marks.set(id, 1); supported = true; break; }
       comp.push(id);
       if (comp.length > MAX_ISLAND) { supported = true; break; }  // too big to drop: let it stand
       for (let nb = 0; nb < 6; nb++) {

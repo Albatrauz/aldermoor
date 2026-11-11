@@ -8,7 +8,7 @@
 // viewmodel (combat) and zone/toast logic can read them without owning them.
 import { canvas, camera, EYE } from './core';
 import { SPAWNS, menuCam } from './world';
-import { floorUnder, standHeight, resolveCircle, solidAt } from './voxel';
+import { floorUnder, standHeight, resolveCircle, confine, solidAt } from './voxel';
 import { ac } from './audio';
 
 // player.y is the eye height that travels over the wire; player.feet is the
@@ -78,7 +78,10 @@ document.addEventListener('pointerlockchange',()=>{
 });
 document.addEventListener('pointerlockerror',()=>{ dragLook=true; });
 canvas.addEventListener('click',()=>{
-  if(!introVisible && !locked && !dragLook) canvas.requestPointerLock?.();
+  if(introVisible || locked || dragLook) return;
+  // same fallback as the enter button: no pointer lock here (an embedded pane) → drag to look
+  const p=canvas.requestPointerLock?.();
+  if(p && p.catch) p.catch(()=>{ dragLook=true; });
 });
 addEventListener('keydown',e=>{
   if(e.code==='Escape' && dragLook && !frozen){ introVisible ? hideIntro() : showIntro(); }
@@ -141,8 +144,7 @@ respawn(); // first life starts somewhere random too
    solid above step height and below head height is a wall */
 function collide(){
   resolveCircle(player, R_PLAYER, player.feet+STEP_UP, player.feet+PLAYER_H);
-  player.x=Math.max(-118,Math.min(118,player.x));
-  player.z=Math.max(-92,Math.min(92,player.z));
+  confine(player, R_PLAYER, player.feet+STEP_UP);   // …and the outer walls go all the way up
 }
 
 /* per-frame: walk the player and drive the camera, or drift gently behind the menu */
