@@ -60,11 +60,18 @@ export interface MapEnv {
 // Where the lobby camera drifts while the menu is up (a gentle establishing shot).
 export interface MenuCam { x: number; y: number; z: number; yaw: number; pitch: number; }
 
+// The playable floor as the outer walls enclose it: the rectangle between their
+// inner faces, and the height of the lowest of them. The voxelizer locks
+// everything a few layers behind these faces, so it must be where the walls really
+// are — not merely where the map happens to end.
+export interface Bounds { x0: number; x1: number; z0: number; z1: number; top: number; }
+
 export interface BuiltMap {
   group: THREE.Group;
   colliders: Collider[];
   spawns: Spawn[];
   zones: Zone[];
+  bounds?: Bounds;     // from B.bounds(); without it the voxelizer locks a rim at the grid edge
 }
 
 export interface MapDef {
@@ -128,9 +135,11 @@ export interface Builder {
   wallZ(x: number, z1: number, z2: number, opts?: WallOpts): void;
   lintel(cx: number, cz: number, sx: number, sz: number, under?: number, top?: number, mat?: THREE.Material): void;
   ramp(cx: number, cz: number, sx: number, sz: number, h: number, facing: '+x' | '-x' | '+z' | '-z', mat?: THREE.Material): void;
+  bounds(): Bounds | undefined;
 }
 
-interface WallOpts { h?: number; t?: number; gaps?: [number, number][]; mat?: THREE.Material; base?: number; }
+// `boundary` marks one of the four outer walls (see Bounds).
+interface WallOpts { h?: number; t?: number; gaps?: [number, number][]; mat?: THREE.Material; base?: number; boundary?: boolean; }
 
 // split [a,b] by sorted gap intervals → the solid spans between the gaps
 function spans(a: number, b: number, gaps: [number, number][]): [number, number][] {
@@ -171,13 +180,33 @@ export function createBuilder(opts: BuilderOpts): Builder {
     addCollider(cx, cz, sx / 2, sz / 2, base + sy, base, mat);
   };
 
+  // outer walls, as [position across, thickness, height]: walls along X, along Z
+  const outerX: number[][] = [], outerZ: number[][] = [];
+
   // wall running along X at fixed z, with optional doorway gaps
-  const wallX: Builder['wallX'] = (z, x1, x2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0 } = {}) => {
+  const wallX: Builder['wallX'] = (z, x1, x2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false } = {}) => {
     for (const [a, b] of spans(x1, x2, gaps)) solid((a + b) / 2, z, b - a, h - base, t, mat, base);
+    if (boundary) outerX.push([z, t, h]);
   };
   // wall running along Z at fixed x
-  const wallZ: Builder['wallZ'] = (x, z1, z2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0 } = {}) => {
+  const wallZ: Builder['wallZ'] = (x, z1, z2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false } = {}) => {
     for (const [a, b] of spans(z1, z2, gaps)) solid(x, (a + b) / 2, t, h - base, b - a, mat, base);
+    if (boundary) outerZ.push([x, t, h]);
+  };
+
+  // The rectangle the outer walls enclose. Of the walls along X the one furthest
+  // −z is the south side and its inner face is the +z one; likewise for the rest.
+  // Needs at least two distinct walls each way; otherwise there is no enclosure.
+  const bounds: Builder['bounds'] = () => {
+    if (outerX.length < 2 || outerZ.length < 2) return undefined;
+    const lo = (ws: number[][]) => ws.reduce((p, q) => q[0] < p[0] ? q : p);
+    const hi = (ws: number[][]) => ws.reduce((p, q) => q[0] > p[0] ? q : p);
+    const s = lo(outerX), n = hi(outerX), w = lo(outerZ), e = hi(outerZ);
+    if (s[0] === n[0] || w[0] === e[0]) return undefined;
+    return {
+      x0: w[0] + w[1] / 2, x1: e[0] - e[1] / 2, z0: s[0] + s[1] / 2, z1: n[0] - n[1] / 2,
+      top: Math.min(...outerX.map((o) => o[2]), ...outerZ.map((o) => o[2])),
+    };
   };
 
   // overhead beam across a doorway: passable below `under`, blocks shots above
@@ -198,5 +227,5 @@ export function createBuilder(opts: BuilderOpts): Builder {
     else addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'z', mat);
   };
 
-  return { group, colliders, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp };
+  return { group, colliders, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp, bounds };
 }

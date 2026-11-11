@@ -38,10 +38,10 @@ function build(): BuiltMap {
   }
 
   /* ============================ outer boundary ============================ */
-  wallX(54, -76, 76, { h: 9, t: 2, mat: matBrick });
-  wallX(-54, -76, 76, { h: 9, t: 2, mat: matBrick });
-  wallZ(-76, -54, 54, { h: 9, t: 2, mat: matBrick });
-  wallZ(76, -54, 54, { h: 9, t: 2, mat: matBrick });
+  wallX(54, -76, 76, { h: 9, t: 2, mat: matBrick, boundary: true });
+  wallX(-54, -76, 76, { h: 9, t: 2, mat: matBrick, boundary: true });
+  wallZ(-76, -54, 54, { h: 9, t: 2, mat: matBrick, boundary: true });
+  wallZ(76, -54, 54, { h: 9, t: 2, mat: matBrick, boundary: true });
 
   /* ============================ building helpers ============================ */
   // A window: a hoppable sill below, a head beam above, an open slit between to
@@ -253,7 +253,7 @@ function build(): BuiltMap {
     { x: 0, z: 0, r: 22, name: 'The Street' },
   ];
 
-  return { group: B.group, colliders: B.colliders, spawns, zones };
+  return { group: B.group, colliders: B.colliders, spawns, zones, bounds: B.bounds() };
 }
 
 export const skidrow: MapDef = {

@@ -38,9 +38,12 @@ export class VoxelGrid {
   // Voxels with j < groundJ are the ground itself: always supported, and the
   // thing every other voxel must ultimately be connected to.
   groundJ = 0;
-  // Indestructible shell: the bottom layer (bedrock) and `lock` voxels in from
-  // each side, so no amount of gunfire opens a hole out of the world.
-  lock = 0;
+  // Indestructible shell: the bottom layer (bedrock), plus every column outside
+  // the box lockI0 ≤ i < lockI1, lockK0 ≤ k < lockK1, at every height — so no
+  // amount of gunfire opens a hole out of the world. The voxelizer sets the four
+  // planes a few layers into the boundary walls (lockBounds in voxelize.ts); by default the
+  // box is the whole grid and nothing but bedrock is locked.
+  lockI0 = 0; lockI1: number; lockK0 = 0; lockK1: number;
 
   constructor(nx: number, ny: number, nz: number, vs: number, ox: number, oy: number, oz: number) {
     this.nx = nx; this.ny = ny; this.nz = nz;
@@ -49,6 +52,7 @@ export class VoxelGrid {
     this.SX = nx + 2; this.SY = ny + 2; this.SZ = nz + 2;
     this.si = this.SY; this.sk = this.SY * this.SX;
     this.data = new Uint8Array(this.SX * this.SY * this.SZ);
+    this.lockI1 = nx; this.lockK1 = nz;
   }
 
   idx(i: number, j: number, k: number) { return (j + 1) + this.SY * ((i + 1) + this.SX * (k + 1)); }
@@ -58,9 +62,18 @@ export class VoxelGrid {
   get(i: number, j: number, k: number) { return this.inside(i, j, k) ? this.data[this.idx(i, j, k)] : 0; }
   set(i: number, j: number, k: number, m: number) { if (this.inside(i, j, k)) this.data[this.idx(i, j, k)] = m; }
 
+  /* Four integer compares: this sits in the carve's inner loop, and it must be a
+     pure function of (i,j,k) so every client agrees on what a shot can take. */
+  lockedCol(i: number, k: number) {
+    return i < this.lockI0 || k < this.lockK0 || i >= this.lockI1 || k >= this.lockK1;
+  }
   locked(i: number, j: number, k: number) {
-    const L = this.lock;
-    return (this.groundJ > 0 && j === 0) || i < L || k < L || i >= this.nx - L || k >= this.nz - L;
+    return (this.groundJ > 0 && j === 0) || this.lockedCol(i, k);
+  }
+  setLock(i0: number, i1: number, k0: number, k1: number) {
+    const c = (v: number, n: number) => Math.max(0, Math.min(n, v));
+    this.lockI0 = c(i0, this.nx); this.lockI1 = c(i1, this.nx);
+    this.lockK0 = c(k0, this.nz); this.lockK1 = c(k1, this.nz);
   }
 
   /* Fill the padding shell: solid under the floor and beside the ground slab,

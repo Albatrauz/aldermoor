@@ -131,6 +131,19 @@ export function resolveCircle(p: { x: number; z: number }, r: number, yLo: numbe
   }
 }
 
+/* Keep a circle (the player) out of the locked columns — the outer walls behind
+   their diggable face, and everything beyond them. The walls themselves already
+   do this at ground level; this is the same wall carried up past its top, so a
+   staircase shot into the diggable face leads onto nothing. Measured from the
+   live grid's lock planes, so it fits whichever map is loaded. */
+export function confine(p: { x: number; z: number }, r: number) {
+  const g = grid;
+  if (!g) return;
+  const vs = g.vs;
+  p.x = Math.max(g.ox + g.lockI0 * vs + r, Math.min(g.ox + g.lockI1 * vs - r, p.x));
+  p.z = Math.max(g.oz + g.lockK0 * vs + r, Math.min(g.oz + g.lockK1 * vs - r, p.z));
+}
+
 /* ============================ shots ============================ */
 export interface ShotHit { end: number; hit: boolean; outside: boolean; ray: RayHit; }
 const _shot: ShotHit = { end: 0, hit: false, outside: false, ray: makeHit() };
