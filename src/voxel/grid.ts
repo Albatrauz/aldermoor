@@ -51,6 +51,11 @@ export class VoxelGrid {
   // wall is no ledge. setLock puts them on the lock planes, which is where they
   // stay on a side with no known wall. Player-only: they change nothing a shot can dig.
   faceI0 = 0; faceI1: number; faceK0 = 0; faceK1: number; wallTop = Infinity;
+  // The locked cores of inner barrier walls, per column (i + nx·k): every voxel
+  // with j < coreTop is locked. A core runs from bedrock to the wall top, so a
+  // column is either core all the way up or not at all. Null when the map
+  // marks no barriers.
+  coreTop: Uint16Array | null = null;
 
   constructor(nx: number, ny: number, nz: number, vs: number, ox: number, oy: number, oz: number) {
     this.nx = nx; this.ny = ny; this.nz = nz;
@@ -75,7 +80,8 @@ export class VoxelGrid {
     return i < this.lockI0 || k < this.lockK0 || i >= this.lockI1 || k >= this.lockK1;
   }
   locked(i: number, j: number, k: number) {
-    return (this.groundJ > 0 && j === 0) || this.lockedCol(i, k);
+    return (this.groundJ > 0 && j === 0) || this.lockedCol(i, k) ||
+      (this.coreTop !== null && j < this.coreTop[i + this.nx * k]);
   }
   setLock(i0: number, i1: number, k0: number, k1: number) {
     const c = (v: number, n: number) => Math.max(0, Math.min(n, v));

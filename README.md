@@ -173,6 +173,16 @@ the rim. The voxels around the hole are then flood-filled toward the ground; any
 group that can no longer reach it is lifted out of the grid as a rigid *island*
 that falls, tumbles and shatters into debris cubes on impact.
 
+**What can't be broken.** Bedrock, and the outer boundary walls a few layers
+behind their inner face. A map can also mark inner walls `barrier: true` (see
+`wallX` / `wallZ` in `mapkit.js`): walls that edge the playable lanes with open
+ground or a sealed-off block behind them. A barrier takes damage from both
+faces, but a core through its middle is locked from bedrock to its top, so no
+hole ever goes all the way through. At most half a metre is diggable from each
+face, less than the player's radius, so the notches never make a foothold to
+climb over it. On Dust2 these are the walls around every lane and around the
+four blocks between them.
+
 **Light.** Every voxel of air stores how much open sky it can see: full under
 open sky, fading over about 10 m as it floods sideways and down under cover.
 The values live in a 3D texture (one byte per voxel, sharing the grid's memory

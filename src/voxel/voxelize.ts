@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { VoxelGrid } from './grid';
 import { patternFor, subsoil, type Ctx, type Pattern } from './palette';
-import type { BuiltMap, Bounds } from '../mapkit';
+import type { BuiltMap, Bounds, Barrier } from '../mapkit';
 import type { Surface } from '../materials';
 
 export const VS = 0.25;            // fine voxel edge, metres
@@ -27,6 +27,11 @@ export const FAR_VS = 1;           // backdrop voxel edge
 const GROUND_LAYERS = 3;           // fine ground slab: bedrock + two diggable layers
 const WALL_LAYERS = 3;             // outer walls: diggable this deep from the inner face, locked behind
 const LOCK = 4;                    // fallback rim at the grid edge (1 m), for a map that declares no bounds
+// Barrier walls: diggable at most this many voxels in from each face, locked in
+// the middle. Kept under the player's radius (0.55 m): the player stands on the
+// column under their centre, and a notch this shallow can never get under it,
+// so carving into the face makes no foothold to climb over the core with.
+const BARRIER_DIG = 2;
 
 const ctx: Ctx = { x: 0, y: 0, z: 0, vs: VS, box: false, li: 0, lj: 0, lk: 0, ni: 0, nj: 0, nk: 0, top: 0 };
 
@@ -205,6 +210,37 @@ function lockBounds(g: VoxelGrid, b: Bounds | undefined) {
     'locking a rim at the grid edge there instead');
 }
 
+/* ============================ barrier cores ============================ */
+// A barrier wall edges the playable lanes with open ground (or a sealed-off
+// block) behind it. It takes damage like any wall from both faces, but the
+// voxels in its middle are locked from bedrock to its top, so no hole ever goes
+// all the way through. Found on the lattice by the same centre rule the wall was
+// filled with; a wall runs to the centre line of the wall it meets, so cores
+// overlap at every corner and junction and a chain of barriers stays sealed.
+function lockBarriers(g: VoxelGrid, barriers: Barrier[] | undefined) {
+  if (!barriers?.length) return;
+  const core = new Uint16Array(g.nx * g.nz);
+  for (const b of barriers) {
+    let [i0, i1] = span(b.x0, b.x1, g.ox, g.inv);
+    let [k0, k1] = span(b.z0, b.z1, g.oz, g.inv);
+    const [, jt] = span(g.oy, b.top, g.oy, g.inv);
+    // Trim the diggable faces off the wall's thickness, never its run: a short
+    // stub can be as long as it is thick.
+    const thinX = b.along === 'z';
+    const n = thinX ? i1 - i0 + 1 : k1 - k0 + 1;
+    const dig = Math.min(BARRIER_DIG, Math.floor((n - 1) / 2));
+    if (thinX) { i0 += dig; i1 -= dig; } else { k0 += dig; k1 -= dig; }
+    const top = Math.min(g.ny, jt + 1);
+    for (let k = Math.max(0, k0); k <= Math.min(g.nz - 1, k1); k++) {
+      for (let i = Math.max(0, i0); i <= Math.min(g.nx - 1, i1); i++) {
+        const c = i + g.nx * k;
+        if (core[c] < top) core[c] = top;
+      }
+    }
+  }
+  g.coreTop = core;
+}
+
 /* The ring of columns just inside the locked zone must be one unbroken wall,
    solid from the ground to the wall top: nothing locked can be dug, so that ring
    is what nobody gets past. A column of it that isn't solid is a way out of the
@@ -256,7 +292,7 @@ export function voxelizeMap(built: BuiltMap, ground: Surface): VoxelMap {
   const oy = -GROUND_LAYERS * VS;
   const fine = new VoxelGrid(
     Math.round((x1 - x0) / VS), Math.ceil((nearTop + 1 - oy) / VS), Math.round((z1 - z0) / VS), VS, x0, oy, z0);
-  fine.groundJ = GROUND_LAYERS; lockBounds(fine, built.bounds);
+  fine.groundJ = GROUND_LAYERS; lockBounds(fine, built.bounds); lockBarriers(fine, built.barriers);
 
   const fx0 = Math.floor(all.min.x), fz0 = Math.floor(all.min.z);
   const far = new VoxelGrid(

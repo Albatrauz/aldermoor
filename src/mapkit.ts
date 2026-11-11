@@ -68,12 +68,19 @@ export interface MenuCam { x: number; y: number; z: number; yaw: number; pitch: 
 // falls back to a rim at the grid edge on that side alone.
 export interface Bounds { x0?: number; x1?: number; z0?: number; z1?: number; top: number; }
 
+// One solid span of a wall marked `barrier`: a wall that edges the playable
+// lanes, with open ground or a sealed-off block behind it. The voxelizer locks a
+// core through its middle, so it can be shot up but never shot through.
+// `along` is the axis the wall runs on; its thickness lies across the other one.
+export interface Barrier { x0: number; x1: number; z0: number; z1: number; top: number; along: 'x' | 'z'; }
+
 export interface BuiltMap {
   group: THREE.Group;
   colliders: Collider[];
   spawns: Spawn[];
   zones: Zone[];
   bounds?: Bounds;     // from B.bounds(); without it the voxelizer locks a rim at the grid edge
+  barriers?: Barrier[];
 }
 
 export interface MapDef {
@@ -126,6 +133,7 @@ export interface BuilderOpts {
 export interface Builder {
   group: THREE.Group;
   colliders: Collider[];
+  barriers: Barrier[];
   WH: number;
   WT: number;
   add(obj: THREE.Object3D): void;
@@ -140,8 +148,9 @@ export interface Builder {
   bounds(): Bounds | undefined;
 }
 
-// `boundary` marks one of the four outer walls (see Bounds).
-interface WallOpts { h?: number; t?: number; gaps?: [number, number][]; mat?: THREE.Material; base?: number; boundary?: boolean; }
+// `boundary` marks one of the four outer walls (see Bounds); `barrier` an inner
+// wall that must never be breached (see Barrier). Every span of the call is one.
+interface WallOpts { h?: number; t?: number; gaps?: [number, number][]; mat?: THREE.Material; base?: number; boundary?: boolean; barrier?: boolean; }
 
 // split [a,b] by sorted gap intervals → the solid spans between the gaps
 function spans(a: number, b: number, gaps: [number, number][]): [number, number][] {
@@ -155,6 +164,7 @@ function spans(a: number, b: number, gaps: [number, number][]): [number, number]
 export function createBuilder(opts: BuilderOpts): Builder {
   const group = new THREE.Group();
   const colliders: Collider[] = [];
+  const barriers: Barrier[] = [];
   const WH = opts.wallH ?? 5;
   const WT = opts.wallT ?? 0.8;
   const wallMat = opts.wallMat;
@@ -186,13 +196,19 @@ export function createBuilder(opts: BuilderOpts): Builder {
   const outerX: number[][] = [], outerZ: number[][] = [];
 
   // wall running along X at fixed z, with optional doorway gaps
-  const wallX: Builder['wallX'] = (z, x1, x2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false } = {}) => {
-    for (const [a, b] of spans(x1, x2, gaps)) solid((a + b) / 2, z, b - a, h - base, t, mat, base);
+  const wallX: Builder['wallX'] = (z, x1, x2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false, barrier = false } = {}) => {
+    for (const [a, b] of spans(x1, x2, gaps)) {
+      solid((a + b) / 2, z, b - a, h - base, t, mat, base);
+      if (barrier) barriers.push({ x0: a, x1: b, z0: z - t / 2, z1: z + t / 2, top: h, along: 'x' });
+    }
     if (boundary) outerX.push([z, t, h]);
   };
   // wall running along Z at fixed x
-  const wallZ: Builder['wallZ'] = (x, z1, z2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false } = {}) => {
-    for (const [a, b] of spans(z1, z2, gaps)) solid(x, (a + b) / 2, t, h - base, b - a, mat, base);
+  const wallZ: Builder['wallZ'] = (x, z1, z2, { h = WH, t = WT, gaps = [], mat = wallMat, base = 0, boundary = false, barrier = false } = {}) => {
+    for (const [a, b] of spans(z1, z2, gaps)) {
+      solid(x, (a + b) / 2, t, h - base, b - a, mat, base);
+      if (barrier) barriers.push({ x0: x - t / 2, x1: x + t / 2, z0: a, z1: b, top: h, along: 'z' });
+    }
     if (boundary) outerZ.push([x, t, h]);
   };
 
@@ -239,5 +255,5 @@ export function createBuilder(opts: BuilderOpts): Builder {
     else addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'z', mat);
   };
 
-  return { group, colliders, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp, bounds };
+  return { group, colliders, barriers, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp, bounds };
 }
