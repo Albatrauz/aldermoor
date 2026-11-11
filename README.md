@@ -144,6 +144,7 @@ dependency flow runs roughly top-to-bottom:
 | `combat.js`     | handgonne viewmodel, firing, hit/kill handling |
 | `stats.js`      | reactive leaderboard + own-career rendering on the intro screen |
 | `main.js`       | entry point: wires the render loop and the `window.__town` debug hook |
+| `visitor.js`    | bird's-eye camera and the top-down capture of a map |
 
 ### The voxel engine (`src/voxel/`)
 
@@ -204,6 +205,14 @@ islands, shots applied so far), `grid` (the live voxel grid),
 `blast([x,y,z],[dx,dy,dz],len,weapon)` to land a shot on the world without
 firing one, `replay(shots)` to land a list of them silently, and
 `skyAt(x,y,z)` for the sky light (0–255) at a point.
+
+`captureMap('dust2')` and `captureMap('skidrow')` render a top-down plate of
+that map (north up, east right) and download `<map>-top.png`. `captureMaps()`
+does both, then puts back the map that was loaded. Each call also returns
+`{ name, label, width, height, url }` where `url` is a PNG data URL. The camera
+is `visitor`, aimed by `frameVisitor(width, height)` — an orthographic view of
+the whole voxel world, kept off the first-person camera so a later map overlay
+can render it without moving the player.
 
 ## Rounds & the lobby
 

@@ -13,7 +13,7 @@
 // The exported `SPAWNS` and `ZONES` arrays keep a stable identity — they're
 // refilled in place — so importers never re-bind.
 import * as THREE from 'three';
-import { scene, renderer } from './core';
+import { scene, renderer, VISITOR_LAYER } from './core';
 import { glowTex } from './textures';
 import { setSky, bakeEnvironment } from './sky';
 import { setFogHeight } from './fog';
@@ -39,8 +39,10 @@ glow.scale.setScalar(150); glow.renderOrder = -2;
 scene.add(glow);
 
 const hemi = new THREE.HemisphereLight(0x9fc0e0, 0x8a7350, 0.9);
+hemi.layers.enable(VISITOR_LAYER);
 scene.add(hemi);
 export const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
+sun.layers.enable(VISITOR_LAYER);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
 sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
@@ -69,6 +71,7 @@ scene.add(sun);
 onGeometryChange(() => { sun.shadow.needsUpdate = true; });
 const fill = new THREE.DirectionalLight(0xb9c9de, 0.4);
 fill.position.set(-60, 40, -45);
+fill.layers.enable(VISITOR_LAYER);
 scene.add(fill);
 
 function applyEnv(env: MapEnv) {
@@ -157,6 +160,7 @@ export function setMap(name: string, fresh = false) {
   currentGroup = buildVoxelWorld(built, def.env.groundSurface);
   disposeGroup(built.group);
   scene.add(currentGroup);
+  markVisitorLayer();
   sun.shadow.needsUpdate = true;    // new geometry: rebake the frozen shadow map
 
   // refill the live arrays in place — importers hold these very references
@@ -168,6 +172,13 @@ export function setMap(name: string, fresh = false) {
 
   currentMapName = name;
   for (const fn of changeListeners) { try { fn(name); } catch { /* ignore */ } }
+}
+
+// The visitor camera only draws VISITOR_LAYER. Chunk meshes are created as the
+// map is built and again whenever a shot re-meshes one, so this is re-run before
+// a plate rather than once at load. Enabling is idempotent.
+export function markVisitorLayer() {
+  currentGroup?.traverse((o) => o.layers.enable(VISITOR_LAYER));
 }
 
 // Advance to the next map in the rotation (used by the debug hook / offline play).

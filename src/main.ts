@@ -15,6 +15,7 @@ import { updateWeather } from './weather';
 import { updateVoxels, voxelStats, voxelGrid, shotImpact, replayShots, skyAt } from './voxel';
 import * as net from './net';
 import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
+import * as visitor from './visitor';   // bird's-eye camera + top-down map plates
 import './stats';            // reactive leaderboard + career (no-op without Convex)
 
 // Timer over Clock: Clock warns on construction from r183, and Timer takes the
@@ -114,6 +115,21 @@ window.__town={
   setMap: world.setMap,                   // jump to a named map (offline / debug)
   rotateMap: world.rotateMap,             // advance to the next map in the rotation
   get map(){ return world.currentMapName; },
+  // Top-down plates. captureMap('dust2' | 'skidrow') plates that map and leaves
+  // it loaded; captureMaps() plates both and restores the one that was up.
+  // Each downloads <map>-top.png and returns {name, label, width, height, url}.
+  captureMap(name?: string, opts?: visitor.CaptureOptions){
+    const plate = visitor.captureMap(name, opts);
+    if (plate) visitor.savePlate(plate);
+    return plate;
+  },
+  captureMaps(opts?: visitor.CaptureOptions){
+    const plates = visitor.captureMaps(opts);
+    for (const plate of plates) visitor.savePlate(plate);
+    return plates;
+  },
+  frameVisitor: visitor.frameVisitor,     // aim the bird's-eye camera, no render
+  visitor: visitor.visitorCam,
   get pos(){ return [controls.player.x, controls.player.z]; },
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly
