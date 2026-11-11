@@ -142,6 +142,7 @@ dependency flow runs roughly top-to-bottom:
 | `auth.js`       | sign-up / sign-in, the session token, and the intro account panel |
 | `net.js`        | WebSocket link + inbound message routing; hands the session token to the server |
 | `combat.js`     | handgonne viewmodel, firing, hit/kill handling |
+| `grenades.ts`   | grenades: cooking on G, the fuse ring and trajectory arc, bounce flights, blasts |
 | `stats.js`      | reactive leaderboard + own-career rendering on the intro screen |
 | `main.js`       | entry point: wires the render loop and the `window.__town` debug hook |
 | `visitor.js`    | bird's-eye camera and the top-down capture of a map |
@@ -205,6 +206,36 @@ undamaged and replays the list silently — about 0.2 s for 5,000 shots — to
 arrive at the map everyone else is looking at. The list is cleared, and the
 damage with it, when the map rotates at the end of a round.
 
+## Grenades
+
+Every life starts with **two grenades** (the ✹ above the ammo). **Hold G** to
+pull the pin: a ring fills round the crosshair over the **5-second** fuse and a
+dotted arc shows where the grenade will fly, bounce and come to rest; the ring at
+its end turns red once the fuse will run out on that arc. **Let go** to throw it
+with whatever fuse is left. Hold on past the end and it goes off in your hand —
+certain death, counted as a death with no kill to anyone. While a grenade is in
+hand you can't fire, reload or swap arms.
+
+The blast deals up to **130** damage (more than a full bar) within 1 m of your
+body, falling off with the square of the distance to nothing at 8 m: about 95 at
+2 m, 66 at 3 m, 42 at 4 m, 24 at 5 m and 11 at 6 m. Cover counts. Damage is
+scaled by how much of you the blast can see: rays to shins, chest and head, so
+a wall between you and the grenade saves you and a corner halves it. Your own
+grenade hurts you too. It also blows a ragged crater about a metre across in the
+world; barrier cores and the outer walls hold as they do against shots.
+
+On the wire the thrower's client works out the flight against its own map and
+sends it as keyframes (`nade`: the throw and every bounce, plus the fuse and the
+blast point). Everyone draws those same keyframes. The server keeps the fuse and
+announces the blast (`boom`), which lands in the same order as shots and goes into
+`shotLog` as `[2, x, y, z, 0, 0, 0, 0]`, so late joiners replay the crater too.
+The thrower then reports who the blast could see and how much of each
+(`nadehit`, once per grenade). The server works out the distance from the
+positions it holds and deals the damage. It also enforces the two-per-life
+limit, refuses throws from the felled, and kills a player whose grenade cooked
+off without waiting to be told. The numbers live in `server.js` (`NADE_*`) and
+`src/grenades.ts`.
+
 ## Debug hook
 
 The client exposes `window.__town` for automated checks: `hideIntro()`,
@@ -214,7 +245,10 @@ voxel world: `voxels()` (quad count, pending re-meshes, live debris and falling
 islands, shots applied so far), `grid` (the live voxel grid),
 `blast([x,y,z],[dx,dy,dz],len,weapon)` to land a shot on the world without
 firing one, `replay(shots)` to land a list of them silently, and
-`skyAt(x,y,z)` for the sky light (0–255) at a point.
+`skyAt(x,y,z)` for the sky light (0–255) at a point. For grenades:
+`throwNade(heldFor)` throws one with the current aim as though G had been held
+`heldFor` seconds (5 or more cooks it off), and `nades` reports the count left,
+whether one is in hand, grenades in flight, and the arc's predicted end.
 
 `captureMap('dust2')` and `captureMap('skidrow')` render a top-down plate of
 that map (north up, east right) and download `<map>-top.png`. `captureMaps()`

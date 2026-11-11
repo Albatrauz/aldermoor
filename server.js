@@ -112,6 +112,25 @@ const RESTART_DELAY = 15000;  // overview screen lingers this long, then a fresh
 const MAX_HP = 100;           // a full health bar
 const BODY_DMG = [25, 12];    // body damage per weapon: [handgonne, ak47]
 const HEAD_MULT = 2;          // a ball to the head hits this much harder than a body shot
+// Weapon slots as the stats see them: [handgonne, ak47, grenade].
+const W_GRENADE = 2;
+const weaponTally = () => [0, 0, 0];
+// Grenades — mirrored in src/grenades.ts, which draws the same numbers.
+const NADES_PER_LIFE = 2;     // every life starts with this many
+const NADE_FUSE = 5;          // seconds from pulling the pin to the blast
+const NADE_MAX_DMG = 130;     // within NADE_INNER of the body: more than a full bar
+const NADE_INNER = 1;         // metres — point blank
+const NADE_OUTER = 8;         // metres — nothing past this
+const NADE_REPORT_MS = 2000;  // the thrower has this long after the blast to say who it reached
+// Damage by distance from the blast to the nearest point of the body. Squared
+// falloff: lethal right next to it (≈95 at 2 m), a heavy wound at 3 m (≈66),
+// a scratch from 6 m (≈11).
+function nadeDamage(d) {
+  if (d <= NADE_INNER) return NADE_MAX_DMG;
+  if (d >= NADE_OUTER) return 0;
+  const k = 1 - (d - NADE_INNER) / (NADE_OUTER - NADE_INNER);
+  return NADE_MAX_DMG * k * k;
+}
 const REGEN_DELAY = 3000;     // unharmed this long and the bar begins to refill
 const REGEN_TICK_MS = 500;    // …topped up this often
 const REGEN_PER_TICK = 8;     // …by this much each step (≈16 hp/s, ~6s from the brink)
@@ -203,6 +222,42 @@ function relayShot(id, w, o, d, l) {
   broadcast({ t: 'shoot', id, w, o, d, l });
 }
 
+// Grenades in flight or just gone off: n → { owner, ex, cook, round, boomAt, resolved }.
+// The server keeps the fuse so every client hears the blast at the same moment
+// and in the same order as the shots around it; the blast goes into the shot log
+// as [2, x, y, z, 0, 0, 0, 0] so a late joiner replays the crater too.
+const nades = new Map();
+let nextNade = 1;
+let roundSeq = 0;             // bumps on every reset, so a fuse from the old round is a dud
+
+function detonate(n) {
+  const g = nades.get(n);
+  if (!g || g.round !== roundSeq || phase !== 'play') { nades.delete(n); return; }
+  g.boomAt = Date.now();
+  if (shotLog.length < MAX_SHOT_LOG) shotLog.push([W_GRENADE, g.ex[0], g.ex[1], g.ex[2], 0, 0, 0, 0]);
+  broadcast({ t: 'boom', id: g.owner, n, ex: g.ex });
+  // Held past the fuse: it went off in the thrower's hand. That is certain death,
+  // and the server does not wait to be told so.
+  if (g.cook) {
+    const q = players.get(g.owner);
+    if (q && q.active && !isDown(q)) dealDamage(g.owner, g.owner, q.hp, false, W_GRENADE);
+  }
+  const t = setTimeout(() => nades.delete(n), NADE_REPORT_MS + 1000);
+  t.unref?.();
+}
+
+// Lying felled, waiting to rise. Not `lastFell`, which a spawn also stamps to
+// give its grace — a fresh spawn is very much up and may throw.
+const isDown = (q) => Date.now() - q.diedAt < RESPAWN_MS - 300;
+
+// Distance from the blast to the nearest point of a player's body: a segment
+// from the feet to the eye (state `y` is eye height, 1.65 above the feet).
+function distToBody(ex, q) {
+  const top = q.y, foot = q.y - 1.65;
+  const cy = Math.max(foot, Math.min(top, ex[1]));
+  return Math.hypot(ex[0] - q.x, ex[1] - cy, ex[2] - q.z);
+}
+
 function pickName() {
   for (let i = 0; i < 50; i++) {
     const n = FIRST[Math.floor(Math.random() * FIRST.length)] + ' ' +
@@ -290,11 +345,12 @@ function resetRound() {
   overInfo = null;
   applyMap(mapIndex + 1);                              // rotate to the next map for the fresh round
   shotLog = [];                                        // fresh map, no holes in it yet
+  roundSeq += 1; nades.clear();                        // any grenade still fizzing belonged to the old map
   const now = Date.now();
   for (const [id, p] of players) {
     p.score = 0; p.deaths = 0; p.hp = MAX_HP; p.alive = true;
     p.roundKills = 0; p.roundHeadshots = 0; p.flushed = false;  // fresh round, fresh tally (deaths via p.deaths)
-    p.roundWeaponKills = BODY_DMG.map(() => 0); p.roundWeaponHeadshots = BODY_DMG.map(() => 0);
+    p.roundWeaponKills = weaponTally(); p.roundWeaponHeadshots = weaponTally(); p.nades = NADES_PER_LIFE; p.diedAt = 0;
     p.x = SPAWN.x; p.y = SPAWN.y; p.z = SPAWN.z; p.yaw = SPAWN.yaw;
     p.m = 0; p.r = 0;                                   // clear stale walk/run anim flags
     p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // brief mercy after the reset
@@ -351,7 +407,7 @@ function spawnBots(n) {
       hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0, bot: true, nextShot: 0,
       roundKills: 0, roundHeadshots: 0,
-      roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
+      roundWeaponKills: weaponTally(), roundWeaponHeadshots: weaponTally(), nades: NADES_PER_LIFE, lastNade: 0, diedAt: 0, flushed: false };
     placeBot(p);
     p.nextShot = Date.now() + Math.floor(Math.random() * BOT_FIRE_CD);  // stagger first volleys
     players.set(id, p);
@@ -374,7 +430,31 @@ function resolveHit(shooterId, targetId, head, w = 0) {
   if (dx * dx + dz * dz > 75 * 75) return;                      // out of range, impossible shot
 
   const base = BODY_DMG[w] ?? BODY_DMG[0];
-  const dealt = Math.min(base * (head ? HEAD_MULT : 1), q.hp);  // a ball to the head hits harder, but no longer fells outright
+  dealDamage(shooterId, targetId, base * (head ? HEAD_MULT : 1), head, w);  // a ball to the head hits harder, but no longer fells outright
+}
+
+// A grenade's blast reaching one player, as reported by its thrower. `exposure`
+// (0..1) is how much of the body the thrower's client found in the open from
+// the blast; the server does the distance itself, from positions it holds.
+function resolveBlast(ownerId, targetId, ex, exposure) {
+  const p = players.get(ownerId);
+  const q = players.get(targetId);
+  if (phase !== 'play' || !p || !q || !q.active) return;
+  if (Date.now() - q.lastFell < RESPAWN_MS + SPAWN_GRACE_MS) return;
+  const dmg = Math.round(nadeDamage(distToBody(ex, q)) * exposure);
+  if (dmg >= 1) dealDamage(ownerId, targetId, dmg, false, W_GRENADE);
+}
+
+// Land `amount` of damage from `shooterId` on `targetId`: the wound tally, then
+// the hitfx-or-fell broadcast. Shooter and target are the same player when a
+// grenade catches its own thrower — that costs a death and scores nothing.
+function dealDamage(shooterId, targetId, amount, head, w) {
+  const p = players.get(shooterId);
+  const q = players.get(targetId);
+  if (!p || !q) return;
+  const self = p === q;
+  const now = Date.now();
+  const dealt = Math.min(amount, q.hp);
   q.hp -= dealt;
   q.lastDamaged = now;                                          // holds off the bar's regen
   // tally the wound against the shooter for this life's death summary
@@ -383,26 +463,31 @@ function resolveHit(shooterId, targetId, head, w = 0) {
   q.dmgFrom.set(shooterId, rec);
 
   if (q.hp > 0) {
-    broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp, dmg: dealt, head });
+    broadcast({ t: 'hitfx', shooter: shooterId, target: targetId, hp: q.hp, dmg: dealt, head, w });
   } else {
-    p.score += 1;
     q.deaths += 1;                                              // round deaths (scoreboard + stat flush)
-    p.roundKills += 1;                                          // per-round tallies for the stat flush
-    if (head) p.roundHeadshots += 1;
-    p.roundWeaponKills[w] = (p.roundWeaponKills[w] || 0) + 1;   // …split by the weapon that felled them
-    if (head) p.roundWeaponHeadshots[w] = (p.roundWeaponHeadshots[w] || 0) + 1;
+    if (!self) {
+      p.score += 1;
+      p.roundKills += 1;                                        // per-round tallies for the stat flush
+      if (head) p.roundHeadshots += 1;
+      p.roundWeaponKills[w] = (p.roundWeaponKills[w] || 0) + 1; // …split by the weapon that felled them
+      if (head) p.roundWeaponHeadshots[w] = (p.roundWeaponHeadshots[w] || 0) + 1;
+    }
     // who chipped them down, this life — best first, for the killscreen
     const dmg = [...q.dmgFrom.entries()]
       .map(([aid, r]) => ({ id: aid, name: r.name, dmg: r.dmg }))
       .sort((a, b) => b.dmg - a.dmg);
     q.hp = MAX_HP;
     q.lastFell = now;
+    q.diedAt = now;
+    q.nades = NADES_PER_LIFE;                                   // the next life comes with a fresh pair
     q.dmgFrom.clear();                                          // next life starts unwounded
     broadcast({ t: 'fell', shooter: shooterId, sname: p.name, target: targetId,
-      tname: q.name, score: p.score, tdeaths: q.deaths, head, dmg, lastDmg: dealt });
-    console.log(`⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''} (${p.score})`);
+      tname: q.name, score: p.score, tdeaths: q.deaths, head, dmg, lastDmg: dealt, w, self });
+    console.log(self ? `✹ ${q.name} was caught by their own grenade`
+      : `⚔ ${p.name} felled ${q.name}${head ? ' (headshot)' : ''}${w === W_GRENADE ? ' (grenade)' : ''} (${p.score})`);
     if (q.bot) placeBot(q);                                     // re-scatter the dummy for the next pass
-    if (p.score >= KILL_CAP) endRound(shooterId);              // first to the cap wins the round
+    if (!self && p.score >= KILL_CAP) endRound(shooterId);     // first to the cap wins the round
   }
 }
 
@@ -452,7 +537,7 @@ function attachGame(httpServer, opts = {}) {
       hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0,  // dmgFrom: attackerId → {name, dmg} this life
       roundKills: 0, roundHeadshots: 0,               // per-round, for stat flush (deaths via p.deaths)
-      roundWeaponKills: BODY_DMG.map(() => 0), roundWeaponHeadshots: BODY_DMG.map(() => 0), flushed: false };
+      roundWeaponKills: weaponTally(), roundWeaponHeadshots: weaponTally(), nades: NADES_PER_LIFE, lastNade: 0, diedAt: 0, flushed: false };
     players.set(id, p);
 
     // A spectator sees who's already fighting (so the field is populated the moment
@@ -521,7 +606,7 @@ function attachGame(httpServer, opts = {}) {
         p.x = num(msg.x, -120, 120, SPAWN.x); p.y = num(msg.y, 0, 30, SPAWN.y);
         p.z = num(msg.z, -120, 120, SPAWN.z); p.yaw = num(msg.yaw, -1e4, 1e4, SPAWN.yaw);
         p.m = 0; p.r = 0; p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // a breath of spawn grace
-        p.lastDamaged = 0; p.dmgFrom.clear();
+        p.lastDamaged = 0; p.dmgFrom.clear(); p.nades = NADES_PER_LIFE; p.diedAt = 0;
         broadcast({ t: 'join', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
           x: p.x, y: p.y, z: p.z, yaw: p.yaw }, id);
         console.log(`▶ ${p.name} (#${id}) takes the field`);
@@ -537,6 +622,50 @@ function attachGame(httpServer, opts = {}) {
         if (p.hitUsed || now - p.lastShot > 400) return;  // one hit per shot, right after it
         p.hitUsed = true;
         resolveHit(id, msg.target | 0, msg.head === true, msg.w === 1 ? 1 : 0);
+      } else if (msg.t === 'nade') {
+        // A grenade leaves the hand. `k` is its flight as the thrower's client
+        // worked it out against the map — keyframes [t, x, y, z, vx, vy, vz] at
+        // the throw and every bounce — relayed untouched so every client draws
+        // the same arc; `ex` is where that flight is when the fuse `f` runs out.
+        // `c` marks a grenade held past its fuse.
+        if (phase !== 'play' || !p.active || p.nades <= 0) return;
+        const now = Date.now();
+        if (isDown(p)) return;                              // the felled throw nothing
+        if (now - p.lastNade < 400) return;
+        if (!Array.isArray(msg.k) || !msg.k.length || msg.k.length > 48 || !Array.isArray(msg.ex)) return;
+        const k = [];
+        for (const f of msg.k) {
+          if (!Array.isArray(f) || f.length !== 7) return;
+          k.push([num(f[0], 0, NADE_FUSE, 0), num(f[1], -200, 200, 0), num(f[2], -10, 60, 0), num(f[3], -200, 200, 0),
+            num(f[4], -60, 60, 0), num(f[5], -60, 60, 0), num(f[6], -60, 60, 0)]);
+        }
+        const ex = [num(msg.ex[0], -200, 200, p.x), num(msg.ex[1], -10, 60, p.y), num(msg.ex[2], -200, 200, p.z)];
+        if (Math.hypot(ex[0] - p.x, ex[2] - p.z) > 70) return;   // further than any arm can send it
+        const cook = msg.c === 1;
+        const fuse = cook ? 0 : num(msg.f, 0, NADE_FUSE, NADE_FUSE);
+        p.nades -= 1;
+        p.lastNade = now;
+        const n = nextNade++;
+        nades.set(n, { owner: id, ex, cook, round: roundSeq, boomAt: 0, resolved: false });
+        broadcast({ t: 'nade', id, n, k, f: fuse, ex });
+        const t = setTimeout(() => detonate(n), fuse * 1000);
+        t.unref?.();
+      } else if (msg.t === 'nadehit') {
+        // The thrower's client, right after the blast: who it found in the open
+        // from it, and how much of each ([id, exposure] pairs). Once per grenade.
+        const g = nades.get(msg.n | 0);
+        if (!g || g.owner !== id || g.resolved || !g.boomAt) return;
+        if (Date.now() - g.boomAt > NADE_REPORT_MS || !Array.isArray(msg.h)) return;
+        g.resolved = true;
+        const seen = new Set();
+        for (const e of msg.h.slice(0, 32)) {
+          if (!Array.isArray(e)) continue;
+          const tid = e[0] | 0;
+          if (seen.has(tid)) continue;
+          seen.add(tid);
+          if (g.cook && tid === id) continue;               // already settled when it went off
+          resolveBlast(id, tid, g.ex, num(e[1], 0, 1, 0));
+        }
       }
     });
     ws.on('pong', () => { p.alive = true; });

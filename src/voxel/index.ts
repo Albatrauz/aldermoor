@@ -211,11 +211,24 @@ export function shotImpact(o: ArrayLike<number>, d: ArrayLike<number>, len: numb
     _d.x, _d.y, _d.z, _n.x, _n.y, _n.z, b.debris);
 }
 
+/* A grenade going off at (x,y,z): a ragged crater about a metre across, debris
+   thrown upward. Like a shot, a pure function of the point and the map, so every
+   client blows the same hole. Barrier cores and the outer walls hold. */
+const NADE_BITE = { radius: 1.0, debris: 60 };
+export function blastImpact(x: number, y: number, z: number) {
+  applied++;
+  const g = grid;
+  if (!g || !g.containsXZ(x, z)) return;
+  touched = true;
+  carve(x, y, z, NADE_BITE.radius, 0, 0, 0, 0, 1, 0, NADE_BITE.debris);
+}
+
 /* Bring a freshly built map up to date with a round already under way: land
    every shot the server has let through so far ([weapon, origin×3, direction×3,
    length] each, in order), silently, then re-mesh in one go. Because damage is
    a pure function of those numbers and the map they land on, the result is the
-   map every other client is already looking at. */
+   map every other client is already looking at. A grenade's blast is logged as
+   weapon 2 at its point, with no direction. */
 const _ro = [0, 0, 0], _rd = [0, 0, 0];
 export function replayShots(log: ArrayLike<number>[]) {
   if (!grid || !chunks || !log.length) return;
@@ -224,6 +237,7 @@ export function replayShots(log: ArrayLike<number>[]) {
   try {
     for (const s of log) {
       if (!s || s.length < 8) continue;
+      if (s[0] === 2) { blastImpact(s[1], s[2], s[3]); continue; }
       _ro[0] = s[1]; _ro[1] = s[2]; _ro[2] = s[3];
       _rd[0] = s[4]; _rd[1] = s[5]; _rd[2] = s[6];
       shotImpact(_ro, _rd, s[7], s[0]);

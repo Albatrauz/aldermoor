@@ -266,6 +266,28 @@ export function spawnDust(point: THREE.Vector3, hex: number, scale = 1, ttl = .9
 }
 const _white = new THREE.Color(1, 1, 1);
 
+/* A grenade going off: a big flash, a ring of dark smoke and a spray of grit.
+   Drawn from the same pools as the guns, so it costs no new lights or programs. */
+const _up = new THREE.Vector3(0, 1, 0);
+const _grit = new THREE.Color(0x5a4a38);
+export function spawnExplosion(pos: THREE.Vector3) {
+  const s = flashes.take();
+  s.position.copy(pos); s.scale.setScalar(4.2);
+  activate(s, .2, 'fade');
+  const l = lights.take();
+  l.position.copy(pos);
+  activate(l, .25, 'light');
+  for (let k = 0; k < 6; k++) {
+    const p = puffs.take();
+    const a = k / 6 * Math.PI * 2;
+    p.position.set(pos.x + Math.cos(a) * .6, pos.y + .3 + (k & 1) * .4, pos.z + Math.sin(a) * .6);
+    p.material.color.setHex(k < 2 ? 0xd8c8b0 : 0x6b6158);
+    p.scale.setScalar(1.4 + (k & 1) * .5);
+    activate(p, 1.6 + k * .12, 'puff');
+  }
+  burst(pos, _up, _grit, 60, 9, 1.2);
+}
+
 /* Clear every chip off the walls — the walls themselves are about to be replaced. */
 export function clearChips() { for (const c of chips.items) c.visible = false; }
 

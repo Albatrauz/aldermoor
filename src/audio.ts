@@ -36,6 +36,34 @@ function tone(freq,dur,vol,type='triangle'){
 export const ding=()=>tone(1318,.14,.15);
 export const thudSnd=()=>tone(98,.22,.4,'sine');
 export const clack=()=>tone(190,.09,.22,'square'); // ramrod tap on reload
+export const pinSnd=()=>tone(2200,.05,.12,'square');  // the pin comes out
+export const fuseTick=(urgent:boolean)=>tone(urgent?1560:980,.05,urgent?.16:.09,'square');
+/* A grenade going off: a long noise burst swept down hard, under a low thump —
+   heavier and longer than any gun, so it reads as the biggest thing in the fight. */
+export function blast(vol){
+  const a=ac(); if(!a || vol<.01) return;
+  const t=a.currentTime, len=1.1;
+  const buf=a.createBuffer(1, Math.floor(a.sampleRate*len), a.sampleRate);
+  const ch=buf.getChannelData(0);
+  for(let i=0;i<ch.length;i++) ch[i]=(Math.random()*2-1)*Math.pow(1-i/ch.length,3);
+  const src=a.createBufferSource(); src.buffer=buf;
+  const f=a.createBiquadFilter(); f.type='lowpass';
+  f.frequency.setValueAtTime(2600,t);
+  f.frequency.exponentialRampToValueAtTime(70,t+len);
+  const g=a.createGain();
+  g.gain.setValueAtTime(Math.min(1,vol),t);
+  g.gain.exponentialRampToValueAtTime(.001,t+len);
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start(t);
+  const o=a.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(90,t);
+  o.frequency.exponentialRampToValueAtTime(32,t+.5);
+  const og=a.createGain();
+  og.gain.setValueAtTime(Math.min(1,vol*1.2),t);
+  og.gain.exponentialRampToValueAtTime(.001,t+.55);
+  o.connect(og); og.connect(a.destination);
+  o.start(t); o.stop(t+.6);
+}
 export function crack(vol){
   const a=ac(); if(!a) return;
   const t=a.currentTime, len=.14;
