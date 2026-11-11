@@ -72,6 +72,117 @@ export const smokeTex = makeTex(128,(g,s)=>{
   g.fillStyle=r; g.fillRect(0,0,s,s);
 });
 
+/* ============================ the blast atlas ============================ */
+// A grenade is drawn from one 2×2 atlas, so every layer of it — fireball, smoke,
+// dust, flash, pressure ring — can share one material and one draw call:
+//
+//   cell 0, 1  billows. A radial gradient stamped forty times reads as forty
+//              identical discs; real fire and smoke are lumpy, so these are a
+//              cluster of soft blobs, domain-warped by noise and eaten into by
+//              more noise at the edge. Grey in RGB (the shader tints them),
+//              density in alpha — the blast shader erodes alpha with age, so a
+//              billow breaks into lumps as it cools instead of fading uniformly.
+//   cell 2     the flash: a hot core with a few soft rays.
+//   cell 3     a ring with a sharp outer edge and a soft inner wake — the
+//              pressure front, seen face-on.
+//
+// Every cell falls to zero alpha before its border, so bilinear filtering (and
+// the smaller mips) never bleed one cell into its neighbour.
+//
+// Tagged NoColorSpace on purpose: the blast shader treats these values (and the
+// colours it multiplies them by) as display values, the same way particles.ts
+// does, and never decodes sRGB.
+function valueNoise(n = 64){
+  const v = new Float32Array(n*n);
+  for(let i=0;i<v.length;i++) v[i]=Math.random();
+  return (x: number, y: number) => {
+    const xi=Math.floor(x), yi=Math.floor(y);
+    const fx=x-xi, fy=y-yi;
+    const u=fx*fx*(3-2*fx), w=fy*fy*(3-2*fy);
+    const x0=((xi%n)+n)%n, y0=((yi%n)+n)%n, x1=(x0+1)%n, y1=(y0+1)%n;
+    const a=v[y0*n+x0], b=v[y0*n+x1], c=v[y1*n+x0], d=v[y1*n+x1];
+    return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;
+  };
+}
+function fbm(noise: (x: number, y: number) => number, x: number, y: number, oct: number){
+  let s=0, amp=.5, f=1, norm=0;
+  for(let o=0;o<oct;o++){ s+=amp*noise(x*f+o*17.3, y*f-o*9.1); norm+=amp; amp*=.5; f*=2.03; }
+  return s/norm;
+}
+const sstep = (a: number, b: number, x: number) => { const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
+
+export const blastTex = (() => {
+  const S=512, C=S/2;
+  const t = makeTex(S,(g)=>{
+    const img=g.createImageData(S,S), px=img.data;
+    const put=(cx: number, cy: number, x: number, y: number, lum: number, a: number)=>{
+      const i=((cy*C+y)*S+cx*C+x)*4;
+      px[i]=px[i+1]=px[i+2]=Math.max(0,Math.min(255,lum*255));
+      px[i+3]=Math.max(0,Math.min(255,a*255));
+    };
+
+    // --- cells 0 and 1: billows ---
+    for(let cell=0;cell<2;cell++){
+      const n=valueNoise();
+      const blobs: number[][]=[];
+      for(let b=0;b<8;b++){
+        const a=Math.random()*Math.PI*2, r=b===0 ? 0 : mr(.12,.36);
+        blobs.push([Math.cos(a)*r, Math.sin(a)*r, mr(.26,.44)]);
+      }
+      for(let y=0;y<C;y++) for(let x=0;x<C;x++){
+        const nx=(x+.5)/C*2-1, ny=(y+.5)/C*2-1;
+        const r=Math.hypot(nx,ny);
+        if(r>=.98){ put(cell,0,x,y,0,0); continue; }
+        // warp the lookup so blob outlines wobble rather than staying round
+        const wx=nx+(fbm(n,nx*2.1+4,ny*2.1,2)-.5)*.42;
+        const wy=ny+(fbm(n,nx*2.1,ny*2.1+11,2)-.5)*.42;
+        let d=0;
+        for(const [bx,by,br] of blobs){
+          const q=((wx-bx)**2+(wy-by)**2)/(br*br);
+          d=Math.max(d, Math.exp(-q*1.6));
+        }
+        const detail=fbm(n,nx*4.2+23,ny*4.2+7,4);
+        let dens=d*(.45+.85*detail);
+        dens*=sstep(.98,.78,r);                    // guaranteed clear at the cell border
+        const a=sstep(.1,.75,dens);
+        // denser reads brighter; the fine noise gives the surface its churn
+        const lum=(.5+.5*sstep(.1,.8,dens))*(.78+.22*fbm(n,nx*9+3,ny*9+5,2));
+        put(cell,0,x,y,lum,a);
+      }
+    }
+
+    // --- cell 2: the flash ---
+    {
+      const n=valueNoise(), rays=7, ph=Math.random()*6.28;
+      for(let y=0;y<C;y++) for(let x=0;x<C;x++){
+        const nx=(x+.5)/C*2-1, ny=(y+.5)/C*2-1;
+        const r=Math.hypot(nx,ny), th=Math.atan2(ny,nx);
+        const core=Math.exp(-r*r*9), halo=Math.exp(-r*r*2.2)*.45;
+        const ray=Math.pow(Math.abs(Math.cos(th*rays*.5+ph+(n(Math.cos(th)*3+8,Math.sin(th)*3+8)-.5)*1.4)),16)*(1-r)*.5;
+        put(0,1,x,y,1,(core+halo+ray)*sstep(1,.82,r));
+      }
+    }
+
+    // --- cell 3: the pressure ring ---
+    {
+      const n=valueNoise();
+      for(let y=0;y<C;y++) for(let x=0;x<C;x++){
+        const nx=(x+.5)/C*2-1, ny=(y+.5)/C*2-1;
+        const r=Math.hypot(nx,ny), th=Math.atan2(ny,nx);
+        const e=r-.84;
+        const edge=Math.exp(-(e*e)/(e>0 ? .0006 : .006));   // hard leading edge, soft wake
+        const wake=.16*sstep(.35,.84,r)*(r<.84 ? 1 : 0);
+        const breakup=.7+.3*fbm(n,Math.cos(th)*4+20,Math.sin(th)*4+20,3);
+        put(1,1,x,y,1,(edge+wake)*breakup*sstep(.99,.93,r));
+      }
+    }
+    g.putImageData(img,0,0);
+  });
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+})();
+
 /* ============================ desert (Dust2) textures ============================ */
 export const sandTex = makeTex(512,(g,s)=>{
   g.fillStyle='#c9a76e'; g.fillRect(0,0,s,s);

@@ -327,17 +327,21 @@ const removed: number[] = [];   // i,j,k,m quads of what the last carve took
 const seeds: number[] = [];
 
 /* Take a ragged spherical bite centred on (cx,cy,cz). `n*` is the struck face's
-   normal and `d*` the shot's direction — used only to throw the debris.
-   Returns how many voxels went. */
+   normal and `d*` the shot's direction — used only to throw the debris. `fling`
+   (a blast, not a shot) instead hurls the debris outward from the centre at up
+   to that many metres a second, and `tall` stretches the bite upward from its
+   centre into an egg: a blast on the ground has the floor under it and goes up
+   the wall instead. Returns how many voxels went. */
 export function carve(
   cx: number, cy: number, cz: number, radius: number,
   dx: number, dy: number, dz: number, nx: number, ny: number, nz: number, maxDebris: number,
+  fling = 0, tall = 1,
 ) {
   const g = grid, ch = chunks;
   if (!g || !ch) return 0;
   const vs = g.vs, data = g.data, R = radius * 1.9 + vs * 2;
   const i0 = Math.max(0, g.ix(cx - R)), i1 = Math.min(g.nx - 1, g.ix(cx + R));
-  const j0 = Math.max(0, g.iy(cy - R)), j1 = Math.min(g.ny - 1, g.iy(cy + R));
+  const j0 = Math.max(0, g.iy(cy - R)), j1 = Math.min(g.ny - 1, g.iy(cy + R * tall));
   const k0 = Math.max(0, g.iz(cz - R)), k1 = Math.min(g.nz - 1, g.iz(cz + R));
   removed.length = 0;
   let nearest = -1, nearestD = Infinity, ni = 0, nj = 0, nk = 0;
@@ -347,7 +351,9 @@ export function carve(
     for (let j = j0; j <= j1; j++) {
       const m = data[col + j];
       if (m === 0) continue;
-      const ey = g.oy + (j + .5) * vs - cy, dist = Math.sqrt(exz + ey * ey);
+      let ey = g.oy + (j + .5) * vs - cy;
+      if (ey > 0) ey /= tall;
+      const dist = Math.sqrt(exz + ey * ey);
       // The bite's reach varies voxel by voxel (hashed, so identical on every
       // client): that is what makes the hole ragged instead of a neat ball.
       const r = radius * matOf(m).soft * (.78 + .44 * h3(i, j, k));
@@ -374,6 +380,21 @@ export function carve(
   const step = Math.max(1, Math.ceil(count / maxDebris));
   for (let a = quiet ? count : Math.floor(Math.random() * step); a < count; a += step) {
     const o = a * 4, sp = 1.5 + Math.random() * 3.2;
+    if (fling > 0) {
+      // A blast: out from the centre and up, the fastest pieces from nearest it —
+      // a fountain of rubble rather than a puff out of a hole.
+      const px = g.ox + (removed[o] + .5) * vs, py = g.oy + (removed[o + 1] + .5) * vs, pz = g.oz + (removed[o + 2] + .5) * vs;
+      let rx = px - cx, ry = py - cy, rz = pz - cz;
+      const rl = Math.hypot(rx, ry, rz) || 1;
+      rx /= rl; ry /= rl; rz /= rl;
+      const f = fling * (.35 + Math.random() * .65) * (1 - .45 * Math.min(1, rl / radius));
+      spawnDebris(px, py, pz,
+        rx * f + (Math.random() - .5) * 2.5,
+        Math.abs(ry) * f * .6 + f * (.35 + Math.random() * .55),
+        rz * f + (Math.random() - .5) * 2.5,
+        removed[o + 3], vs * (.45 + Math.random() * .75), 4 + Math.random() * 5);
+      continue;
+    }
     spawnDebris(g.ox + (removed[o] + .5) * vs, g.oy + (removed[o + 1] + .5) * vs, g.oz + (removed[o + 2] + .5) * vs,
       (nx * 1.1 - dx * .25) * sp + (Math.random() - .5) * 2.4,
       (ny * 1.1 - dy * .25) * sp + Math.random() * 2.2,

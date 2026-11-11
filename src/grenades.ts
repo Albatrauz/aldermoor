@@ -17,7 +17,7 @@ import { remotes } from './villagers';
 import { myId, sendNet } from './net';
 import { spawnExplosion } from './effects';
 import { blast, pinSnd, fuseTick } from './audio';
-import { setNades, setNadeRing } from './hud';
+import { setNades, setNadeRing, concuss } from './hud';
 import { matIron, matGoldTrim } from './materials';
 import { introVisible, frozen, dead, locked, dragLook, player } from './controls';
 import { onMapChange } from './world';
@@ -25,8 +25,8 @@ import { onMapChange } from './world';
 export const NADES_PER_LIFE = 2;
 const FUSE = 5;               // seconds from the pin to the blast — server.js holds the same
 const GRAVITY = 13;           // the players' own gravity, so a lob reads like a hop
-const THROW_SPEED = 15;       // ≈ 20 m on the flat at 45°
-const THROW_LIFT = 2.5;       // a little loft on top of the aim, as an overarm throw has
+const THROW_SPEED = 16.15;    // ≈ 26 m to the first bounce on the flat, at best
+const THROW_LIFT = 2.7;       // a little loft on top of the aim, as an overarm throw has
 const BOUNCE = .4;            // share of the speed into a surface that comes back out
 const SLIDE = .7;             // share of the speed along a surface kept through a bounce
 const REST_SPEED = 1.2;       // landing on a floor slower than this, it stays put
@@ -36,7 +36,7 @@ const MAX_KEYS = 40;
 const ARC_SPAN = 3.5;         // seconds of flight the preview draws, at most
 const ARC_STEP = .025;
 // The blast's reach — server.js deals the damage; this only decides whom to report.
-const BLAST_REACH = 8;
+const BLAST_REACH = 12;
 
 // One keyframe of a flight: [t, x, y, z, vx, vy, vz]. Between keyframes the
 // grenade is ballistic; zero velocity means it is lying still.
@@ -175,7 +175,6 @@ const flights: Flight[] = [];
 let nades = NADES_PER_LIFE;
 let cookStart = 0;          // performance.now() when the pin came out; 0 = not cooking
 let nextTick = 0;
-let shake = 0;
 
 export const isCooking = () => cookStart > 0;
 
@@ -261,16 +260,113 @@ export function handleBoom(m) {
   explode(m.ex, m.id === myId ? m.n : null);
 }
 
-/* The blast itself. Exposure is judged on the map as it stands before the
-   crater is dug, which is the map every client holds at this point. */
+/* The blast itself. Exposure — and whether we can see it — is judged on the map
+   as it stands before the crater is dug, which is the map every client holds at
+   this point. */
 function explode(ex: number[], reportAs: number | null) {
   if (reportAs !== null) sendNet({ t: 'nadehit', n: reportAs, h: exposures(ex) });
-  blastImpact(ex[0], ex[1], ex[2]);
   _p.set(ex[0], ex[1], ex[2]);
-  spawnExplosion(_p);
   const d = _p.distanceTo(camera.position);
-  blast(Math.min(1, 14 / Math.max(4, d)));
-  shake = Math.max(shake, Math.max(0, 1 - d / 18));
+  const seen = inSight(ex);
+  blastImpact(ex[0], ex[1], ex[2]);
+  spawnExplosion(_p);
+  blast(Math.min(1, 14 / Math.max(4, d)), d);
+  feel(_p, d, seen);
+}
+
+/* Can the eye see the point of the blast? A wall in the way takes the glare and
+   most of the punch out of it; the ground still heaves. */
+function inSight(ex: number[]) {
+  _e.set(ex[0], ex[1] + .2, ex[2]);
+  if (solidAt(_e.x, _e.y, _e.z)) _e.set(ex[0], ex[1], ex[2]);
+  _dir.subVectors(camera.position, _e);
+  const len = _dir.length();
+  return len < .3 || !traceWorld(_e, _dir.divideScalar(len), len - .1).hit;
+}
+
+/* ============================ the blast, felt ============================ */
+// What the camera does when a grenade goes off, in three layers:
+//
+//   SHAKE — "trauma" in 0..1 that a blast adds to and time drains. The shake
+//   actually applied is trauma², so a near miss is violent and a far one a
+//   tremor, and it is driven by smooth noise rather than a fresh random number
+//   each frame: random jitter reads as a rendering fault, noise reads as the
+//   ground moving. Mostly rotation — a few centimetres of translation is
+//   invisible at any distance, a degree of roll is not.
+//
+//   KICK — one shove away from the blast (back, up and rolled to the far side),
+//   on a critically damped spring so it lands in a sixteenth of a second and is
+//   gone in a third. This is what tells you where it came from.
+//
+//   PUNCH — the field of view jumps wider; controls.ts eases it back by itself.
+//   With it goes the glare on the HUD, and after a close one the daze (hud.ts).
+const REACH_FELT = 26;        // metres — past this the ground does not move
+const TRAUMA_DRAIN = .85;     // per second
+const SHAKE_HZ = 21;
+const SHAKE_ROLL = .13, SHAKE_PITCH = .06, SHAKE_YAW = .06, SHAKE_SLIDE = .07;   // radians, metres at full trauma
+const KICK_W = 16;            // the spring's natural frequency, rad/s
+const KICK_BACK = .3, KICK_PITCH = .075, KICK_ROLL = .09;   // metres, radians at point blank, in the open
+const FOV_PUNCH = 9;          // degrees
+let trauma = 0, shakeClock = 0;
+// the kick spring: displacement and velocity of [push, pitch, roll]
+const kick = [0, 0, 0], kickV = [0, 0, 0];
+const kickDir = new THREE.Vector3();
+
+/* Smooth 1-D value noise in -1..1; each `seed` is an independent track. */
+function wobble(t: number, seed: number) {
+  const i = Math.floor(t), f = t - i, u = f * f * (3 - 2 * f);
+  const a = Math.sin((i + seed * 57.3) * 127.1) * 43758.5453, b = Math.sin((i + 1 + seed * 57.3) * 127.1) * 43758.5453;
+  return ((a - Math.floor(a)) * (1 - u) + (b - Math.floor(b)) * u) * 2 - 1;
+}
+
+/* A blast `d` metres from the eye at `pos`; `seen` if nothing stands between. */
+function feel(pos: THREE.Vector3, d: number, seen: boolean) {
+  const near = Math.max(0, 1 - d / REACH_FELT);
+  const cover = seen ? 1 : .55;
+  trauma = Math.min(1, trauma + (near * near * 1.15 + (near > 0 ? .05 : 0)) * cover);
+
+  // the shove: strongest inside the killing ground, nothing by the edge of the reach
+  const k = Math.max(0, 1 - d / BLAST_REACH) * cover;
+  if (k <= 0 || introVisible || frozen) return;
+  if (k > .05) concuss(k);                    // the glare, and the daze after a close one
+  kickDir.subVectors(camera.position, pos);
+  kickDir.y = 0;
+  if (kickDir.lengthSq() < 1e-4) kickDir.set(0, 0, 1).applyQuaternion(camera.quaternion).setY(0);
+  kickDir.normalize();
+  // which side of the view it came from decides which way the head rolls
+  _right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+  const side = Math.sign(kickDir.dot(_right)) || 1;
+  const v0 = KICK_W * Math.E;                 // an impulse that peaks at exactly the displacement asked for
+  kickV[0] += KICK_BACK * k * v0;
+  kickV[1] += KICK_PITCH * k * v0;
+  kickV[2] += -side * KICK_ROLL * k * v0;
+  if (!dead) camera.fov = Math.min(100, camera.fov + FOV_PUNCH * k);   // nothing eases it back while felled
+}
+
+/* Lay the shake and the kick over wherever controls.ts has just put the camera. */
+function shakeCamera(dt: number) {
+  let moving = false;
+  for (let i = 0; i < 3; i++) {
+    kickV[i] += (-2 * KICK_W * kickV[i] - KICK_W * KICK_W * kick[i]) * dt;
+    kick[i] += kickV[i] * dt;
+    if (Math.abs(kick[i]) < 1e-4 && Math.abs(kickV[i]) < 1e-3) kick[i] = kickV[i] = 0;
+    else moving = true;
+  }
+  if (trauma > 0) { trauma = Math.max(0, trauma - TRAUMA_DRAIN * dt); shakeClock += dt * SHAKE_HZ; }
+  if ((trauma <= 0 && !moving) || introVisible || frozen) return;
+  const s = trauma * trauma;
+  camera.rotation.x += s * SHAKE_PITCH * wobble(shakeClock, 1) + kick[1];
+  camera.rotation.y += s * SHAKE_YAW * wobble(shakeClock, 2);
+  camera.rotation.z += s * SHAKE_ROLL * wobble(shakeClock, 3) + kick[2];
+  camera.position.x += s * SHAKE_SLIDE * wobble(shakeClock, 4);
+  camera.position.y += s * SHAKE_SLIDE * wobble(shakeClock, 5);
+  // the shove must not put the eye inside the wall the player has their back to
+  let push = kick[0];
+  if (push > .005) {
+    const hit = traceWorld(camera.position, kickDir, push + .25);
+    if (hit.hit) push = Math.max(0, hit.end - .25);
+    camera.position.addScaledVector(kickDir, push);
+  }
 }
 
 /* Who stands within reach of a blast at `ex`, and how much of each is in the
@@ -360,12 +456,7 @@ export function update(dt: number) {
     else if ((now - f.start) / 1000 > f.fuse + 5) dropFlight(i);
   }
 
-  if (shake > 0 && !introVisible && !frozen) {
-    camera.position.x += (Math.random() - .5) * shake * .12;
-    camera.position.y += (Math.random() - .5) * shake * .12;
-    camera.rotation.x += (Math.random() - .5) * shake * .03;
-  }
-  shake = Math.max(0, shake - dt * 2.5);
+  shakeCamera(dt);
 }
 
 /* A new map: whatever was in the air belonged to the old one. */

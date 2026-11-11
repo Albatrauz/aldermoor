@@ -118,13 +118,13 @@ const weaponTally = () => [0, 0, 0];
 // Grenades — mirrored in src/grenades.ts, which draws the same numbers.
 const NADES_PER_LIFE = 2;     // every life starts with this many
 const NADE_FUSE = 5;          // seconds from pulling the pin to the blast
-const NADE_MAX_DMG = 130;     // within NADE_INNER of the body: more than a full bar
-const NADE_INNER = 1;         // metres — point blank
-const NADE_OUTER = 8;         // metres — nothing past this
+const NADE_MAX_DMG = 140;     // within NADE_INNER of the body: well over a full bar
+const NADE_INNER = 1.5;       // metres — point blank
+const NADE_OUTER = 12;        // metres — nothing past this
 const NADE_REPORT_MS = 2000;  // the thrower has this long after the blast to say who it reached
 // Damage by distance from the blast to the nearest point of the body. Squared
-// falloff: lethal right next to it (≈95 at 2 m), a heavy wound at 3 m (≈66),
-// a scratch from 6 m (≈11).
+// falloff: it kills out to about 3 m (≈102 at 3 m), wounds heavily at 5 m (≈62),
+// still bites at 8 m (≈20) and only scratches from 10 m (≈5).
 function nadeDamage(d) {
   if (d <= NADE_INNER) return NADE_MAX_DMG;
   if (d >= NADE_OUTER) return 0;

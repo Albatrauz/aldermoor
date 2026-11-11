@@ -216,13 +216,25 @@ with whatever fuse is left. Hold on past the end and it goes off in your hand �
 certain death, counted as a death with no kill to anyone. While a grenade is in
 hand you can't fire, reload or swap arms.
 
-The blast deals up to **130** damage (more than a full bar) within 1 m of your
-body, falling off with the square of the distance to nothing at 8 m: about 95 at
-2 m, 66 at 3 m, 42 at 4 m, 24 at 5 m and 11 at 6 m. Cover counts. Damage is
+The blast deals up to **140** damage (well over a full bar) within 1.5 m of your
+body, falling off with the square of the distance to nothing at 12 m: about 127
+at 2 m, 103 at 3 m, 81 at 4 m, 62 at 5 m, 46 at 6 m, 20 at 8 m and 5 at 10 m — it
+kills out to about 3 m. Cover counts. Damage is
 scaled by how much of you the blast can see: rays to shins, chest and head, so
 a wall between you and the grenade saves you and a corner halves it. Your own
-grenade hurts you too. It also blows a ragged crater about a metre across in the
-world; barrier cores and the outer walls hold as they do against shots.
+grenade hurts you too. It also blows a ragged crater some three and a half metres
+across in the world — and nearly three metres up any wall it lies against —
+flinging the rubble outward; barrier cores and the outer walls hold as they do against shots.
+
+The blast is built to feel heavy. On screen (`src/effects.ts`): a white flash, a
+fireball that cools into smoke, a pressure ring racing 11 m over the ground, a
+rolling dust ring, sparks and dirt, a smoke column that hangs for five seconds
+and one long-reach light. In the camera (`src/grenades.ts`): noise-driven shake
+that scales with distance, a shove away from the blast and a jump in field of
+view; a wall between you and it takes most of that away. On the HUD a glare, and
+after a close one a dark daze. In the ears (`src/audio.ts`): crack, body, sub
+thump, a long rumble and rubble pattering down, delayed and dulled by distance;
+inside 6 m everything goes muffled for a few seconds, with a ring.
 
 On the wire the thrower's client works out the flight against its own map and
 sends it as keyframes (`nade`: the throw and every bounce, plus the fuse and the
