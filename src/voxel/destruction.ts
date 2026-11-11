@@ -8,8 +8,9 @@
 //      ground. After a carve, the voxels bordering the hole are flood-filled
 //      toward the ground; any group that can no longer reach it has been cut
 //      loose. Shoot the foot out from under a pillar and the top is such a group.
-//      The locked shell (bedrock, and the outer walls behind their diggable
-//      face) counts as ground: it never moves, and nothing anchored to it falls.
+//      The locked shell (bedrock, the outer walls behind their diggable face,
+//      and the core of every barrier wall) counts as ground: it never moves,
+//      and nothing anchored to it falls.
 //
 //   3. COLLAPSE — a loose group is lifted out of the grid and becomes an ISLAND:
 //      a rigid body with its own mesh that falls and tumbles under gravity. When
@@ -284,6 +285,7 @@ function checkSupport(seeds: number[]) {
   // the lock box in padded column coordinates (see grid.ts), so the test below
   // needs no unpadding
   const li0 = g.lockI0 + 1, li1 = g.lockI1 + 1, lk0 = g.lockK0 + 1, lk1 = g.lockK1 + 1;
+  const core = g.coreTop, nx = g.nx;
   marks.clear();
   for (const seed of seeds) {
     if (data[seed] === 0 || marks.has(seed)) continue;
@@ -299,6 +301,8 @@ function checkSupport(seeds: number[]) {
       // island — not merely the luck of its column still reaching the floor.
       const c = (id / SY) | 0, pi = c % SX, pk = (c / SX) | 0;
       if (pi < li0 || pi >= li1 || pk < lk0 || pk >= lk1) { marks.set(id, 1); supported = true; break; }
+      // …and so is a barrier wall's locked core.
+      if (core && id % SY - 1 < core[pi - 1 + nx * (pk - 1)]) { marks.set(id, 1); supported = true; break; }
       comp.push(id);
       if (comp.length > MAX_ISLAND) { supported = true; break; }  // too big to drop: let it stand
       for (let nb = 0; nb < 6; nb++) {

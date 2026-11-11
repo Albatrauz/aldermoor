@@ -40,20 +40,25 @@ function build(): BuiltMap {
   wallZ(-120, -94, 94, { h: 7, t: 2, mat: matSandstoneDark, boundary: true });
   wallZ(120, -94, 94, { h: 7, t: 2, mat: matSandstoneDark, boundary: true });
 
+  // `barrier` marks the walls that edge the playable lanes: behind them is the
+  // open sand inside the boundary, or one of the sealed blocks between lanes.
+  // They take damage, but their core is locked so no hole ever goes through.
+  const edge = { barrier: true };
+
   /* ============================ T spawn (west plaza) ============================ */
-  wallX(20, -120, -88);                                  // plaza north
-  wallX(-20, -120, -88);                                 // plaza south
-  wallZ(-88, -26, 20, { t: 2, gaps: [[-18, -8], [8, 18]] }); // east wall + split block between exits
+  wallX(20, -120, -88, edge);                            // plaza north
+  wallX(-20, -120, -88, edge);                           // plaza south
+  wallZ(-88, -26, 20, { t: 2, gaps: [[-18, -8], [8, 18]], barrier: true }); // east wall + split block between exits
   solid(-110, 8, 1.8, .8, 1.8, matCrate);
   solid(-112, -6, 1.8, 1.6, 1.8, matCrate);
   solid(-103, -12, .9, 1.0, .9, matCarRed);              // barrel-ish drum
   solid(-101.8, -11.2, .9, 1.0, .9, matIron);
 
   /* ============================ T upper (N exit → long & mid) ============================ */
-  wallX(18, -88, -52, { gaps: [[-78, -60]] });           // north, opens to outside-long
-  wallZ(-52, 5, 18);                                     // east end cap
-  wallZ(-78, 18, 36);
-  wallZ(-60, 18, 36);
+  wallX(18, -88, -52, { gaps: [[-78, -60]], barrier: true }); // north, opens to outside-long
+  wallZ(-52, 5, 18, edge);                               // east end cap
+  wallZ(-78, 18, 36, edge);
+  wallZ(-60, 18, 36, edge);
   wallX(30, -78, -60, { gaps: [[-67.25, -64.75]] });     // LONG DOORS (2.5 gap)
   lintel(-66, 30, 2.5, WT, 3.0, 5);
   {
@@ -64,9 +69,9 @@ function build(): BuiltMap {
   solid(-76, 21, 1.8, .8, 1.8, matCrate);                // courtyard crate
 
   /* ============================ Long A ============================ */
-  wallX(36, -78, -2, { gaps: [[-70, -60]] });            // long south (open over vestibule)
-  wallX(45, -70, -2);                                    // long north
-  wallZ(-70, 36, 45);                                    // long west cap
+  wallX(36, -78, -2, { gaps: [[-70, -60]], barrier: true }); // long south (open over vestibule)
+  wallX(45, -70, -2, edge);                              // long north
+  wallZ(-70, 36, 45, edge);                              // long west cap
   solid(-58, 43.2, 6, 2.6, 2.4, matContainerBlue);       // blue container
   solid(-63.7, 43.2, 1.8, .8, 1.8, matCrate);            // flush risers
   solid(-61.9, 43.2, 1.8, 1.6, 1.8, matCrate);
@@ -87,26 +92,26 @@ function build(): BuiltMap {
   /* ============================ Bombsite A (raised +1.2) ============================ */
   block(13, 44, 30, 1.2, 26, matConcrete);
   addCollider(13, 44, 15, 13, 1.2, 0, matConcrete);
-  wallX(57, -2, 28);                                     // site north
-  wallZ(-2, 31, 57, { gaps: [[36, 45]] });               // site west (open at long ramp)
-  wallZ(28, 31, 57, { gaps: [[31, 39]] });               // site east (open to CT ramp)
-  wallX(31, -2, 28, { gaps: [[0, 8]] });                 // site south (open to catwalk)
+  wallX(57, -2, 28, edge);                               // site north
+  wallZ(-2, 31, 57, { gaps: [[36, 45]], barrier: true }); // site west (open at long ramp)
+  wallZ(28, 31, 57, { gaps: [[31, 39]], barrier: true }); // site east (open to CT ramp)
+  wallX(31, -2, 28, { gaps: [[0, 8]], barrier: true });  // site south (open to catwalk)
   solid(8, 48, 1.8, .8, 1.8, matCrate, 1.2);
   solid(9.8, 48, 1.8, 1.6, 1.8, matCrate, 1.2);
   solid(8, 49.8, 1.8, 1.6, 1.8, matCrate, 1.2);
   solid(2, 38, 4, 1.1, 2, matSandbag, 1.2);
 
   /* ============================ Catwalk / Short A ============================ */
-  wallZ(0, 5, 31);
-  wallZ(8, 5, 31);
+  wallZ(0, 5, 31, edge);
+  wallZ(8, 5, 31, edge);
   ramp(4, 12, 7.2, 6, 1.4, '+z', matConcrete);
   block(4, 23, 7.2, 1.4, 16, matConcrete);
   addCollider(4, 23, 3.6, 8, 1.4, 0, matConcrete);
 
   /* ============================ Mid ============================ */
-  wallX(5, -88, 80, { gaps: [[-57, -52], [0, 8]] });     // north (T-upper entrance, catwalk)
-  wallX(-5, -57, 80, { gaps: [[5, 11]] });               // south (mid→B passage)
-  wallZ(-57, -5, 5);                                     // mid west cap
+  wallX(5, -88, 80, { gaps: [[-57, -52], [0, 8]], barrier: true }); // north (T-upper entrance, catwalk)
+  wallX(-5, -57, 80, { gaps: [[5, 11]], barrier: true }); // south (mid→B passage)
+  wallZ(-57, -5, 5, edge);                               // mid west cap
   wallZ(-2, -5, 5, { gaps: [[-1.25, 1.25]] });           // MID DOORS at x=−2
   lintel(-2, 0, WT, 2.5, 3.0, 5);
   {
@@ -120,18 +125,18 @@ function build(): BuiltMap {
   solid(14, -3.4, 3, 1.2, 2.4, matSandbag);
 
   /* ============================ Mid → B passage ============================ */
-  wallZ(5, -22, -5);
-  wallZ(11, -14, -5);
+  wallZ(5, -22, -5, edge);
+  wallZ(11, -14, -5, edge);
 
   /* ============================ Tunnels (T → B) ============================ */
-  wallX(-8, -88, -75);                                   // pocket north
-  wallZ(-75, -17, -8);                                   // pocket east (tunnel mouth below)
-  wallX(-26, -88, -47);                                  // pocket/upper south
-  wallX(-17, -75, -39);                                  // upper north
-  wallZ(-39, -30, -17);                                  // dogleg east (above lower opening)
-  wallZ(-47, -38, -26);                                  // dogleg west
-  wallX(-30, -39, -12);                                  // lower north
-  wallX(-38, -47, -12);                                  // lower south
+  wallX(-8, -88, -75, edge);                             // pocket north
+  wallZ(-75, -17, -8, edge);                             // pocket east (tunnel mouth below)
+  wallX(-26, -88, -47, edge);                            // pocket/upper south
+  wallX(-17, -75, -39, edge);                            // upper north
+  wallZ(-39, -30, -17, edge);                            // dogleg east (above lower opening)
+  wallZ(-47, -38, -26, edge);                            // dogleg west
+  wallX(-30, -39, -12, edge);                            // lower north
+  wallX(-38, -47, -12, edge);                            // lower south
   solid(-60, -19, 1.6, .8, 1.6, matCrate);
   solid(-30, -32, 1.6, .8, 1.6, matCrate);
   solid(-43, -35.8, .9, 1.0, .9, matIron);
@@ -144,10 +149,11 @@ function build(): BuiltMap {
   ceil(-29.5, -34, 35, 8);                               // lower
 
   /* ============================ Bombsite B ============================ */
-  wallX(-47, -12, 16);                                   // south
-  wallZ(-12, -47, -22, { gaps: [[-38, -30]] });          // west (tunnel doorway)
+  wallX(-47, -12, 16, edge);                             // south
+  wallZ(-12, -47, -22, { gaps: [[-38, -30]], barrier: true }); // west (tunnel doorway)
   lintel(-12, -34, WT, 8, 3.0, 5);
-  wallZ(16, -47, -22, { gaps: [[-31, -25]] });           // east, with the B WINDOW
+  wallZ(16, -47, -31, edge);                             // east, below the B WINDOW…
+  wallZ(16, -25, -22);                                   // …and the stub above it, between site and yard
   solid(16, -28, WT, 1.2, 6, matSandstone);              // window sill (hoppable)
   block(16, -28, WT, 2.6, 6, matSandstone, 2.4);         // window head
   addCollider(16, -28, WT / 2, 3, 5, 2.4);
@@ -160,25 +166,29 @@ function build(): BuiltMap {
   solid(-6, -24.5, 4, 1.2, 2, matSandbag);
 
   /* ============================ B doors corridor (CT → B) ============================ */
-  wallX(-14, 5, 80, { gaps: [[5, 11]] });                // north (mid→B drops in)
-  wallX(-22, -12, 120, { gaps: [[8, 16], [30, 38]] });   // south: B doors + window-yard entry
+  wallX(-14, 5, 80, { gaps: [[5, 11]], barrier: true }); // north (mid→B drops in)
+  // south: B doors (8..16) and the window-yard entry (30..38) break it in three;
+  // the middle span only divides the corridor from the yard, so it stays soft
+  wallX(-22, -12, 8, edge);
+  wallX(-22, 16, 30);
+  wallX(-22, 38, 120, edge);
   lintel(12, -22, 8, WT, 3.0, 5);                        // B doors arch
-  wallX(-32, 16, 40);                                    // window yard
-  wallZ(40, -32, -22);
+  wallX(-32, 16, 40, edge);                              // window yard
+  wallZ(40, -32, -22, edge);
   solid(24, -28, 1.8, .8, 1.8, matCrate);
 
   /* ============================ CT → A connector ============================ */
-  wallX(39, 28, 92);                                     // corridor north
-  wallX(31, 28, 84);                                     // corridor south
-  wallZ(84, 22, 31);                                     // leg west
-  wallZ(92, 22, 39);                                     // leg east
+  wallX(39, 28, 92, edge);                               // corridor north
+  wallX(31, 28, 84, edge);                               // corridor south
+  wallZ(84, 22, 31, edge);                               // leg west
+  wallZ(92, 22, 39, edge);                               // leg east
   ramp(32, 35, 8, 8, 1.2, '-x', matSandstone);           // CT ramp up to A
   solid(50, 37.6, 1.8, .8, 1.8, matCrate);
   solid(60, 32.4, .9, 1.0, .9, matIron);
 
   /* ============================ CT spawn (east) ============================ */
-  wallX(22, 80, 120, { gaps: [[84, 92]] });              // north (gate to A connector)
-  wallZ(80, -22, 22, { gaps: [[-22, -14], [-5, 5]] });   // west (B corridor, mid)
+  wallX(22, 80, 120, { gaps: [[84, 92]], barrier: true }); // north (gate to A connector)
+  wallZ(80, -22, 22, { gaps: [[-22, -14], [-5, 5]], barrier: true }); // west (B corridor, mid)
   solid(95, 10, 3, 1, 3, matConcrete);
   solid(98, -8, 3, 1, 3, matConcrete);
   solid(108, 2, 2, .8, 2, matConcrete);
@@ -245,7 +255,7 @@ function build(): BuiltMap {
     { x: 95, z: 2, r: 17, name: 'CT Spawn' },
   ];
 
-  return { group: B.group, colliders: B.colliders, spawns, zones, bounds: B.bounds() };
+  return { group: B.group, colliders: B.colliders, spawns, zones, bounds: B.bounds(), barriers: B.barriers };
 }
 
 export const dust2: MapDef = {

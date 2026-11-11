@@ -15,7 +15,7 @@
 // no per-frame cost beyond the env-map taps the standard shader already does.
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { renderer, scene, REVERSED_DEPTH } from './core';
+import { renderer, scene, REVERSED_DEPTH, VISITOR_LAYER } from './core';
 
 /* Build a Sky whose depth convention matches the renderer's.
    three's own Sky addon is not reverse-Z aware. Its vertex shader ends with
@@ -57,6 +57,7 @@ export const sky = makeSky();
 sky.scale.setScalar(450000);
 sky.renderOrder = -3;
 sky.frustumCulled = false;
+sky.layers.enable(VISITOR_LAYER); // the margin around a top-down plate is sky, not black
 scene.add(sky);
 
 function applyParams(target: Sky, p: SkyParams) {

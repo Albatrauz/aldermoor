@@ -244,6 +244,39 @@ export function voxelStats() {
   };
 }
 export const voxelGrid = () => grid;
+
+export interface WorldSpan {
+  minX: number; minY: number; minZ: number;
+  maxX: number; maxY: number; maxZ: number;
+}
+
+function spanOf(g: VoxelGrid): WorldSpan {
+  return {
+    minX: g.ox, minY: g.oy, minZ: g.oz,
+    maxX: g.ox + g.nx * g.vs, maxY: g.oy + g.ny * g.vs, maxZ: g.oz + g.nz * g.vs,
+  };
+}
+
+/** Axis-aligned extent of everything the voxel world draws — the playable block
+    and the coarse backdrop past the walls. Null until a map has been built. */
+export function worldSpan(): WorldSpan | null {
+  if (!chunks) return null;
+  const fine = spanOf(chunks.grid);
+  if (!farChunks) return fine;
+  const far = spanOf(farChunks.grid);
+  return {
+    minX: Math.min(fine.minX, far.minX), minY: Math.min(fine.minY, far.minY), minZ: Math.min(fine.minZ, far.minZ),
+    maxX: Math.max(fine.maxX, far.maxX), maxY: Math.max(fine.maxY, far.maxY), maxZ: Math.max(fine.maxZ, far.maxZ),
+  };
+}
+
+/** Finish any chunk re-meshes still queued, so a plate shows the holes that
+    have already been carved rather than the mesh from a few frames ago. */
+export function flushMeshes() {
+  if (!chunks || chunks.flush(1e9) === 0) return;
+  onChange?.();
+  shadowStale = false; sinceBake = 0;
+}
 /* Sky light (0–255) at a world position — what the shader would look up there. */
 export function skyAt(x: number, y: number, z: number) {
   if (!grid || !sky || !sky.ok) return 255;

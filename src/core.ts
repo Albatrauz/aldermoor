@@ -40,6 +40,12 @@ scene.fog = new THREE.FogExp2(0xcdbb94, 0.0025);
 export const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 700);
 camera.rotation.order = 'YXZ';
 
+// The bird's-eye visitor camera draws this layer only (see visitor.ts). The map,
+// the sky and the lights that shade them sit on it as well as the default layer;
+// actors, the viewmodel and weather do not, so a plate of the map never has to
+// hide them and a later minimap can render the same camera.
+export const VISITOR_LAYER = 1;
+
 /* deterministic rng for layout */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 const rand = mulberry32(1347);
