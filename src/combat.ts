@@ -32,6 +32,9 @@ let fireCd=0, gunKick=0, reloadT=0, deathT=0;
 // `cool` rate, scaling each shot's bloom so a held spray walks the cone open.
 let fireHeat=0;
 let mouseDown=false;
+// renderer.info.render.frame when the last shot left (only main.ts renders, so
+// that counter is the drawn-frame count); full-auto fires once per frame at most
+let shotFrame=-1;
 // shot scatter as a cone half-angle (radians), drawn from the active weapon's
 // `spread` config. a small idle floor keeps even a settled shot from being a
 // guaranteed headshot; moving/running/hopping raise the floor and every shot
@@ -67,6 +70,7 @@ export function fire(){
   ammo[weaponIdx]-=1;
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
   fireCd=w.fireCd; gunKick=Math.max(gunKick, w.kick);
+  shotFrame=renderer.info.render.frame;
   camera.updateMatrixWorld(true);
   const o=camera.position.clone();
   const d=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
@@ -319,8 +323,11 @@ export function update(dt){
       ding();
     }
   }
-  // full-auto: keep firing while mouse is held
-  if(mouseDown && WEAPONS[weaponIdx].full && !frozen) fire();
+  // full-auto: keep firing while mouse is held — but at most one shot per drawn
+  // frame. A slow frame runs several sub-steps (main.ts), and the shots they'd
+  // fire leave in one burst; the server spaces shots by arrival time and drops
+  // all but the first, which would cost ammo and a tracer for nothing.
+  if(mouseDown && WEAPONS[weaponIdx].full && !frozen && shotFrame!==renderer.info.render.frame) fire();
   gunKick=Math.max(0, gunKick-dt*5);
   // ease spread toward its floor (moving/running/airborne raise it; firing bloomed it),
   // then map the cone half-angle to a screen-pixel gap at the live FOV so the crosshair
