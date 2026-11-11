@@ -13,6 +13,7 @@ import { boom, crack, ding, thudSnd, clack } from './audio';
 import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
   showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud';
 import { announce, syncZone } from './zones';
+import { isCooking, resetNades } from './grenades';
 import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, showMenu, onMenuShown, player, vel, keys } from './controls';
 
 scene.add(camera); // the viewmodel rides on the camera
@@ -49,6 +50,7 @@ function refillAll(){
   reloadT=0; fireCd=0; gunKick=0; fireHeat=0; spread=WEAPONS[weaponIdx].spread.base;
   const w=WEAPONS[weaponIdx];
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
+  resetNades();
 }
 
 // show the active model (called once after modules load and controls unlock)
@@ -57,7 +59,7 @@ setAmmo(ammo[weaponIdx], WEAPONS[weaponIdx].mag, false, spare[weaponIdx], WEAPON
 
 export function startReload(){
   const w=WEAPONS[weaponIdx];
-  if(reloadT>0||ammo[weaponIdx]===w.mag||spare[weaponIdx]<=0||introVisible||deathT>0) return;
+  if(reloadT>0||ammo[weaponIdx]===w.mag||spare[weaponIdx]<=0||introVisible||deathT>0||isCooking()) return;
   reloadT=w.reloadTime;
   setAmmo(ammo[weaponIdx], w.mag, true, spare[weaponIdx], w);
   clack();
@@ -65,7 +67,7 @@ export function startReload(){
 
 export function fire(){
   const w=WEAPONS[weaponIdx];
-  if(fireCd>0||reloadT>0||introVisible||deathT>0) return;
+  if(fireCd>0||reloadT>0||introVisible||deathT>0||isCooking()) return;   // one hand is on the grenade
   if(ammo[weaponIdx]<=0){ startReload(); return; }
   ammo[weaponIdx]-=1;
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
@@ -130,7 +132,7 @@ addEventListener('keydown',e=>{
 });
 
 function switchWeapon(idx){
-  if(idx===weaponIdx||reloadT>0||introVisible||deathT>0) return;
+  if(idx===weaponIdx||reloadT>0||introVisible||deathT>0||isCooking()) return;
   fpModels[weaponIdx].group.visible=false;
   weaponIdx=idx;
   fpModels[weaponIdx].group.visible=true;
@@ -171,7 +173,7 @@ export function handleHitFx(m){
     setHp(m.hp); hurtFlash(); thudSnd();
     gunKick=Math.max(gunKick,.5);                         // flinch
   }
-  if(m.shooter===myId){ hitmark(); ding(); }
+  if(m.shooter===myId && m.target!==myId){ hitmark(); ding(); }
   popDamage(m.target, m.dmg, m.head);                     // float the ball's bite off the struck traveller
 }
 
@@ -196,12 +198,16 @@ export function handleFell(m){
     setHp(0); hurtFlash(); thudSnd();
     setDead(true);                        // freeze where we fell; respawn happens on the count
     deathT=DEATH_T;
-    showKillscreen(m.sname, Math.ceil(DEATH_T), m.dmg, m.head, m.shooter);
+    showKillscreen(m.sname, Math.ceil(DEATH_T), m.dmg, m.head, m.shooter, m.self);
+  }else if(m.self){
+    announce(`${m.tname} was undone by their own grenade`);
   }else if(m.shooter===myId){
-    announce(m.head ? `You felled ${m.tname} with a ball to the head!` : `You felled ${m.tname}!`);
+    announce(m.w===2 ? `Your grenade felled ${m.tname}!`
+      : m.head ? `You felled ${m.tname} with a ball to the head!` : `You felled ${m.tname}!`);
     ding();
   }else{
-    announce(m.head ? `${m.sname} felled ${m.tname} with a headshot` : `${m.sname} felled ${m.tname}`);
+    announce(m.w===2 ? `${m.sname}'s grenade felled ${m.tname}`
+      : m.head ? `${m.sname} felled ${m.tname} with a headshot` : `${m.sname} felled ${m.tname}`);
   }
 }
 export function handleOver(m){

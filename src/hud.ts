@@ -12,6 +12,7 @@ const healthEl=document.getElementById('health');
 const ammoEl=document.getElementById('ammo');
 const killEl=document.getElementById('killscreen');
 const killByEl=document.getElementById('killByName');
+const killByLeadEl=document.getElementById('killByLead');
 const killCountEl=document.getElementById('killCount');
 const ksDamageEl=document.getElementById('ksDamage');
 
@@ -44,6 +45,24 @@ export function setAmmo(n, max, reloading, spare=Infinity, weapon=null){
     ammoEl.innerHTML=`${n}`+(isFinite(spare)?`<span class="spare"> / ${spare}</span>`:'');
   }
 }
+const nadesEl=document.getElementById('nades');
+export function setNades(n, max){
+  nadesEl.innerHTML='✹ '.repeat(n)+(n<max?`<span class="spent">${'✹ '.repeat(max-n)}</span>`:'');
+}
+
+/* the fuse ring round the crosshair: `left` is the fraction of the fuse still to burn */
+const nadeRingEl=document.getElementById('nadeRing');
+const nadeFillEl=nadeRingEl.querySelector('.fill') as SVGCircleElement;
+const RING_C=2*Math.PI*20;
+nadeFillEl.style.strokeDasharray=String(RING_C);
+export function setNadeRing(left: number | null){
+  if(left===null){ nadeRingEl.classList.remove('on','urgent'); return; }
+  nadeRingEl.classList.add('on');
+  nadeRingEl.classList.toggle('urgent', left<.3);
+  nadeFillEl.style.strokeDashoffset=(RING_C*left).toFixed(2);
+  nadeFillEl.style.stroke=`hsl(${42*left}, ${55+30*(1-left)}%, ${86-36*(1-left)}%)`;
+}
+
 export function renderScores(){
   if(myId===null){ scoresEl.style.display='none'; return; }
   scoresEl.style.display='block';
@@ -103,8 +122,9 @@ export function hideOverview(){
   overviewEl.classList.remove('show');
 }
 /* the death overlay: name the slayer, tally the wounds, seed the respawn countdown */
-export function showKillscreen(killerName, count, dmg, head, killerId){
-  killByEl.textContent=killerName;
+export function showKillscreen(killerName, count, dmg, head, killerId, self=false){
+  killByLeadEl.textContent=self ? 'undone by' : 'by the hand of';
+  killByEl.textContent=self ? 'your own grenade' : killerName;
   killCountEl.textContent=count;
   renderDamage(dmg, head, killerId);
   killEl.classList.add('on');
@@ -116,7 +136,8 @@ function renderDamage(dmg, head, killerId){
   const rows=dmg.map(d=>{
     const pct=Math.max(4, Math.round(d.dmg/max*100));
     const slayer=d.id===killerId ? ' killer' : '';
-    return `<div class="dmg-row${slayer}"><span class="dmg-name">${esc(d.name)}</span>`+
+    const name=d.id===myId ? 'Your own grenade' : d.name;   // the only way to wound yourself
+    return `<div class="dmg-row${slayer}"><span class="dmg-name">${esc(name)}</span>`+
       `<span class="dmg-bar"><i style="width:${pct}%"></i></span>`+
       `<span class="dmg-val">${Math.round(d.dmg)}</span></div>`;
   }).join('');

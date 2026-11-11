@@ -13,6 +13,7 @@ import { player, vel, keys, introVisible } from './controls';
 import { getToken, getSession, onAuthChange } from './auth';
 import { setMap, mapLabel, mapBlurb, onMapChange } from './world';
 import { replayShots } from './voxel';
+import { handleNade, handleBoom } from './grenades';
 
 // Keep the lobby's map nameplate in step with whatever map is live.
 const introTitleEl=document.getElementById('introMapTitle');
@@ -129,6 +130,10 @@ function connect(){
       announce(`${m.name} departs`);
     }else if(m.t==='shoot'){
       remoteShoot(m);
+    }else if(m.t==='nade'){
+      handleNade(m);
+    }else if(m.t==='boom'){
+      handleBoom(m);
     }else if(m.t==='hitfx'){
       handleHitFx(m);
     }else if(m.t==='hp'){

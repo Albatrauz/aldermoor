@@ -20,6 +20,10 @@
       <i class="dot"></i><i class="t"></i><i class="b"></i><i class="l"></i
       ><i class="r"></i>
     </div>
+    <svg id="nadeRing" viewBox="0 0 48 48" aria-hidden="true">
+      <circle class="track" cx="24" cy="24" r="20"></circle>
+      <circle class="fill" cx="24" cy="24" r="20"></circle>
+    </svg>
     <div id="toast">
       <span class="orn">❦</span><span id="toastText"></span
       ><span class="orn">❦</span>
@@ -27,7 +31,7 @@
     <div id="hud">
       W&thinsp;A&thinsp;S&thinsp;D wander &nbsp;·&nbsp; click fire (hold for
       AK-47) &nbsp;·&nbsp; R reload &nbsp;·&nbsp; 1&thinsp;/&thinsp;2 swap arms
-      &nbsp;·&nbsp; shift run &nbsp;·&nbsp; space hop &nbsp;·&nbsp; hold tab
+      &nbsp;·&nbsp; hold G grenade &nbsp;·&nbsp; shift run &nbsp;·&nbsp; space hop &nbsp;·&nbsp; hold tab
       tally &nbsp;·&nbsp; esc menu
     </div>
     <div id="presence"></div>
@@ -48,6 +52,7 @@
     </div>
     <div id="health"><div id="healthFill"></div></div>
     <div id="ammo"></div>
+    <div id="nades"></div>
     <div id="hitmark">✕</div>
     <div id="hurt"></div>
     <div id="killscreen">
@@ -56,7 +61,7 @@
         <h2 class="ks-title">You were killed</h2>
         <div class="ks-rule">✦ ⚜ ✦</div>
         <div class="ks-by">
-          by the hand of <span id="killByName">a stranger</span>
+          <span id="killByLead">by the hand of</span> <span id="killByName">a stranger</span>
         </div>
         <div class="ks-count"><span id="killCount">4</span></div>
         <div class="ks-rise">you rise again…</div>

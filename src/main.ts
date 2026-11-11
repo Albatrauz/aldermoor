@@ -9,6 +9,7 @@ import * as controls from './controls';
 import * as zones from './zones';
 import * as combat from './combat';
 import * as villagers from './villagers';
+import * as grenades from './grenades';
 import { updateFx } from './effects';
 import { updateParticles } from './particles';
 import { updateWeather } from './weather';
@@ -51,6 +52,7 @@ function frame(dt){
   // debris and falling islands collide by point samples, so they get one call
   // with the old clamp: at < 20 fps the rubble still falls in slow motion, as
   // before, rather than through the floor.
+  grenades.update(dt);         // the fuse in hand, the arc, grenades in flight
   updateVoxels(Math.min(dt, STEP)); // falling masonry, debris, re-meshing what was shot
   // The rest is presentation and takes any dt up to CATCH_UP: closed-form or
   // clamped/exponential easing, nothing that collides.
@@ -108,6 +110,8 @@ addEventListener('resize',()=>{
 window.__town={
   hideIntro: controls.hideIntro,
   fire: combat.fire,
+  throwNade: grenades.debugThrow,         // throwNade(heldFor=0): throw with the current aim; ≥5 cooks it off
+  get nades(){ return grenades.debugState(); },
   over: combat.handleOver,        // e.g. over({winnerName:'Wat the Cooper', cap:15, restartIn:20, standings:[...]})
   restart: combat.handleRestart,
   teleport(x,z,yaw=0,pitch=0){ controls.player.x=x; controls.player.z=z; controls.player.yaw=yaw; controls.player.pitch=pitch; controls.snapDown(); },

@@ -76,11 +76,13 @@ function renderDossier() {
   const stat = (v, label, gold?) =>
     `<div class="fs-stat${gold ? ' gold' : ''}"><b>${v}</b><span>${label}</span></div>`;
 
-  // per-weapon kills + headshots, labelled from the weapon table
+  // per-weapon kills + headshots, labelled from the weapon table; the server
+  // tallies grenade kills in the slot after the guns
   const wk = s.weaponKills || [], wh = s.weaponHeadshots || [];
   const arms = WEAPONS.map((w, i) =>
     `<span class="fs-arm">${esc(w.name)} <b>${wk[i] || 0}</b>` +
-    `<span class="hs">${wh[i] || 0} hs</span></span>`).join('');
+    `<span class="hs">${wh[i] || 0} hs</span></span>`).join('') +
+    `<span class="fs-arm">Grenade <b>${wk[WEAPONS.length] || 0}</b></span>`;
 
   careerEl.innerHTML =
     `<div class="fs-doss-head"><div>` +
