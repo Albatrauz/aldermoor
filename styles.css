@@ -386,6 +386,32 @@ canvas#scene {
     transition: opacity 0.04s;
 }
 
+/* grenade concussion: a warm white-hot flash, then a dark vignette closing in that eases away */
+#flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 8;
+    opacity: 0;
+    background: rgb(255, 244, 220);
+}
+#stun {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 8;
+    opacity: 0;
+    background: radial-gradient(
+        ellipse at center,
+        transparent 18%,
+        rgba(8, 6, 6, 0.55) 55%,
+        rgba(4, 3, 3, 0.92) 100%
+    );
+}
+#scene.stunned {
+    filter: saturate(0.55) brightness(0.92);
+}
+
 /* the killscreen: a dimmed pall while the felled player counts down to rising */
 #killscreen {
     position: fixed;

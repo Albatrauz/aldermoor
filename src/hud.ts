@@ -77,6 +77,46 @@ export function hurtFlash(){
   el.classList.add('on');
   setTimeout(()=>el.classList.remove('on'),130);
 }
+/* A grenade going off next to you: a white-hot flash, and past a hard hit a dark vignette
+   (plus a brief desaturation of the scene) that lingers. Restarts cleanly, keeps the stronger. */
+let flashK=0, flashT=0, stunK=0, stunT=0, stunTO=0;
+const calm=matchMedia('(prefers-reduced-motion: reduce)');
+export function concuss(k:number){
+  k=Math.max(0,Math.min(1,k)); if(k<.02) return;
+  const fl=document.getElementById('flash'), st=document.getElementById('stun');
+  const scene=document.getElementById('scene');
+  const now=performance.now();
+  // a still-bright earlier flash wins over a weaker new one
+  const left=Math.max(0,1-(now-flashT)/(500+400*flashK));
+  if(k>=flashK*left){
+    flashK=k; flashT=now;
+    const peak=Math.min(.85,.25+.6*k)*(calm.matches?.5:1);
+    const fade=300+300*k;
+    fl.style.transition='none'; fl.style.opacity=String(peak);
+    void fl.offsetWidth;
+    setTimeout(()=>{ if(flashT!==now) return;
+      fl.style.transition=`opacity ${fade}ms ease-out`; fl.style.opacity='0'; },50+30*k);
+  }
+  if(k>.45){
+    const sleft=Math.max(0,1-(now-stunT)/(1500+1500*stunK));
+    if(k>=stunK*sleft){
+      stunK=k; stunT=now;
+      const dur=1500+1500*k, peak=Math.min(1,.4+.7*k)*(calm.matches?.6:1);
+      st.style.transition='none'; st.style.opacity=String(peak);
+      void st.offsetWidth;
+      st.style.transition=`opacity ${dur}ms ease-in`; st.style.opacity='0';
+      if(scene){
+        scene.style.transition='filter 80ms';
+        scene.classList.add('stunned');
+        clearTimeout(stunTO);
+        stunTO=window.setTimeout(()=>{
+          scene.style.transition=`filter ${dur*.6}ms ease-out`;
+          scene.classList.remove('stunned');
+        },dur*.4);
+      }
+    }
+  }
+}
 export function hitmark(){
   const el=document.getElementById('hitmark');
   el.classList.remove('pop');

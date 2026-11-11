@@ -211,16 +211,18 @@ export function shotImpact(o: ArrayLike<number>, d: ArrayLike<number>, len: numb
     _d.x, _d.y, _d.z, _n.x, _n.y, _n.z, b.debris);
 }
 
-/* A grenade going off at (x,y,z): a ragged crater about a metre across, debris
-   thrown upward. Like a shot, a pure function of the point and the map, so every
-   client blows the same hole. Barrier cores and the outer walls hold. */
-const NADE_BITE = { radius: 1.0, debris: 60 };
+/* A grenade going off at (x,y,z): a ragged crater some three and a half metres
+   across and reaching nearly three metres up whatever stands over it, the rubble
+   flung outward from its centre. Like a shot, a pure function
+   of the point and the map, so every client blows the same hole. Barrier cores
+   and the outer walls hold. */
+const NADE_BITE = { radius: 1.75, debris: 150, fling: 9, tall: 1.6 };
 export function blastImpact(x: number, y: number, z: number) {
   applied++;
   const g = grid;
   if (!g || !g.containsXZ(x, z)) return;
   touched = true;
-  carve(x, y, z, NADE_BITE.radius, 0, 0, 0, 0, 1, 0, NADE_BITE.debris);
+  carve(x, y, z, NADE_BITE.radius, 0, 0, 0, 0, 1, 0, NADE_BITE.debris, NADE_BITE.fling, NADE_BITE.tall);
 }
 
 /* Bring a freshly built map up to date with a round already under way: land
