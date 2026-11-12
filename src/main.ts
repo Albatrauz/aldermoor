@@ -119,8 +119,8 @@ window.__town={
   setMap: world.setMap,                   // jump to a named map (offline / debug)
   rotateMap: world.rotateMap,             // advance to the next map in the rotation
   get map(){ return world.currentMapName; },
-  // Top-down plates. captureMap('dust2' | 'skidrow') plates that map and leaves
-  // it loaded; captureMaps() plates both and restores the one that was up.
+  // Top-down plates. captureMap('dust2' | 'skidrow' | 'kantoor') plates that map and
+  // leaves it loaded; captureMaps() plates them all and restores the one that was up.
   // Each downloads <map>-top.png and returns {name, label, width, height, url}.
   captureMap(name?: string, opts?: visitor.CaptureOptions){
     const plate = visitor.captureMap(name, opts);

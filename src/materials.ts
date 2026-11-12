@@ -88,4 +88,53 @@ export const matSnowCap   = tag(new THREE.MeshStandardMaterial({color:0xe6ecf2, 
 export const matRust      = tag(new THREE.MeshStandardMaterial({color:0x7a4a32, roughness:.85, metalness:.3}), 'metal');
 export const matDumpster  = tag(new THREE.MeshStandardMaterial({color:0x2f5a3e, roughness:.6, metalness:.35}), 'metal');
 export const matCarBlue   = tag(new THREE.MeshStandardMaterial({color:0x2c4763, roughness:.5, metalness:.3}), 'metal');
-export const matCarGrey   = tag(new THREE.MeshStandardMaterial({color:0x6a6f76, roughness:.5, metalness:.3}), 'metal');
+export const matCarGrey   = tag(new THREE.MeshStandardMaterial({color:0x6a6f76, roughness:.5, metalness:.3}), 'metal');/* --- office (kantoor) palette ---
+   The office map is built from flat colours rather than painted textures: the
+   voxel engine draws a material as its palette pattern (see voxel/palette.ts),
+   never as its texture, so a colour is all a material needs to carry. Kept to
+   one fixed set on purpose — every distinct colour costs a palette entry, and
+   the palette has 127. */
+const flatK = (color: number, s: Surface, roughness = .9, metalness = 0) =>
+  tag(new THREE.MeshStandardMaterial({ color, roughness, metalness }), s);
+// the building's skin
+export const matKBrick      = flatK(0x4b4c50, 'stone');           // anthracite facade brick
+export const matKBrickWhite = flatK(0xdcdad3, 'stone');           // white brick, rear ground floor
+export const matKTrim       = flatK(0xb4b8bd, 'metal', .5, .6);   // aluminium roof edge, canopy, columns
+export const matKFrame      = flatK(0x27303d, 'metal', .5, .6);   // window and door frames
+export const matKGlass      = flatK(0x3f6f9e, 'metal', .2, .3);   // blue-tinted facade glass
+export const matKGlassPale  = flatK(0xa8c6d4, 'metal', .2, .3);   // interior partition glass
+export const matKRoof       = flatK(0x3a3c40, 'concrete');        // bitumen roofing
+// the grounds
+export const matKPaver      = flatK(0x8c867e, 'stone');           // clay pavers: parking, drives
+export const matKPaverLine  = flatK(0xcfcbc2, 'stone');           // parking-bay lines, kerbs
+export const matKHedge      = flatK(0xa3552a, 'wood');            // beech hedge in its winter leaf
+export const matKGrass      = flatK(0x5c7438, 'sand');
+export const matKShed       = flatK(0xaeb2b6, 'metal', .6, .4);   // neighbouring sheds, pale cladding
+export const matKShedDark   = flatK(0x6a7078, 'metal', .6, .4);
+export const matKFence      = flatK(0x3b3f42, 'metal', .6, .5);
+// interior surfaces
+export const matKWall       = flatK(0xecebe6, 'concrete');        // white plaster
+export const matKWallWarm   = flatK(0xe6dcc6, 'concrete');        // cream plaster
+export const matKCeiling    = flatK(0xf2f1ec, 'concrete');        // suspended ceiling tiles
+export const matKLight      = flatK(0xfff3cf, 'metal', .3, 0);    // light panels, lamps
+export const matKCarpet     = flatK(0x45433f, 'sand');            // anthracite carpet tiles
+export const matKTile       = flatK(0x55504a, 'stone');           // dark stone floor tiles
+export const matKFloorWood  = flatK(0xb79a74, 'wood');            // pale timber / laminate floor
+// furniture and accents
+export const matKDeskTop    = flatK(0xd9bc8c, 'wood');            // light oak worktops
+export const matKWoodDark   = flatK(0x4a2f22, 'wood');            // dark timber
+export const matKWhite      = flatK(0xf4f4f1, 'wood');            // white furniture
+export const matKBlack      = flatK(0x1c1d20, 'metal', .5, .3);   // monitors, chairs
+export const matKGreyLight  = flatK(0xc6c8ca, 'concrete');
+export const matKGrey       = flatK(0x8a8d91, 'concrete');
+export const matKGreyDark   = flatK(0x4a4d52, 'concrete');
+export const matKSteel      = flatK(0x9aa0a6, 'metal', .4, .8);
+export const matKRed        = flatK(0xb8322c, 'wood');
+export const matKOrange     = flatK(0xe08a2a, 'wood');
+export const matKYellow     = flatK(0xe6c23c, 'wood');
+export const matKPink       = flatK(0xd6507e, 'wood');
+export const matKPurple     = flatK(0x6b3f8f, 'wood');
+export const matKBlue       = flatK(0x2a5fa8, 'wood');
+export const matKTeal       = flatK(0x2f9aa0, 'wood');
+export const matKGreen      = flatK(0x3f7a3a, 'wood');            // plants
+export const matKPot        = flatK(0x6f6259, 'stone');

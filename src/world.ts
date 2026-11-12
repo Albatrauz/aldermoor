@@ -18,11 +18,13 @@ import { glowTex } from './textures';
 import { setSky, bakeEnvironment } from './sky';
 import { setFogHeight } from './fog';
 import { buildVoxelWorld, onGeometryChange, voxelsTouched } from './voxel';
+import { skyUniforms } from './voxel/skylight';
 import { setWeather } from './weather';
 import { setLanterns } from './villagers';
 import { colliderTopAt, type Collider, type Spawn, type Zone, type MapEnv, type MenuCam, type MapDef } from './mapkit';
 import { dust2 } from './maps/dust2';
 import { skidrow } from './maps/skidrow';
+import { kantoor } from './maps/kantoor';
 
 export { colliderTopAt };
 
@@ -100,6 +102,7 @@ function applyEnv(env: MapEnv) {
   (scene.fog as THREE.FogExp2).density = env.fogDensity;
   setFogHeight(env.fogHeight, env.fogHeightFalloff);
 
+  skyUniforms.uSkyMin.value = env.interiorMin ?? .3;
   setWeather(env.weather);
   setLanterns(env.lanterns === true);
 
@@ -108,9 +111,9 @@ function applyEnv(env: MapEnv) {
 }
 
 /* ============================ map registry & rotation ============================ */
-const MAPS: Record<string, MapDef> = { dust2, skidrow };
+const MAPS: Record<string, MapDef> = { dust2, skidrow, kantoor };
 // The order the server rotates through; mirrored in server.js.
-export const MAP_ORDER = ['dust2', 'skidrow'];
+export const MAP_ORDER = ['dust2', 'skidrow', 'kantoor'];
 
 // Live, stable-identity arrays the rest of the game reads. Refilled on switch.
 export const colliders: Collider[] = [];
