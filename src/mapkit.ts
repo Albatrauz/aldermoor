@@ -80,8 +80,24 @@ export interface Bounds { x0?: number; x1?: number; z0?: number; z1?: number; to
 // `along` is the axis the wall runs on; its thickness lies across the other one.
 export interface Barrier { x0: number; x1: number; z0: number; z1: number; top: number; along: 'x' | 'z'; }
 
+// A picture laid flat on the outer face of some voxels: a logo, a printed sign —
+// anything the voxel lattice is far too coarse to draw legibly. It is not
+// voxelized; it is drawn as-is, a hair in front of the face it lies on, and it
+// loses a cell wherever the voxel behind that cell is shot away (see decals.ts).
+// `at` is that face: its z for a decal facing 'n'/'s', its x for 'e'/'w'.
+// `a0..a1` is its extent across (x for 'n'/'s', z for 'e'/'w') and `y0..y1` up;
+// keep all four on the voxel lattice so the cells line up with the voxels.
+export interface Decal {
+  tex: THREE.Texture;
+  facing: 'n' | 's' | 'e' | 'w';
+  at: number;
+  a0: number; a1: number;
+  y0: number; y1: number;
+}
+
 export interface BuiltMap {
   group: THREE.Group;
+  decals?: Decal[];
   colliders: Collider[];
   spawns: Spawn[];
   zones: Zone[];
@@ -140,9 +156,11 @@ export interface Builder {
   group: THREE.Group;
   colliders: Collider[];
   barriers: Barrier[];
+  decals: Decal[];
   WH: number;
   WT: number;
   add(obj: THREE.Object3D): void;
+  decal(d: Decal): void;
   addCollider(x: number, z: number, hx: number, hz: number, top?: number, base?: number, mat?: THREE.Material): void;
   addRamp(x: number, z: number, hx: number, hz: number, loTop: number, hiTop: number, axis?: 'x' | 'z', mat?: THREE.Material): void;
   block(cx: number, cz: number, sx: number, sy: number, sz: number, mat?: THREE.Material, base?: number, uv?: number): THREE.Mesh;
@@ -171,12 +189,14 @@ export function createBuilder(opts: BuilderOpts): Builder {
   const group = new THREE.Group();
   const colliders: Collider[] = [];
   const barriers: Barrier[] = [];
+  const decals: Decal[] = [];
   const WH = opts.wallH ?? 5;
   const WT = opts.wallT ?? 0.8;
   const wallMat = opts.wallMat;
   const rampMat = opts.rampMat;
 
   const add = (obj: THREE.Object3D) => { group.add(obj); };
+  const decal = (d: Decal) => { decals.push(d); };
 
   const addCollider: Builder['addCollider'] = (x, z, hx, hz, top = 5, base = 0, mat = wallMat) =>
     colliders.push({ x, z, hx, hz, base, top, h: top, kind: 'box', mat });
@@ -261,5 +281,5 @@ export function createBuilder(opts: BuilderOpts): Builder {
     else addRamp(cx, cz, sx / 2, sz / 2, h, 0, 'z', mat);
   };
 
-  return { group, colliders, barriers, WH, WT, add, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp, bounds };
+  return { group, colliders, barriers, decals, WH, WT, add, decal, addCollider, addRamp, block, solid, wallX, wallZ, lintel, ramp, bounds };
 }

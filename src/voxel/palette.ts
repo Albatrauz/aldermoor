@@ -124,6 +124,7 @@ const K_STEEL = def(0x9aa0a6, 'metal', .7, .7);
 const K_RED = def(0xb8322c, 'wood', 1.2), K_ORANGE = def(0xe08a2a, 'wood', 1.2), K_YELLOW = def(0xe6c23c, 'wood', 1.2);
 const K_PINK = def(0xd6507e, 'wood', 1.2), K_PURPLE = def(0x6b3f8f, 'wood', 1.2), K_BLUE = def(0x2a5fa8, 'wood', 1.2);
 const K_TEAL = def(0x2f9aa0, 'wood', 1.2), K_GREEN = def(0x3f7a3a, 'wood', 1.4), K_POT = def(0x6f6259, 'stone');
+const K_MINT = def(0xa9d8dc, 'metal', 1.1, .2), K_LED = def(0x8f2a1c, 'metal', 1.3, .2);
 
 /* ============================ patterns ============================ */
 // Masonry in horizontal courses. Tone is chosen per course so a whole course
@@ -249,7 +250,7 @@ const patterns = new Map<THREE.Material, Pattern>([
   [M.matKGreyLight, flat(K_GREY_L)], [M.matKGrey, flat(K_GREY)], [M.matKGreyDark, flat(K_GREY_D)], [M.matKSteel, flat(K_STEEL)],
   [M.matKRed, flat(K_RED)], [M.matKOrange, flat(K_ORANGE)], [M.matKYellow, flat(K_YELLOW)], [M.matKPink, flat(K_PINK)],
   [M.matKPurple, flat(K_PURPLE)], [M.matKBlue, flat(K_BLUE)], [M.matKTeal, flat(K_TEAL)], [M.matKGreen, flat(K_GREEN)],
-  [M.matKPot, flat(K_POT)],
+  [M.matKPot, flat(K_POT)], [M.matKMint, flat(K_MINT)], [M.matKLed, flat(K_LED)],
 ]);
 
 /* A material nobody registered still voxelizes: it gets a flat palette entry in

@@ -138,3 +138,6 @@ export const matKBlue       = flatK(0x2a5fa8, 'wood');
 export const matKTeal       = flatK(0x2f9aa0, 'wood');
 export const matKGreen      = flatK(0x3f7a3a, 'wood');            // plants
 export const matKPot        = flatK(0x6f6259, 'stone');
+// the scoreboard on the entrance roof
+export const matKMint       = flatK(0xa9d8dc, 'metal', .5, .2);   // the pale aqua strip on the sponsor board
+export const matKLed        = flatK(0x8f2a1c, 'metal', .4, .2);   // the red LED message strip, unlit
