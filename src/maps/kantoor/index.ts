@@ -11,6 +11,7 @@ import { createKit } from './kit';
 import { buildStructure } from './structure';
 import { buildGrounds } from './grounds';
 import { buildFacade } from './facade';
+import { buildScoreboard } from './scoreboard';
 import { buildGroundWest } from './interior_ground_west';
 import { buildGroundEast } from './interior_ground_east';
 import { buildUpperWest } from './interior_upper_west';
@@ -43,13 +44,14 @@ function build(): BuiltMap {
   const grounds = buildGrounds(k);
   buildStructure(k);
   buildFacade(k);
+  buildScoreboard(k);
   buildGroundWest(k);
   buildGroundEast(k);
   buildUpperWest(k);
   buildUpperEast(k);
 
   const spawns = [...grounds.spawns, ...INDOOR_SPAWNS];
-  return { group: B.group, colliders: B.colliders, spawns, zones: buildZones(), bounds: B.bounds() };
+  return { group: B.group, decals: B.decals, colliders: B.colliders, spawns, zones: buildZones(), bounds: B.bounds() };
 }
 
 export const kantoor: MapDef = {
