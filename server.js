@@ -90,13 +90,26 @@ const MIME = {
   '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2',
 };
 
+// Tell the page which map is live before its script runs, so it builds that map
+// at load instead of a default it would swap out again once `welcome` arrives.
+// src/world.ts reads this tag; Vite's dev server injects the same one.
+function injectLiveMap(html) {
+  return html.replace(/<head>/i, `<head>\n    <meta name="aldermoor-map" content="${activeMapName()}" />`);
+}
+
 function serveStatic(req, res) {
   const url = (req.url === '/' ? '/index.html' : req.url).split('?')[0];
   const file = path.join(ROOT, path.normalize(url));
   if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    const ext = path.extname(file);
+    if (ext === '.html') {
+      // The live map changes every round, so the page must not be cached.
+      res.writeHead(200, { 'Content-Type': MIME[ext], 'Cache-Control': 'no-cache' });
+      return res.end(injectLiveMap(data.toString('utf8')));
+    }
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
     res.end(data);
   });
 }
@@ -135,11 +148,11 @@ const REGEN_DELAY = 3000;     // unharmed this long and the bar begins to refill
 const REGEN_TICK_MS = 500;    // …topped up this often
 const REGEN_PER_TICK = 8;     // …by this much each step (≈16 hp/s, ~6s from the brink)
 
-// The maps the server rotates through — one swap per finished round. The server
-// holds no geometry; it only needs each map's fallback spawn and the dev-bot
-// spots (eye height `y` baked in, since there are no colliders server-side). The
-// browser builds the matching world from the map name we broadcast.
-const GAME_MAPS = [
+// Every map the server knows — one swap per finished round. The server holds no
+// geometry; it only needs each map's fallback spawn and the dev-bot spots (eye
+// height `y` baked in, since there are no colliders server-side). The browser
+// builds the matching world from the map name we broadcast.
+const ALL_MAPS = [
   {
     name: 'dust2', label: 'de_aldermoor',
     spawn: { x: 0, y: 1.65, z: 38.5, yaw: 0 },
@@ -198,6 +211,26 @@ const GAME_MAPS = [
     ],
   },
 ];
+
+// MAP_ROTATION narrows the rotation, in the order given: `kantoor` locks the
+// server to that one map, `dust2,kantoor` swaps between just those two. Unset
+// or empty plays every map. Unknown names are dropped with a warning; if none
+// is left the server falls back to every map rather than refusing to start.
+function pickRotation(raw) {
+  const wanted = String(raw || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (!wanted.length) return ALL_MAPS;
+  const known = ALL_MAPS.map((m) => m.name);
+  const unknown = wanted.filter((n) => !known.includes(n));
+  if (unknown.length) console.warn(`⚠ MAP_ROTATION: unknown map(s) ${unknown.join(', ')} — known: ${known.join(', ')}`);
+  const picked = [...new Set(wanted)].filter((n) => known.includes(n)).map((n) => ALL_MAPS.find((m) => m.name === n));
+  if (!picked.length) { console.warn('⚠ MAP_ROTATION matched no map — rotating through all of them'); return ALL_MAPS; }
+  console.log(picked.length === 1
+    ? `✦ Map locked to ${picked[0].name} (${picked[0].label})`
+    : `✦ Map rotation: ${picked.map((m) => m.name).join(' → ')}`);
+  return picked;
+}
+const GAME_MAPS = pickRotation(process.env.MAP_ROTATION);
+
 let mapIndex = 0;
 let SPAWN = GAME_MAPS[mapIndex].spawn;
 let BOT_SPOTS = GAME_MAPS[mapIndex].botSpots;
@@ -782,7 +815,7 @@ function attachGame(httpServer, opts = {}) {
   return wss;
 }
 
-module.exports = { attachGame };
+module.exports = { attachGame, injectLiveMap };
 
 // Run directly (`node server.js` / `npm start`): the standalone production
 // server that serves the build and hosts the game on one port.

@@ -11,17 +11,21 @@ import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, enterF
 
 import { player, vel, keys, introVisible } from './controls';
 import { getToken, getSession, onAuthChange } from './auth';
-import { setMap, mapLabel, mapBlurb, onMapChange } from './world';
+import { setMap, mapLabel, mapBlurb, onMapChange, currentMapName } from './world';
 import { replayShots } from './voxel';
 import { handleNade, handleBoom } from './grenades';
 
 // Keep the lobby's map nameplate in step with whatever map is live.
 const introTitleEl=document.getElementById('introMapTitle');
 const introSubEl=document.getElementById('introMapSub');
-onMapChange(name=>{
+function showMapPlate(name){
   if(introTitleEl) introTitleEl.textContent=mapLabel(name);
   if(introSubEl) introSubEl.textContent=mapBlurb(name);
-});
+}
+onMapChange(showMapPlate);
+// The first map was built before this listener existed (and may not be the one
+// index.html's static plate describes), so fill the plate in once now.
+showMapPlate(currentMapName);
 
 const presenceEl=document.getElementById('presence');
 export let net=null, myId=null, myName=null;
