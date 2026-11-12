@@ -18,7 +18,7 @@
 // a sign, and a sign has to keep its aspect to stay legible.
 import * as THREE from 'three';
 import { type Kit, VS, L1 } from './kit';
-import { matKBlack, matKFrame, matKTrim, matKSteel, matKMint, matKLed } from '../../materials';
+import { matKBlack, matKFrame, matKSteel, matKMint, matKLed } from '../../materials';
 
 const W = 13;                // overall width
 const X0 = 3 - W / 2;        // its west end: centred on the porch (x −4.5 … 10.5)
@@ -45,13 +45,12 @@ function frame(k: Kit) {
   bx(.5, W - .5, .25, 1, 0, VS, matKLed);
   for (const u of [5, 9.75]) bx(u, u + VS, .25, 1, 0, VS, matKBlack);
 
-  // the two sponsor boards, each under an aluminium top edge; the rb-media one
-  // ends in a pale aqua strip
+  // the two sponsor boards, black to the top; the rb-media one ends in a narrow
+  // pale aqua strip
   for (const [u0, u1] of [[0, 4.25], [8.75, W]]) {
-    bx(u0, u1, LED_TOP, PANEL_TOP - VS, 0, D, matKBlack);
-    bx(u0, u1, PANEL_TOP - VS, PANEL_TOP, 0, D, matKTrim);
+    bx(u0, u1, LED_TOP, PANEL_TOP, 0, D, matKBlack);
   }
-  bx(3.75, 4.25, LED_TOP, PANEL_TOP - VS, 0, VS, matKMint);
+  bx(4, 4.25, LED_TOP, PANEL_TOP, 0, VS, matKMint);
 
   // the dark centre that carries the digits
   bx(4.25, 8.75, LED_TOP, PANEL_TOP, 0, D, matKFrame);
@@ -191,8 +190,8 @@ export function buildScoreboard(k: Kit) {
   const put = (c: HTMLCanvasElement, u0: number, u1: number, v0: number, v1: number, proud = 0) =>
     k.B.decal({ tex: tex(c), facing: 's', at: Z + proud, a0: X0 + u0, a1: X0 + u1, y0: B + v0, y1: B + v1 });
 
-  put(wordmark('rb-media', 3.5, 1.75, 3, .72), .25, 3.75, LED_TOP, PANEL_TOP - VS);
-  put(wordmark('shopnotch', 4, 1.75, 3.5, .72), 8.75, W - .25, LED_TOP, PANEL_TOP - VS);
+  put(wordmark('rb-media', 3.75, 2, 3, .72), .25, 4, LED_TOP, PANEL_TOP);
+  put(wordmark('shopnotch', 4, 2, 3.5, .72), 8.75, W - .25, LED_TOP, PANEL_TOP);
   put(centre(4.5, 2), 4.25, 8.75, LED_TOP, PANEL_TOP);
   put(crest(2, 2.5), CREST.u0 - .25, CREST.u1 + .25, 1.75, CREST.v1 + .25, VS);
 }
