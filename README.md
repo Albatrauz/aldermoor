@@ -104,6 +104,22 @@ into the bundle), and `CONVEX_URL` + `SERVER_SHARED_SECRET` (and optional
 Convex deployment env. The game's Docker image needs only the `convex` npm
 package (already a dependency) — the functions live in Convex Cloud, not the image.
 
+### Locking the map
+
+By default the server rotates through every map (`dust2` → `skidrow` →
+`kantoor`), one swap per finished round. Set `MAP_ROTATION` at **runtime** to
+narrow that, in the order given:
+
+```sh
+MAP_ROTATION=kantoor          # only mp_kantoor is ever played
+MAP_ROTATION=dust2,kantoor    # swap between just these two
+```
+
+It is a runtime variable, so a restart is enough — no rebuild. Unknown names are
+skipped with a warning in the log; if nothing valid is left, every map plays.
+The server tags the page with the live map (`<meta name="aldermoor-map">`), so
+the browser builds the right map at load instead of swapping it in later.
+
 ## Layout
 
 ```

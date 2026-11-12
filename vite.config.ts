@@ -23,9 +23,14 @@ function gameServer(): Plugin {
     // copy the server-side keys across, letting a real shell export win.
     config(_config, { mode }) {
       const env = loadEnv(mode, process.cwd(), '');
-      for (const k of ['CONVEX_URL', 'SERVER_SHARED_SECRET', 'ALLOW_GUESTS', 'DEV_BOTS']) {
+      for (const k of ['CONVEX_URL', 'SERVER_SHARED_SECRET', 'ALLOW_GUESTS', 'DEV_BOTS', 'MAP_ROTATION']) {
         if (env[k] !== undefined && process.env[k] === undefined) process.env[k] = env[k];
       }
+    },
+    // Same live-map tag the production server adds (see injectLiveMap). Dev
+    // server only: `vite build` must not bake a map into dist/index.html.
+    transformIndexHtml(html, ctx) {
+      return ctx.server ? require('./server.js').injectLiveMap(html) : html;
     },
     configureServer(server) {
       const { attachGame } = require('./server.js');
