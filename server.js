@@ -178,6 +178,25 @@ const GAME_MAPS = [
       { x: 0,   z: 9,   y: 5.05, yaw: Math.PI / 2 },   // street porch (+3.4)
     ],
   },
+  {
+    name: 'kantoor', label: 'mp_kantoor',
+    spawn: { x: 0, y: 1.65, z: 63.5, yaw: 0 },
+    botSpots: [
+      { x: -50,  z: 64,    y: 1.65, yaw: -Math.PI / 2 }, // street, west end
+      { x: 50,   z: 64,    y: 1.65, yaw: Math.PI / 2 },  // street, east end
+      { x: -28,  z: 50.5,  y: 1.65, yaw: 0 },            // parking strip
+      { x: 20,   z: 50.5,  y: 1.65, yaw: 0 },
+      { x: 41,   z: 27,    y: 1.65, yaw: 0 },            // east driveway
+      { x: -18,  z: -42,   y: 1.65, yaw: Math.PI },      // rear yard
+      { x: -4,   z: -58,   y: 1.65, yaw: Math.PI },
+      { x: 28,   z: -50,   y: 1.65, yaw: Math.PI },
+      { x: 3,    z: 26,    y: 1.65, yaw: 0 },            // atrium, foot of the stair
+      { x: 15,   z: -8.5,  y: 1.65, yaw: -Math.PI / 2 }, // east corridor
+      { x: -4,   z: -27.5, y: 1.65, yaw: Math.PI / 2 },  // kantine
+      { x: 25,   z: -23.5, y: 1.65, yaw: Math.PI },      // open office
+      { x: -1.5, z: 24,    y: 6.65, yaw: 0 },            // gallery, upstairs (+5)
+    ],
+  },
 ];
 let mapIndex = 0;
 let SPAWN = GAME_MAPS[mapIndex].spawn;

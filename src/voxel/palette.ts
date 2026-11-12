@@ -101,6 +101,30 @@ const DUMP_A = def(0x2f5a3e, 'metal', .6, .4), DUMP_B = def(0x284d35, 'metal', .
 const CAR_BLUE = def(0x2c4763, 'metal', .65, .55), CAR_GREY = def(0x6a6f76, 'metal', .65, .55);
 const WOOD_DARK = def(0x3a2a1c, 'wood', 1.2), PLANK = def(0x6b4a2e, 'wood', 1.2), GOLD = def(0xcaa64e, 'metal', .6, .8);
 
+// office (kantoor)
+const KB = [def(0x4b4c50, 'stone'), def(0x424347, 'stone'), def(0x55565a, 'stone')];
+const KBW = [def(0xdcdad3, 'stone'), def(0xd0cec6, 'stone'), def(0xe6e4dd, 'stone')];
+const K_TRIM = def(0xb4b8bd, 'metal', .7, .5), K_FRAME = def(0x27303d, 'metal', .7, .5);
+const K_GLASS = def(0x3f6f9e, 'metal', 1.5, .9), K_GLASS_PALE = def(0xa8c6d4, 'metal', 1.5, .8);
+const K_ROOF_A = def(0x3a3c40, 'concrete', .9), K_ROOF_B = def(0x44464a, 'concrete', .9);
+const KP = [def(0x8c867e, 'stone'), def(0x827c74, 'stone'), def(0x979189, 'stone')], K_PLINE = def(0xcfcbc2, 'stone');
+const KH = [def(0xa3552a, 'wood', 1.4), def(0x8f4722, 'wood', 1.4), def(0xb56a35, 'wood', 1.4)];
+const K_GRASS_A = def(0x5c7438, 'sand', 1.15), K_GRASS_B = def(0x526a31, 'sand', 1.15);
+const K_SHED_A = def(0xaeb2b6, 'metal', .7, .35), K_SHED_B = def(0xa2a6aa, 'metal', .7, .35), K_SHED_DARK = def(0x6a7078, 'metal', .7, .35);
+const K_FENCE = def(0x3b3f42, 'metal', .8, .4);
+const K_WALL = def(0xecebe6, 'concrete', 1.1), K_WALL_WARM = def(0xe6dcc6, 'concrete', 1.1);
+const K_CEIL = def(0xf2f1ec, 'concrete', 1.2), K_LIGHT = def(0xfff3cf, 'metal', 1.2, .2);
+const K_CARPET_A = def(0x45433f, 'sand', 1), K_CARPET_B = def(0x4c4a46, 'sand', 1);
+const K_TILE_A = def(0x55504a, 'stone'), K_TILE_B = def(0x4c4843, 'stone');
+const K_FWOOD_A = def(0xb79a74, 'wood', 1.1), K_FWOOD_B = def(0xad906a, 'wood', 1.1);
+const K_DESK = def(0xd9bc8c, 'wood', 1.25), K_WOOD_DARK = def(0x4a2f22, 'wood', 1.2), K_WHITE = def(0xf4f4f1, 'wood', 1.25);
+const K_BLACK = def(0x1c1d20, 'metal', .9, .5);
+const K_GREY_L = def(0xc6c8ca, 'concrete'), K_GREY = def(0x8a8d91, 'concrete'), K_GREY_D = def(0x4a4d52, 'concrete');
+const K_STEEL = def(0x9aa0a6, 'metal', .7, .7);
+const K_RED = def(0xb8322c, 'wood', 1.2), K_ORANGE = def(0xe08a2a, 'wood', 1.2), K_YELLOW = def(0xe6c23c, 'wood', 1.2);
+const K_PINK = def(0xd6507e, 'wood', 1.2), K_PURPLE = def(0x6b3f8f, 'wood', 1.2), K_BLUE = def(0x2a5fa8, 'wood', 1.2);
+const K_TEAL = def(0x2f9aa0, 'wood', 1.2), K_GREEN = def(0x3f7a3a, 'wood', 1.4), K_POT = def(0x6f6259, 'stone');
+
 /* ============================ patterns ============================ */
 // Masonry in horizontal courses. Tone is chosen per course so a whole course
 // greedy-meshes into one quad; a sprinkling of individually weathered blocks
@@ -177,6 +201,31 @@ const facade = (tones: number[], trim: number): Pattern => (c) => {
   return base;
 };
 
+/* ---- office (kantoor) ---- */
+// Clay pavers laid in a herringbone: two-voxel bricks that turn a quarter each row.
+const paver: Pattern = (c) => {
+  const i = Math.floor(c.x / c.vs + 1e-4), k = Math.floor(c.z / c.vs + 1e-4);
+  const b = ((i + k) >> 1) + ((i - k) >> 1) * 3;
+  return KP[Math.floor(h3(b, 9, (i + k) & 1) * KP.length)];
+};
+// A beech hedge holding its dead leaves: mottled, no two voxels in a row alike.
+const hedge: Pattern = (c) => KH[Math.floor(h3(Math.floor(c.x * 4), Math.floor(c.y * 4), Math.floor(c.z * 4)) * KH.length)];
+const grass: Pattern = (c) => (vnoise(c.x * .3, c.z * .3) > .52 ? K_GRASS_B : K_GRASS_A);
+// Profiled steel cladding: upright ribs.
+const cladding: Pattern = (c) => ((Math.floor((c.x + c.z) / Math.max(.5, c.vs) + 1e-4) & 1) ? K_SHED_B : K_SHED_A);
+const roofing: Pattern = (c) => (h3(Math.floor(c.x * 2), 4, Math.floor(c.z * 2)) < .25 ? K_ROOF_B : K_ROOF_A);
+// Carpet tiles and stone tiles: a quiet chequer on a world-aligned grid.
+const chequer = (a: number, b: number, size: number): Pattern => (c) =>
+  ((Math.floor(c.x / size + 1e-4) + Math.floor(c.z / size + 1e-4)) & 1 ? b : a);
+const boards = (a: number, b: number): Pattern => (c) => (h3(Math.floor(c.z / .5 + 1e-4), 2, Math.floor(c.x / 4)) < .4 ? b : a);
+// A suspended ceiling: white tiles with a light panel let into it every few
+// metres. Only the underside carries the panels — that is the face a room sees.
+const ceilingTiles: Pattern = (c) => {
+  if (c.box && c.lj > 0) return K_CEIL;
+  const fx = ((c.x % 5) + 5) % 5, fz = ((c.z % 5) + 5) % 5;
+  return fx >= 1.5 && fx < 3.5 && fz >= 2 && fz < 3 ? K_LIGHT : K_CEIL;
+};
+
 const patterns = new Map<THREE.Material, Pattern>([
   [M.matSand, sand], [M.matSandPath, sandPath],
   [M.matSandstone, courses(SS, SS_WORN, .5, 1)], [M.matSandstoneDark, courses(SSD, SSD_WORN, .75, 1.5)],
@@ -188,6 +237,19 @@ const patterns = new Map<THREE.Material, Pattern>([
   [M.matRoofTar, flat(TAR)], [M.matSnowCap, flat(SNOWCAP)], [M.matRust, rust], [M.matDumpster, dumpster],
   [M.matCarBlue, car(CAR_BLUE)], [M.matCarGrey, car(CAR_GREY)],
   [M.matDarkWood, flat(WOOD_DARK)], [M.matPlank, flat(PLANK)], [M.matGoldTrim, flat(GOLD)],
+  // office (kantoor)
+  [M.matKBrick, courses(KB, KB[1], .25, .75)], [M.matKBrickWhite, courses(KBW, KBW[1], .25, .75)],
+  [M.matKTrim, flat(K_TRIM)], [M.matKFrame, flat(K_FRAME)], [M.matKGlass, flat(K_GLASS)], [M.matKGlassPale, flat(K_GLASS_PALE)],
+  [M.matKRoof, roofing], [M.matKPaver, paver], [M.matKPaverLine, flat(K_PLINE)], [M.matKHedge, hedge], [M.matKGrass, grass],
+  [M.matKShed, cladding], [M.matKShedDark, flat(K_SHED_DARK)], [M.matKFence, flat(K_FENCE)],
+  [M.matKWall, flat(K_WALL)], [M.matKWallWarm, flat(K_WALL_WARM)], [M.matKCeiling, ceilingTiles], [M.matKLight, flat(K_LIGHT)],
+  [M.matKCarpet, chequer(K_CARPET_A, K_CARPET_B, 1.5)], [M.matKTile, chequer(K_TILE_A, K_TILE_B, 1.5)],
+  [M.matKFloorWood, boards(K_FWOOD_A, K_FWOOD_B)],
+  [M.matKDeskTop, flat(K_DESK)], [M.matKWoodDark, flat(K_WOOD_DARK)], [M.matKWhite, flat(K_WHITE)], [M.matKBlack, flat(K_BLACK)],
+  [M.matKGreyLight, flat(K_GREY_L)], [M.matKGrey, flat(K_GREY)], [M.matKGreyDark, flat(K_GREY_D)], [M.matKSteel, flat(K_STEEL)],
+  [M.matKRed, flat(K_RED)], [M.matKOrange, flat(K_ORANGE)], [M.matKYellow, flat(K_YELLOW)], [M.matKPink, flat(K_PINK)],
+  [M.matKPurple, flat(K_PURPLE)], [M.matKBlue, flat(K_BLUE)], [M.matKTeal, flat(K_TEAL)], [M.matKGreen, flat(K_GREEN)],
+  [M.matKPot, flat(K_POT)],
 ]);
 
 /* A material nobody registered still voxelizes: it gets a flat palette entry in

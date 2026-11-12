@@ -18,6 +18,8 @@ export function announce(text){
 function zoneAt(){
   for(const z of zones){
     const dx=player.x-z.x, dz=player.z-z.z;
+    if(z.minY!==undefined && player.feet<z.minY) continue;
+    if(z.maxY!==undefined && player.feet>=z.maxY) continue;
     if(dx*dx+dz*dz < z.r*z.r) return z.name;
   }
   return null;

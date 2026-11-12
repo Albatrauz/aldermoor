@@ -130,7 +130,7 @@ dependency flow runs roughly top-to-bottom:
 | `textures.js`   | procedurally painted canvas textures |
 | `materials.js`  | shared materials built from those textures |
 | `world.js`      | map manager: shared sky/sun/fog, builds the active map and hands it to the voxel engine |
-| `mapkit.js`, `maps/` | the map toolkit and the two maps, described as boxes, ramps and props |
+| `mapkit.js`, `maps/` | the map toolkit and the maps, described as boxes, ramps and props |
 | `voxel/`        | the voxel engine — see below |
 | `audio.js`      | synthesized black-powder / UI sounds (WebAudio) |
 | `effects.js`    | transient tracers / muzzle flashes / smoke + ray-cast hit tests |
@@ -146,6 +146,26 @@ dependency flow runs roughly top-to-bottom:
 | `stats.js`      | reactive leaderboard + own-career rendering on the intro screen |
 | `main.js`       | entry point: wires the render loop and the `window.__town` debug hook |
 | `visitor.js`    | bird's-eye camera and the top-down capture of a map |
+
+### The office map (`src/maps/kantoor/`)
+
+`mp_kantoor` is a replica of a real two-storey office, and is put together
+differently from the other two maps: its shell is generated, not typed in.
+
+| Module           | Responsibility |
+|------------------|----------------|
+| `plan.ts`        | the estate agent's floor plans, vectorised: walls, doors, windows and rooms in real metres (generated — do not edit by hand) |
+| `kit.ts`         | plan → game transform (2.5× horizontally), storey heights, walls at any angle with door/window cuts, extruded polygons, stairs |
+| `structure.ts`   | the shell built from the plan: facades, partitions, the upper floor with its stair void, roof, stair |
+| `facade.ts`      | roof lantern, entrance canopy, overhang columns, sign boards, the fire-escape stair |
+| `grounds.ts`     | the plot: street, parking, hedges, cars, fences, the four boundary walls, the skyline beyond |
+| `interior_*.ts`  | furniture and wall art, one file per storey half |
+| `props.ts`       | desks, tables, chairs, cupboards, pixel-art wall panels |
+| `callouts.ts`    | location names, one set per storey |
+
+The voxel engine has no transparency, so a window is a hole with a sill you can
+vault and a glass partition is a low pale band with posts. Company names on the
+sign boards are deliberately left as blank bands.
 
 ### The voxel engine (`src/voxel/`)
 
@@ -262,9 +282,9 @@ firing one, `replay(shots)` to land a list of them silently, and
 `heldFor` seconds (5 or more cooks it off), and `nades` reports the count left,
 whether one is in hand, grenades in flight, and the arc's predicted end.
 
-`captureMap('dust2')` and `captureMap('skidrow')` render a top-down plate of
+`captureMap('dust2')`, `captureMap('skidrow')` and `captureMap('kantoor')` render a top-down plate of
 that map (north up, east right) and download `<map>-top.png`. `captureMaps()`
-does both, then puts back the map that was loaded. Each call also returns
+does them all, then puts back the map that was loaded. Each call also returns
 `{ name, label, width, height, url }` where `url` is a PNG data URL. The camera
 is `visitor`, aimed by `frameVisitor(width, height)` — an orthographic view of
 the whole voxel world, kept off the first-person camera so a later map overlay

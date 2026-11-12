@@ -22,7 +22,9 @@ export interface Collider {
   mat?: THREE.Material;
 }
 export interface Spawn { x: number; z: number; yaw: number; }
-export interface Zone { x: number; z: number; r: number; name: string; }
+// A callout circle. `minY`/`maxY` (feet height) restrict it to one storey of a
+// map that has more than one; a zone without them applies at any height.
+export interface Zone { x: number; z: number; r: number; name: string; minY?: number; maxY?: number; }
 
 // The colour/atmosphere a map asks the shared sky, sun and fog to wear.
 export interface MapEnv {
@@ -52,6 +54,10 @@ export interface MapEnv {
   groundSurface: Surface;
   // Falling snow, drifting dust, or nothing. count:0 switches it off.
   weather?: WeatherSpec;
+  // How much of the ambient light is left where no sky reaches at all (0..1,
+  // default 0.3). A map that is mostly indoors raises it: its rooms are lit by
+  // lamps the sky-light model knows nothing about.
+  interiorMin?: number;
   // Player lanterns. They belong to a night-time market town, not to high noon
   // in a desert — off unless a map actually wants them.
   lanterns: boolean;
