@@ -187,6 +187,8 @@ MAP_ROTATION=kantoor          # only mp_kantoor is ever played
 MAP_ROTATION=dust2,kantoor    # swap between just these two
 ```
 
+`npm run dev:kantoor` starts the dev server with `MAP_ROTATION=kantoor`.
+
 It is a runtime variable, so a restart is enough — no rebuild. Unknown names are
 skipped with a warning in the log; if nothing valid is left, every map plays.
 The server tags the page with the live map (`<meta name="aldermoor-map">`), so

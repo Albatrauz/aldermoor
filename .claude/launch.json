@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "aldermoor-kantoor",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:kantoor"],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
