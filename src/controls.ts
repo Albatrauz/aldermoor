@@ -19,9 +19,20 @@ const R_PLAYER=.55, STEP_UP=.55, PLAYER_H=1.8;
 export const vel={x:0,z:0};
 export const keys=new Set();
 export let walkPhase=0;
+// chat is up: movement, look and the Escape-to-menu path all stand down
+export let chatOpen=false;
+// Escape while chatting drops pointer lock. That unlock must not raise the menu,
+// including the beat after the box closes while lock is being taken back.
+let suppressMenu=false;
+export function setChatOpen(open:boolean){
+  chatOpen=open;
+  if(open) suppressMenu=true;
+}
+export function releaseMenuSuppress(){ if(!chatOpen) suppressMenu=false; }
 
 addEventListener('keydown',e=>{
   if(['Space','ArrowUp','ArrowDown'].includes(e.code)) e.preventDefault();
+  if(chatOpen) return;
   keys.add(e.code);
   if(e.code==='Space' && player.grounded && !introVisible && !dead){ player.vy=5.2; player.grounded=false; }
 });
@@ -75,24 +86,24 @@ document.addEventListener('pointerlockchange',()=>{
   locked = document.pointerLockElement===canvas;
   // Don't fall back to the menu while the overview holds the screen (e.g. the
   // browser drops the lock on Escape) — the round restart will hand control back.
-  if(!locked && !dragLook && !frozen) showIntro();
+  if(!locked && !dragLook && !frozen && !suppressMenu) showIntro();
 });
 document.addEventListener('pointerlockerror',()=>{ dragLook=true; });
 canvas.addEventListener('click',()=>{
-  if(introVisible || locked || dragLook) return;
+  if(introVisible || locked || dragLook || chatOpen) return;
   // same fallback as the enter button: no pointer lock here (an embedded pane) → drag to look
   const p=canvas.requestPointerLock?.();
   if(p && p.catch) p.catch(()=>{ dragLook=true; });
 });
 addEventListener('keydown',e=>{
-  if(e.code==='Escape' && dragLook && !frozen){ introVisible ? hideIntro() : showIntro(); }
+  if(e.code==='Escape' && dragLook && !frozen && !chatOpen){ introVisible ? hideIntro() : showIntro(); }
 });
 
 let dragging=false;
 addEventListener('mousedown',()=>dragging=true);
 addEventListener('mouseup',()=>dragging=false);
 addEventListener('mousemove',e=>{
-  if(introVisible || frozen || dead) return;
+  if(introVisible || frozen || dead || chatOpen) return;
   if(locked || (dragLook&&dragging)){
     const k=0.0023*aimSens();   // slower to match the zoom while aiming down sights
     player.yaw   -= e.movementX*k;
@@ -157,7 +168,12 @@ export function update(dt, time){
     camera.rotation.set(player.pitch, player.yaw, 0);
     return;
   }
-  if(!introVisible && !frozen){
+  if(chatOpen && !introVisible && !frozen){
+    // hold the view where the player stopped typing — no walk, no bob
+    vel.x=0; vel.z=0;
+    camera.position.set(player.x, eyeY, player.z);
+    camera.rotation.set(player.pitch, player.yaw, 0);
+  }else if(!introVisible && !frozen){
     const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
     // default walk bumped 10% (4.2 → 4.62); sprint unchanged; aiming down sights slows the walk
     const speed=(run?7.4:4.62)*(1+(aim.speed-1)*aim.t);

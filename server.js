@@ -367,6 +367,12 @@ function cleanName(v) {
   if (typeof v !== 'string') return '';
   return v.replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
 }
+// Chat keeps letters the name filter would strip (punctuation, emoji) but drops
+// control characters, so a message can't smuggle a newline into the log.
+function cleanChat(v) {
+  if (typeof v !== 'string') return '';
+  return v.replace(/[\u0000-\u001F\u007F]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
 function uniqueName(n, selfId) {
   let name = n;
   for (let i = 2; [...players.entries()].some(([pid, p]) => pid !== selfId && p.name === name); i++)
@@ -635,7 +641,7 @@ function attachGame(httpServer, opts = {}) {
       username: auth ? auth.username : null,
       active: false,                                  // a fresh socket waits in the lobby, not the field
       x: SPAWN.x, y: SPAWN.y, z: SPAWN.z, yaw: SPAWN.yaw, m: 0, r: 0, alive: true,
-      hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
+      hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0, lastChat: 0,
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0,  // dmgFrom: attackerId → {name, dmg} this life
       roundKills: 0, roundHeadshots: 0,               // per-round, for stat flush (deaths via p.deaths)
       roundWeaponKills: weaponTally(), roundWeaponHeadshots: weaponTally(), nades: NADES_PER_LIFE, lastNade: 0, diedAt: 0, flushed: false };
@@ -778,6 +784,13 @@ function attachGame(httpServer, opts = {}) {
           if (g.cook && tid === id) continue;               // already settled when it went off
           resolveBlast(id, tid, g.ex, num(e[1], 0, 1, 0));
         }
+      } else if (msg.t === 'chat') {
+        const now = Date.now();
+        if (now - p.lastChat < 400) return;
+        const text = cleanChat(msg.text);
+        if (!text) return;
+        p.lastChat = now;
+        broadcast({ t: 'chat', id, name: p.name, text });
       }
     });
     ws.on('pong', () => { p.alive = true; });

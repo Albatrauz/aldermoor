@@ -15,7 +15,7 @@ import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
 import { announce, syncZone } from './zones';
 import { isCooking, resetNades } from './grenades';
 import { aim } from './aim';
-import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, showMenu, onMenuShown, player, vel, keys } from './controls';
+import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, showMenu, onMenuShown, player, vel, keys, chatOpen } from './controls';
 
 scene.add(camera); // the viewmodel rides on the camera
 const fpModels = [buildHandgonneFP(), buildAK47FP()];
@@ -129,8 +129,8 @@ export function fire(){
 }
 
 addEventListener('mousedown',e=>{
-  if(e.button===0 && !introVisible && !frozen && (locked||dragLook)){ mouseDown=true; fire(); }
-  if(e.button===2 && !introVisible && !frozen && (locked||dragLook)) aim.held=true;
+  if(e.button===0 && !introVisible && !frozen && !chatOpen && (locked||dragLook)){ mouseDown=true; fire(); }
+  if(e.button===2 && !introVisible && !frozen && !chatOpen && (locked||dragLook)) aim.held=true;
 });
 addEventListener('mouseup',e=>{
   if(e.button===0) mouseDown=false;
@@ -142,6 +142,7 @@ addEventListener('contextmenu',e=>{ if(!introVisible) e.preventDefault(); });
 addEventListener('blur',()=>{ aim.held=false; });
 document.addEventListener('pointerlockchange',()=>{ if(!document.pointerLockElement) aim.held=false; });
 addEventListener('keydown',e=>{
+  if(chatOpen) return;
   if(e.code==='KeyR' && !introVisible) startReload();
   if(e.code==='Digit1' && !introVisible && deathT<=0) switchWeapon(0);
   if(e.code==='Digit2' && !introVisible && deathT<=0) switchWeapon(1);
@@ -351,6 +352,7 @@ export function update(dt){
   // frame. A slow frame runs several sub-steps (main.ts), and the shots they'd
   // fire leave in one burst; the server spaces shots by arrival time and drops
   // all but the first, which would cost ammo and a tracer for nothing.
+  if(chatOpen){ mouseDown=false; aim.held=false; }
   if(mouseDown && WEAPONS[weaponIdx].full && !frozen && shotFrame!==renderer.info.render.frame) fire();
   gunKick=Math.max(0, gunKick-dt*5);
   // ease spread toward its floor (moving/running/airborne raise it; firing bloomed it),

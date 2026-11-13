@@ -14,6 +14,7 @@ import { getToken, getSession, onAuthChange } from './auth';
 import { setMap, mapLabel, mapBlurb, onMapChange, currentMapName } from './world';
 import { replayShots } from './voxel';
 import { handleNade, handleBoom } from './grenades';
+import { showChatMessage, bindChatSend } from './chat';
 
 // Keep the lobby's map nameplate in step with whatever map is live.
 const introTitleEl=document.getElementById('introMapTitle');
@@ -67,6 +68,7 @@ export function sendNet(obj){
   net.send(JSON.stringify(obj));
   return true;
 }
+bindChatSend(text => sendNet({ t: 'chat', text }));
 
 function updatePresence(){
   presenceEl.classList.toggle('offline', !net);
@@ -163,6 +165,8 @@ function connect(){
       // tried to take the field while a contest was wrapping up — bounce to the menu
       handleLobby();
       announce(m.restartIn>0 ? `A round is finishing — try again in ${m.restartIn}s` : 'A round is finishing — one moment…');
+    }else if(m.t==='chat'){
+      showChatMessage({ name: m.name, text: m.text, self: m.id===myId });
     }else if(m.t==='snap'){
       for(const id of Object.keys(m.p)){
         if(+id===myId) continue;
