@@ -9,6 +9,7 @@ const scoresEl=document.getElementById('scores');
 const scoreRowsEl=document.getElementById('scoreRows');
 const healthFillEl=document.getElementById('healthFill');
 const healthEl=document.getElementById('health');
+const hpNumEl=document.getElementById('hpNum');
 const ammoEl=document.getElementById('ammo');
 const killEl=document.getElementById('killscreen');
 const killByEl=document.getElementById('killByName');
@@ -24,30 +25,36 @@ let hp=MAX_HP;
 const esc=s=>String(s).replace(/[&<>"']/g,
   c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-/* set local health and repaint the bar — width plus a gold→crimson tint as it ebbs */
+/* set local health and repaint the bar — RB-Media cyan while healthy, warning red when low */
 export function setHp(n){
   hp=Math.max(0, Math.min(MAX_HP, n));
   const f=hp/MAX_HP;
   healthFillEl.style.width=(f*100)+'%';
-  healthFillEl.style.background=`hsl(${42*f}, 68%, ${34+18*f}%)`;  // 42°gold→0°red
+  if(hpNumEl) hpNumEl.textContent=String(Math.ceil(hp));
+  healthEl.classList.toggle('mid', f<=.6 && f>.3);
   healthEl.classList.toggle('low', f<=.3);
 }
 setHp(MAX_HP);                     // start the bar full, even before we connect
-/* ammo display: pips for small mags (handgonne), numeric + spare for larger (AK-47) */
+/* ammo display: weapon label over a big round count — pips for small mags (handgonne),
+   numeric + spare for larger (AK-47) */
+const pips=(n,max)=>'<span class="pips">'+
+  '<i class="pip"></i>'.repeat(n)+'<i class="pip spent"></i>'.repeat(Math.max(0,max-n))+'</span>';
 export function setAmmo(n, max, reloading, spare=Infinity, weapon=null){
+  const label=weapon?.name ? `<span class="ammo-label">${esc(weapon.name)}</span>` : '';
   if(reloading){
-    ammoEl.innerHTML=`<span class="ramming">${weapon?.reloadLabel ?? 'reloading…'}</span>`;
+    ammoEl.innerHTML=label+`<span class="ramming">${weapon?.reloadLabel ?? 'reloading…'}</span>`;
     return;
   }
   if(max<=10){
-    ammoEl.innerHTML='● '.repeat(n)+(n<max?`<span class="spent">${'○ '.repeat(max-n)}</span>`:'');
+    ammoEl.innerHTML=label+pips(n,max);
   }else{
-    ammoEl.innerHTML=`${n}`+(isFinite(spare)?`<span class="spare"> / ${spare}</span>`:'');
+    ammoEl.innerHTML=label+`<span class="ammo-num${n===0?' empty':''}">${n}</span>`+
+      (isFinite(spare)?`<span class="spare">/ ${spare}</span>`:'');
   }
 }
 const nadesEl=document.getElementById('nades');
 export function setNades(n, max){
-  nadesEl.innerHTML='✹ '.repeat(n)+(n<max?`<span class="spent">${'✹ '.repeat(max-n)}</span>`:'');
+  nadesEl.innerHTML='<span class="ammo-label">Grenades</span>'+pips(n,max);
 }
 
 /* the fuse ring round the crosshair: `left` is the fraction of the fuse still to burn */
@@ -134,18 +141,17 @@ const ovNextEl=document.getElementById('ovNext');
 let countTimer=null;
 
 function paintCount(s){
-  ovCountEl.textContent = s>0 ? `The next contest begins in ${s}…` : 'Returning to the town…';
+  ovCountEl.textContent = s>0 ? `Next round in ${s}s` : 'Loading next round…';
 }
 /* raise the overview with the final tally; m: {winnerId, winnerName, cap, restartIn, standings, nextMap} */
 export function showOverview(m){
   ovWinnerEl.textContent=m.winnerName||'Nobody';
   ovCapEl.textContent=m.cap;
-  if(ovNextEl) ovNextEl.textContent=m.nextMap ? `Next field · ${mapLabel(m.nextMap)}` : '';
+  if(ovNextEl) ovNextEl.textContent=m.nextMap ? `Next map · ${mapLabel(m.nextMap)}` : '';
   ovRowsEl.innerHTML=(m.standings||[]).map((s,i)=>{
     const cls=(s.id===m.winnerId?' win':'')+(s.id===myId?' me':'');
-    const rank=s.id===m.winnerId?'♛':i+1;
-    return `<div class="ov-row${cls}"><span class="ov-rank">${rank}</span>`+
-      `<span class="ov-name">${s.name}</span><span class="ov-score">${s.score}</span></div>`;
+    return `<div class="ov-row${cls}"><span class="ov-rank">${i+1}</span>`+
+      `<span class="ov-name">${esc(s.name)}</span><span class="ov-score">${s.score}</span></div>`;
   }).join('');
   let secs=Math.max(0, Math.round(m.restartIn ?? 20));
   paintCount(secs);
@@ -163,7 +169,7 @@ export function hideOverview(){
 }
 /* the death overlay: name the slayer, tally the wounds, seed the respawn countdown */
 export function showKillscreen(killerName, count, dmg, head, killerId, self=false){
-  killByLeadEl.textContent=self ? 'undone by' : 'by the hand of';
+  killByLeadEl.textContent='by';
   killByEl.textContent=self ? 'your own grenade' : killerName;
   killCountEl.textContent=count;
   renderDamage(dmg, head, killerId);
@@ -181,8 +187,8 @@ function renderDamage(dmg, head, killerId){
       `<span class="dmg-bar"><i style="width:${pct}%"></i></span>`+
       `<span class="dmg-val">${Math.round(d.dmg)}</span></div>`;
   }).join('');
-  ksDamageEl.innerHTML=`<div class="dmg-title">Wounds you suffered`+
-    `${head?` · <span class="dmg-head">a ball to the head</span>`:''}</div>${rows}`;
+  ksDamageEl.innerHTML=`<div class="dmg-title">Damage taken`+
+    `${head?` · <span class="dmg-head">headshot</span>`:''}</div>${rows}`;
 }
 /* repaint the ticking numeral (only on change — it's called every frame) */
 export function setKillCount(n){

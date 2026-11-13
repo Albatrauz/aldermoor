@@ -1,9 +1,32 @@
+/* ============================ RB-Media brand tokens ============================ */
+/* Lifted from rb-media.nl: black / white with a single cyan accent (#00beeb),
+   Gotham-style geometric sans (Montserrat stands in — Gotham is licensed),
+   pill buttons, hairline grey borders and small, quiet uppercase labels. */
 :root {
-    --gold: #d8a948;
-    --gold-dim: #b9a06b;
-    --parchment: #e9d8b0;
-    --ink: #15100b;
-    --white: #fff;
+    --accent: #00beeb;
+    --accent-hi: #52deff;
+    --accent-soft: rgba(0, 190, 235, 0.14);
+    --accent-line: rgba(0, 190, 235, 0.45);
+    --black: #000;
+    --bg: #0a0a0a;
+    --surface: #1f1f1f;
+    --surface-2: #282828;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-strong: #3d3d3d;
+    --text: #fff;
+    --text-2: #dcdcdc;
+    --muted: #999;
+    --dim: #4c4c4c;
+    --danger: #ff4d5e;
+    --danger-deep: #d92140;
+    --warn: #ffb547;
+    --panel: rgba(10, 10, 10, 0.78);
+    --font: 'Montserrat', 'Gotham', ui-sans-serif, system-ui, -apple-system,
+        'Segoe UI', sans-serif;
+    --radius: 12px;
+    --radius-sm: 6px;
+    --pill: 9999px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 * {
     margin: 0;
@@ -14,7 +37,10 @@ html,
 body {
     height: 100%;
     overflow: hidden;
-    background: #0a0806;
+    background: var(--black);
+    font-family: var(--font);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
 }
 canvas#scene {
     position: fixed;
@@ -22,19 +48,9 @@ canvas#scene {
     display: block;
 }
 
-/* gilded frame around the viewport */
+/* the old gilded viewport frame is retired in the RB-Media look */
 #frame {
-    position: fixed;
-    inset: 12px;
-    border: 1px solid rgba(216, 169, 72, 0.3);
-    pointer-events: none;
-    z-index: 5;
-}
-#frame::before {
-    content: '';
-    position: absolute;
-    inset: 4px;
-    border: 1px solid rgba(216, 169, 72, 0.12);
+    display: none;
 }
 
 #vignette {
@@ -44,9 +60,26 @@ canvas#scene {
     z-index: 4;
     background: radial-gradient(
         ellipse at center,
-        transparent 52%,
-        rgba(8, 5, 3, 0.42) 100%
+        transparent 58%,
+        rgba(0, 0, 0, 0.38) 100%
     );
+}
+
+/* reusable small uppercase label, RB-Media style */
+.sc-title,
+.over-title,
+.auth-eyebrow,
+.auth-me-label,
+.fs-doss-eyebrow,
+.fs-arms-label,
+.ammo-label,
+.hp-label {
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
 }
 
 /* a four-tick crosshair pinned to screen centre. --gap (set each frame by combat.js)
@@ -58,14 +91,15 @@ canvas#scene {
     width: 0;
     height: 0;
     --gap: 6px;
-    opacity: 0.9;
+    opacity: 0.95;
     pointer-events: none;
     z-index: 6;
 }
 #crosshair i {
     position: absolute;
-    background: var(--white);
-    box-shadow: 0 0 0 1px var(--ink);
+    background: var(--text);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.75);
+    border-radius: 1px;
 }
 #crosshair i.dot {
     left: -1px;
@@ -73,6 +107,7 @@ canvas#scene {
     width: 2px;
     height: 2px;
     border-radius: 50%;
+    background: var(--accent);
 }
 #crosshair i.t,
 #crosshair i.b {
@@ -99,41 +134,51 @@ canvas#scene {
     left: var(--gap);
 }
 
+/* ---- live score card, top-left ---- */
 #scores {
     position: fixed;
-    top: 26px;
-    left: 32px;
+    top: 24px;
+    left: 24px;
     z-index: 7;
     pointer-events: none;
     display: none;
-    font-family: 'Lora', serif;
-    font-size: 14px;
-    color: var(--parchment);
-    background: rgba(10, 7, 4, 0.5);
-    border: 1px solid rgba(216, 169, 72, 0.25);
-    padding: 10px 16px 12px;
-    min-width: 200px;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 12px 14px;
+    min-width: 210px;
 }
-.sc-title {
-    font-size: 12px;
-    letter-spacing: 0.22em;
-    text-indent: 0.22em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 7px;
-    text-align: center;
+#scores .sc-title {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
 }
 .sc-row {
     display: flex;
     justify-content: space-between;
     gap: 18px;
-    opacity: 0.85;
-    font-style: italic;
+    padding: 3px 8px;
+    margin: 0 -8px;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    color: var(--text-2);
     line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+}
+.sc-row span:last-child {
+    font-weight: 700;
+    color: var(--text);
 }
 .sc-row.me {
-    color: var(--gold);
-    opacity: 1;
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+.sc-row.me span:last-child {
+    color: var(--accent);
 }
 
 /* the held-open Tab scoreboard: the full roll of kills & deaths */
@@ -144,65 +189,75 @@ canvas#scene {
     display: none;
     place-items: center;
     pointer-events: none;
-    background: radial-gradient(
-        ellipse at center,
-        rgba(12, 9, 5, 0.5) 0%,
-        rgba(6, 4, 3, 0.72) 100%
-    );
+    background: rgba(0, 0, 0, 0.55);
 }
 #scoreboard.show {
     display: grid;
 }
 .sb-inner {
-    min-width: min(440px, 86vw);
+    min-width: min(520px, 90vw);
     max-height: 80vh;
     overflow-y: auto;
     text-align: left;
-    font-family: 'Lora', serif;
-    color: var(--parchment);
-    background: rgba(10, 7, 4, 0.74);
-    border: 1px solid rgba(216, 169, 72, 0.3);
-    box-shadow: 0 12px 64px rgba(0, 0, 0, 0.6);
-    padding: 16px 22px 18px;
-    animation: rise 0.25s ease both;
+    color: var(--text);
+    background: rgba(10, 10, 10, 0.9);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+    padding: 22px 24px 18px;
+    animation: rise 0.22s var(--ease) both;
 }
 .sb-title {
-    font-family: 'IM Fell English', serif;
-    font-size: 13px;
-    letter-spacing: 0.34em;
-    text-indent: 0.34em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    text-align: center;
-    margin-bottom: 12px;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sb-title::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
 }
 .sb-head,
 .sb-row {
     display: grid;
-    grid-template-columns: 1fr 4.5em 4.5em;
-    align-items: baseline;
+    grid-template-columns: 1fr 5em 5em;
+    align-items: center;
     gap: 10px;
-    line-height: 1.85;
 }
 .sb-head {
     font-size: 11px;
-    letter-spacing: 0.12em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--gold-dim);
-    border-bottom: 1px solid rgba(216, 169, 72, 0.22);
-    padding-bottom: 6px;
-    margin-bottom: 6px;
+    color: var(--muted);
+    padding: 0 12px 10px;
+    border-bottom: 1px solid var(--line);
 }
 .sb-row {
-    font-size: 16px;
-    font-style: italic;
-    opacity: 0.86;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-2);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+}
+.sb-row:last-child {
+    border-bottom: none;
 }
 .sb-head .sb-num,
 .sb-row .sb-num {
     text-align: right;
-    font-style: normal;
     font-variant-numeric: tabular-nums;
+}
+.sb-row .sb-num:nth-child(2) {
+    font-weight: 700;
+    color: var(--text);
 }
 .sb-row .sb-name {
     overflow: hidden;
@@ -210,95 +265,163 @@ canvas#scene {
     text-overflow: ellipsis;
 }
 .sb-row.me {
-    color: var(--gold);
-    opacity: 1;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 8px;
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+.sb-row.me .sb-num:nth-child(2) {
+    color: var(--accent);
 }
 
+/* ---- health: label · pill track · number, bottom-left ---- */
 #health {
     position: fixed;
-    bottom: 48px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(300px, 42vw);
-    height: 15px;
+    bottom: 24px;
+    left: 24px;
     z-index: 7;
     pointer-events: none;
-    padding: 2px;
-    border: 1px solid rgba(216, 169, 72, 0.5);
-    border-radius: 3px;
-    background: rgba(12, 8, 5, 0.72);
-    box-shadow:
-        0 1px 5px rgba(0, 0, 0, 0.8),
-        inset 0 0 6px rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--pill);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+.hp-track {
+    width: min(220px, 34vw);
+    height: 8px;
+    border-radius: var(--pill);
+    background: rgba(255, 255, 255, 0.1);
     overflow: hidden;
 }
 #healthFill {
     height: 100%;
     width: 100%;
-    border-radius: 2px;
-    background: hsl(42, 68%, 52%);
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.18);
+    border-radius: var(--pill);
+    background: var(--accent);
+    box-shadow: 0 0 12px rgba(0, 190, 235, 0.55);
     transition:
-        width 0.25s ease,
-        background 0.25s ease;
+        width 0.25s var(--ease),
+        background 0.25s var(--ease);
 }
-/* a low bar throbs crimson at the edge */
+.hp-num {
+    min-width: 2.2em;
+    text-align: right;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+#health.mid #healthFill {
+    background: var(--warn);
+    box-shadow: 0 0 12px rgba(255, 181, 71, 0.5);
+}
+#health.low #healthFill {
+    background: var(--danger);
+    box-shadow: 0 0 12px rgba(255, 77, 94, 0.6);
+}
+#health.low .hp-num {
+    color: var(--danger);
+}
+/* a low bar throbs red at the edge */
 #health.low {
     animation: hp-pulse 1s ease-in-out infinite;
 }
 @keyframes hp-pulse {
     0%,
     100% {
-        box-shadow:
-            0 1px 5px rgba(0, 0, 0, 0.8),
-            inset 0 0 6px rgba(0, 0, 0, 0.7);
+        border-color: var(--line);
     }
     50% {
-        box-shadow:
-            0 0 11px rgba(192, 40, 24, 0.75),
-            inset 0 0 6px rgba(0, 0, 0, 0.7);
+        border-color: rgba(255, 77, 94, 0.8);
+        box-shadow: 0 0 18px rgba(255, 77, 94, 0.45);
     }
 }
 
-#ammo {
-    position: fixed;
-    bottom: 52px;
-    right: 32px;
-    text-align: right;
-    z-index: 7;
-    pointer-events: none;
-    font-size: 15px;
-    color: var(--gold);
-    letter-spacing: 0.25em;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
-}
-#ammo .spent {
-    color: rgba(216, 169, 72, 0.28);
-}
-#ammo .ramming {
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 14px;
-    letter-spacing: 0.06em;
-    color: var(--gold-dim);
-}
-#ammo .spare {
-    color: rgba(216, 169, 72, 0.45);
-    font-size: 13px;
-}
+/* ---- ammo + grenades, bottom-right ---- */
+#ammo,
 #nades {
     position: fixed;
-    bottom: 78px;
-    right: 32px;
+    right: 24px;
     z-index: 7;
     pointer-events: none;
-    font-size: 15px;
-    color: var(--gold);
-    letter-spacing: 0.3em;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 12px 18px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--pill);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
-#nades .spent {
-    color: rgba(216, 169, 72, 0.28);
+#ammo {
+    bottom: 24px;
+    min-height: 52px;
+}
+#nades {
+    bottom: 86px;
+    padding: 8px 16px;
+}
+#nades:empty,
+#ammo:empty {
+    display: none;
+}
+.ammo-num {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+.ammo-num.empty {
+    color: var(--danger);
+}
+#ammo .spare {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+#ammo .ramming {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    animation: blink 0.9s ease-in-out infinite alternate;
+}
+@keyframes blink {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.45;
+    }
+}
+.pips {
+    display: inline-flex;
+    gap: 5px;
+}
+.pip {
+    width: 8px;
+    height: 16px;
+    border-radius: var(--pill);
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(0, 190, 235, 0.5);
+}
+.pip.spent {
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: none;
+}
+#nades .pip {
+    width: 10px;
+    height: 10px;
 }
 
 /* the grenade's fuse, drawn round the crosshair while G is held: the ring fills
@@ -323,10 +446,10 @@ canvas#scene {
     stroke-width: 3.5;
 }
 #nadeRing .track {
-    stroke: rgba(21, 16, 11, 0.55);
+    stroke: rgba(0, 0, 0, 0.5);
 }
 #nadeRing .fill {
-    stroke: var(--parchment);
+    stroke: var(--accent);
     stroke-linecap: round;
     filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
 }
@@ -349,10 +472,12 @@ canvas#scene {
     transform: translate(-50%, -50%);
     z-index: 7;
     pointer-events: none;
-    color: var(--gold);
+    color: var(--accent);
+    font-family: var(--font);
+    font-weight: 300;
     font-size: 30px;
     opacity: 0;
-    text-shadow: 0 0 10px rgba(216, 169, 72, 0.8);
+    text-shadow: 0 0 10px rgba(0, 190, 235, 0.8);
 }
 #hitmark.pop {
     animation: hitpop 0.28s ease;
@@ -378,7 +503,7 @@ canvas#scene {
     background: radial-gradient(
         ellipse at center,
         transparent 35%,
-        rgba(150, 18, 8, 0.5) 100%
+        rgba(217, 33, 64, 0.45) 100%
     );
 }
 #hurt.on {
@@ -386,14 +511,14 @@ canvas#scene {
     transition: opacity 0.04s;
 }
 
-/* grenade concussion: a warm white-hot flash, then a dark vignette closing in that eases away */
+/* grenade concussion: a white-hot flash, then a dark vignette closing in that eases away */
 #flash {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 8;
     opacity: 0;
-    background: rgb(255, 244, 220);
+    background: rgb(250, 252, 255);
 }
 #stun {
     position: fixed;
@@ -404,15 +529,15 @@ canvas#scene {
     background: radial-gradient(
         ellipse at center,
         transparent 18%,
-        rgba(8, 6, 6, 0.55) 55%,
-        rgba(4, 3, 3, 0.92) 100%
+        rgba(0, 0, 0, 0.55) 55%,
+        rgba(0, 0, 0, 0.92) 100%
     );
 }
 #scene.stunned {
     filter: saturate(0.55) brightness(0.92);
 }
 
-/* the killscreen: a dimmed pall while the felled player counts down to rising */
+/* the killscreen: a dark pall while the killed player counts down to respawn */
 #killscreen {
     position: fixed;
     inset: 0;
@@ -421,13 +546,15 @@ canvas#scene {
     place-items: center;
     pointer-events: none;
     opacity: 0;
-    background: radial-gradient(
-        ellipse at center,
-        rgba(60, 8, 4, 0.55) 0%,
-        rgba(8, 3, 2, 0.92) 100%
-    );
-    backdrop-filter: blur(3px) saturate(0.6);
-    -webkit-backdrop-filter: blur(3px) saturate(0.6);
+    background:
+        radial-gradient(
+            120% 70% at 50% 100%,
+            rgba(217, 33, 64, 0.22),
+            transparent 60%
+        ),
+        rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(6px) saturate(0.5);
+    -webkit-backdrop-filter: blur(6px) saturate(0.5);
     transition: opacity 0.5s ease;
 }
 #killscreen.on {
@@ -437,50 +564,56 @@ canvas#scene {
 .ks-inner {
     text-align: center;
     padding: 0 24px;
+    font-family: var(--font);
 }
 .ks-kicker {
-    font-family: 'Lora', serif;
-    font-size: 13px;
-    letter-spacing: 0.45em;
-    text-indent: 0.45em;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: #c0726a;
-    margin-bottom: 16px;
+    color: var(--danger);
+    margin-bottom: 12px;
 }
 .ks-title {
-    font-family: 'Sekuya', serif;
-    font-weight: 400;
-    font-size: clamp(48px, 8vw, 88px);
+    font-weight: 800;
+    font-size: clamp(48px, 8vw, 96px);
     line-height: 1;
-    color: #d8493a;
-    text-shadow:
-        0 0 48px rgba(192, 40, 24, 0.5),
-        0 4px 14px rgba(0, 0, 0, 0.9);
+    letter-spacing: -0.04em;
+    color: var(--text);
 }
-.ks-rule {
-    margin: 20px 0;
-    color: var(--gold-dim);
-    letter-spacing: 1.1em;
-    text-indent: 1.1em;
-    font-size: 14px;
+.ks-rule,
+.rule {
+    width: 48px;
+    height: 3px;
+    border-radius: var(--pill);
+    background: var(--accent);
+    margin: 24px auto;
 }
 .ks-by {
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: clamp(17px, 2.2vw, 22px);
-    color: var(--parchment);
+    font-size: clamp(16px, 2vw, 20px);
+    font-weight: 400;
+    color: var(--muted);
 }
-.ks-by span {
-    color: var(--gold);
-    font-style: normal;
+.ks-by #killByName {
+    color: var(--text);
+    font-weight: 700;
 }
 .ks-count {
-    margin-top: 26px;
-    font-family: 'Sekuya', serif;
-    font-size: clamp(64px, 10vw, 104px);
+    margin: 28px auto 0;
+    width: 104px;
+    height: 104px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    box-shadow:
+        0 0 40px rgba(0, 190, 235, 0.3),
+        inset 0 0 24px rgba(0, 190, 235, 0.12);
+    font-size: 48px;
+    font-weight: 700;
     line-height: 1;
-    color: var(--gold);
-    text-shadow: 0 0 40px rgba(216, 169, 72, 0.4);
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
 }
 /* a faint heartbeat on each new numeral keeps the wait feeling alive */
 #killscreen.on .ks-count span {
@@ -502,45 +635,47 @@ canvas#scene {
     }
 }
 .ks-rise {
-    margin-top: 14px;
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 14px;
-    letter-spacing: 0.12em;
-    color: var(--gold-dim);
+    margin-top: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
 }
 
-/* the life's-end wound summary: who chipped you down, and by how much */
+/* the life's-end damage summary: who chipped you down, and by how much */
 .ks-damage {
-    margin: 26px auto 0;
-    width: min(380px, 84vw);
+    margin: 28px auto 0;
+    width: min(400px, 86vw);
     text-align: left;
+    padding: 16px 18px;
+    background: rgba(10, 10, 10, 0.75);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 .ks-damage:empty {
     display: none;
 }
 .dmg-title {
-    margin-bottom: 12px;
-    text-align: center;
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 13px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-weight: 600;
     letter-spacing: 0.14em;
-    color: var(--gold-dim);
+    text-transform: uppercase;
+    color: var(--muted);
 }
 .dmg-title .dmg-head {
-    color: #d8493a;
-    font-style: normal;
+    color: var(--danger);
 }
 .dmg-row {
     display: grid;
-    grid-template-columns: 1fr 92px auto;
+    grid-template-columns: 1fr 100px auto;
     align-items: center;
     gap: 12px;
-    padding: 4px 0;
-    font-family: 'Lora', serif;
+    padding: 5px 0;
     font-size: 14px;
-    color: var(--parchment);
+    font-weight: 500;
+    color: var(--text-2);
 }
 .dmg-name {
     overflow: hidden;
@@ -548,75 +683,101 @@ canvas#scene {
     white-space: nowrap;
 }
 .dmg-bar {
-    height: 7px;
-    border-radius: 3px;
-    background: rgba(120, 80, 60, 0.28);
+    height: 6px;
+    border-radius: var(--pill);
+    background: rgba(255, 255, 255, 0.1);
     overflow: hidden;
 }
 .dmg-bar i {
     display: block;
     height: 100%;
-    border-radius: 3px;
-    background: linear-gradient(90deg, #8a2a1c, #d8493a);
+    border-radius: var(--pill);
+    background: var(--muted);
 }
 .dmg-val {
     min-width: 30px;
     text-align: right;
-    color: var(--gold);
+    font-weight: 700;
+    color: var(--text);
     font-variant-numeric: tabular-nums;
 }
 .dmg-row.killer .dmg-name {
-    color: #f0b3aa;
-    font-style: italic;
+    color: var(--text);
+    font-weight: 700;
+}
+.dmg-row.killer .dmg-bar i {
+    background: var(--danger);
 }
 .dmg-row.killer .dmg-val {
-    color: #ff6b5a;
+    color: var(--danger);
 }
 
+/* ---- announcements: a dark pill with a cyan status dot, top-centre ---- */
 #toast {
     position: fixed;
-    top: 8%;
-    left: 0;
-    right: 0;
-    text-align: center;
+    top: 9%;
+    left: 50%;
+    transform: translate(-50%, -8px);
+    max-width: calc(100vw - 32px);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px 12px 18px;
     pointer-events: none;
     z-index: 7;
-    font-family: 'Sekuya', serif;
-    font-size: clamp(26px, 3.4vw, 40px);
-    color: var(--gold);
-    text-shadow:
-        0 0 26px rgba(216, 169, 72, 0.45),
-        0 2px 8px rgba(0, 0, 0, 0.8);
+    font-family: var(--font);
+    font-size: clamp(15px, 1.6vw, 19px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    white-space: nowrap;
+    background: rgba(10, 10, 10, 0.82);
+    border: 1px solid var(--line);
+    border-radius: var(--pill);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
     opacity: 0;
-    transition: opacity 1.1s ease;
+    transition:
+        opacity 0.6s var(--ease),
+        transform 0.6s var(--ease);
 }
-#toast .orn {
-    font-size: 0.55em;
-    color: var(--gold-dim);
-    vertical-align: middle;
-    margin: 0 0.6em;
+#toastText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.toast-dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
 }
 #toast.show {
     opacity: 1;
+    transform: translate(-50%, 0);
+    transition:
+        opacity 0.2s var(--ease),
+        transform 0.2s var(--ease);
 }
 
-/* (legacy single-column intro styles removed — the two-pane start screen
-   below is the live block; this older copy used fonts that were never loaded) */
-
-/* end-of-round overview — final tally + countdown to the next contest */
+/* end-of-round overview — final tally + countdown to the next round */
 #overview {
     position: fixed;
     inset: 0;
     z-index: 11;
     display: none;
     place-items: center;
-    background: radial-gradient(
-        ellipse at center,
-        rgba(18, 13, 8, 0.82) 0%,
-        rgba(6, 4, 3, 0.96) 100%
-    );
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background:
+        radial-gradient(
+            120% 70% at 50% 0%,
+            rgba(0, 190, 235, 0.16),
+            transparent 60%
+        ),
+        rgba(0, 0, 0, 0.86);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 #overview.show {
     display: grid;
@@ -624,87 +785,111 @@ canvas#scene {
 .ov-inner {
     text-align: center;
     padding: 24px;
-    animation: rise 1s ease both;
-    font-family: 'IM Fell English', serif;
-    color: var(--parchment);
+    animation: rise 0.6s var(--ease) both;
+    font-family: var(--font);
+    color: var(--text);
+}
+#overview .over-title {
+    color: var(--accent);
+    margin-bottom: 14px;
 }
 #ovWinner {
-    font-family: 'UnifrakturMaguntia', serif;
-    font-weight: 400;
-    font-size: clamp(48px, 8vw, 92px);
-    line-height: 1.05;
-    color: var(--gold);
-    text-shadow:
-        0 0 48px rgba(216, 169, 72, 0.4),
-        0 4px 14px rgba(0, 0, 0, 0.9);
+    font-weight: 800;
+    font-size: clamp(44px, 8vw, 96px);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    color: var(--text);
 }
 .ov-claim {
-    font-style: italic;
     font-size: 17px;
-    color: #cdbb92;
-    margin-top: 8px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-top: 10px;
+}
+.ov-claim #ovCap {
+    color: var(--text);
+    font-weight: 700;
 }
 .ov-tally {
     display: inline-block;
-    min-width: 288px;
+    min-width: 320px;
     text-align: left;
-    background: rgba(10, 7, 4, 0.5);
-    border: 1px solid rgba(216, 169, 72, 0.25);
-    padding: 12px 18px 14px;
+    background: rgba(10, 10, 10, 0.8);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 18px 12px;
 }
 .ov-tally .sc-title {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
 }
 .ov-row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 14px;
-    font-style: italic;
-    font-size: 16px;
-    line-height: 1.85;
-    opacity: 0.85;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 8px 10px;
+    margin: 0 -10px;
+    border-radius: 8px;
+    color: var(--text-2);
 }
 .ov-row .ov-rank {
-    width: 1.5em;
-    text-align: center;
-    font-style: normal;
-    font-size: 14px;
-    color: var(--gold-dim);
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--surface-2);
+    color: var(--muted);
 }
 .ov-row .ov-name {
     flex: 1;
 }
 .ov-row .ov-score {
-    color: var(--gold-dim);
+    font-weight: 700;
+    color: var(--text);
     font-variant-numeric: tabular-nums;
 }
 .ov-row.win {
-    opacity: 1;
-    color: var(--gold);
+    color: var(--text);
+    background: var(--accent-soft);
 }
-.ov-row.win .ov-rank,
+.ov-row.win .ov-rank {
+    background: var(--accent);
+    color: var(--black);
+}
 .ov-row.win .ov-score {
-    color: var(--gold);
+    color: var(--accent);
 }
 .ov-row.me .ov-name {
-    text-decoration: underline;
-    text-decoration-color: rgba(216, 169, 72, 0.45);
-    text-underline-offset: 3px;
+    font-weight: 700;
+    color: var(--accent);
 }
 .ov-count {
-    margin-top: 26px;
-    font-style: italic;
-    font-size: 18px;
-    letter-spacing: 0.04em;
-    color: var(--gold);
-    text-shadow: 0 0 22px rgba(216, 169, 72, 0.35);
+    margin: 28px auto 0;
+    display: table;
+    padding: 12px 26px;
+    border-radius: var(--pill);
+    background: var(--accent);
+    color: var(--black);
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.ov-count:empty {
+    display: none;
 }
 .ov-next {
-    margin-top: 8px;
-    font-size: 13px;
-    letter-spacing: 0.12em;
+    margin-top: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: rgba(232, 222, 198, 0.62);
+    color: var(--muted);
 }
 .ov-next:empty {
     display: none;
@@ -719,65 +904,103 @@ canvas#scene {
         width: 100%;
     }
 }
+
+/* ---- controls hint, bottom-centre: key caps + labels ---- */
 #hud {
     position: fixed;
-    bottom: 26px;
-    left: 0;
-    right: 0;
-    text-align: center;
+    bottom: 34px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 700px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
     pointer-events: none;
     z-index: 7;
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 14px;
-    letter-spacing: 0.06em;
-    color: rgba(233, 216, 176, 0.55);
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.62);
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
+#hud > span {
+    white-space: nowrap;
+}
+#hud kbd {
+    color: var(--text);
+    background: rgba(10, 10, 10, 0.7);
+    border-color: rgba(255, 255, 255, 0.18);
+    text-shadow: none;
+}
+@media (max-width: 1100px) {
+    #hud {
+        display: none;
+    }
+}
 
+/* ---- presence pill, top-right ---- */
 #presence {
     position: fixed;
-    top: 26px;
-    right: 32px;
-    text-align: right;
+    top: 24px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px 9px 14px;
     pointer-events: none;
     z-index: 7;
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 14px;
-    letter-spacing: 0.05em;
-    color: rgba(233, 216, 176, 0.6);
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--pill);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+#presence:empty {
+    display: none;
+}
+#presence::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+#presence.offline::before {
+    background: var(--muted);
+    box-shadow: 0 0 0 3px rgba(153, 153, 153, 0.18);
 }
 
 /* ============================ start screen (two-pane) ============================ */
-/* Left rail = identity + sign-in; right pane = dossier + champions board. It's a
-   translucent overlay, so the blurred town still shows faintly behind it. */
+/* Left rail = identity + sign-in; right pane = stats + leaderboard. It's a
+   translucent overlay, so the blurred map still shows faintly behind it. */
 #intro {
     position: fixed;
     inset: 0;
     z-index: 10;
     display: flex;
     overflow: hidden;
-    background: radial-gradient(
-        ellipse at center,
-        rgba(18, 13, 8, 0.72) 0%,
-        rgba(6, 4, 3, 0.93) 100%
-    );
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    transition: opacity 0.7s ease;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: opacity 0.5s var(--ease);
     opacity: 1;
+    font-family: var(--font);
 }
 #intro.hidden {
     opacity: 0;
     pointer-events: none;
 }
 
-/* slim gilded scrollbars for the two panes */
+/* slim scrollbars for the two panes */
 .fs-scroll {
     scrollbar-width: thin;
-    scrollbar-color: rgba(216, 169, 72, 0.22) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
 .fs-scroll::-webkit-scrollbar {
     width: 9px;
@@ -786,156 +1009,196 @@ canvas#scene {
     background: transparent;
 }
 .fs-scroll::-webkit-scrollbar-thumb {
-    background: rgba(216, 169, 72, 0.22);
-    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: var(--pill);
 }
 
 @keyframes rise {
     from {
         opacity: 0;
-        transform: translateY(18px);
+        transform: translateY(14px);
     }
     to {
         opacity: 1;
         transform: none;
     }
 }
-@keyframes fsGlow {
-    0%,
-    100% {
-        text-shadow:
-            0 0 40px rgba(216, 169, 72, 0.26),
-            0 2px 0 rgba(0, 0, 0, 0.55);
-    }
-    50% {
-        text-shadow:
-            0 0 64px rgba(216, 169, 72, 0.44),
-            0 2px 0 rgba(0, 0, 0, 0.55);
-    }
-}
 
 /* ---- left rail: identity ---- */
 .fs-aside {
     flex: 0 0 32%;
-    max-width: 560px;
+    max-width: 520px;
     min-width: 340px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     gap: 32px;
-    padding: clamp(28px, 4vh, 54px) clamp(26px, 3vw, 50px);
+    padding: clamp(28px, 5vh, 56px) clamp(26px, 3vw, 48px);
     overflow-y: auto;
-    background: linear-gradient(
-        178deg,
-        rgba(17, 13, 7, 0.72) 0%,
-        rgba(8, 5, 2, 0.66) 100%
-    );
-    border-right: 1px solid rgba(216, 169, 72, 0.16);
-    box-shadow: 26px 0 70px rgba(0, 0, 0, 0.45);
-    animation: rise 1.1s ease both;
+    background: rgba(0, 0, 0, 0.88);
+    border-right: 1px solid var(--line);
+    animation: rise 0.7s var(--ease) both;
+}
+.brand-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: clamp(28px, 6vh, 64px);
+    color: var(--text);
+}
+.brand-by {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.rb-logo {
+    display: block;
+    height: 20px;
+    width: auto;
 }
 .over-title {
-    font-family: 'Lora', serif;
-    font-size: 12px;
-    letter-spacing: 0.34em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 22px;
+    margin-bottom: 0;
+}
+#introMapTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+    padding: 7px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--pill);
+    color: var(--text-2);
+    text-transform: none;
+    letter-spacing: 0.02em;
+}
+#introMapTitle::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
 }
 #intro h1 {
-    font-family: 'Sekuya', serif;
-    font-weight: 400;
-    font-size: clamp(46px, 4vw, 78px);
-    line-height: 0.92;
-    letter-spacing: 0.01em;
-    color: var(--gold);
-    text-shadow:
-        0 0 40px rgba(216, 169, 72, 0.26),
-        0 2px 0 rgba(0, 0, 0, 0.55);
-    animation: fsGlow 6s ease-in-out infinite;
+    font-weight: 800;
+    font-size: clamp(46px, 4.6vw, 82px);
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+    color: var(--text);
 }
-.rule {
-    margin: 22px 0;
-    color: var(--gold-dim);
-    letter-spacing: 1.1em;
-    text-indent: 1.1em;
-    font-size: 13px;
+#intro h1 em,
+.fs-sealed-title em {
+    display: block;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--accent);
 }
 .sub {
-    font-family: 'Lora', serif;
-    font-style: italic;
+    margin-top: 18px;
     font-size: 16px;
-    line-height: 1.6;
-    color: #cdbb92;
-    max-width: 36ch;
+    font-weight: 400;
+    line-height: 1.65;
+    color: var(--muted);
+    max-width: 38ch;
 }
 
 /* ---- left rail foot: account + guest entry ---- */
 .fs-aside-foot {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
 }
-#nameInput {
+#nameInput,
+#authUser,
+#authPass {
     display: block;
     width: 100%;
-    background: rgba(216, 169, 72, 0.06);
-    border: 1px solid rgba(216, 169, 72, 0.3);
-    color: var(--parchment);
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 17px;
-    letter-spacing: 0.04em;
-    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid transparent;
+    border-radius: var(--pill);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 500;
+    padding: 14px 20px;
     outline: none;
-    transition: all 0.25s ease;
+    transition:
+        border-color 0.2s var(--ease),
+        background 0.2s var(--ease),
+        box-shadow 0.2s var(--ease);
 }
-#nameInput::placeholder {
-    color: #8d7b58;
+#nameInput::placeholder,
+#authUser::placeholder,
+#authPass::placeholder {
+    color: var(--muted);
 }
-#nameInput:focus {
-    border-color: var(--gold);
-    background: rgba(216, 169, 72, 0.12);
-    box-shadow: 0 0 24px rgba(216, 169, 72, 0.18);
+#nameInput:focus,
+#authUser:focus,
+#authPass:focus {
+    border-color: var(--accent);
+    background: var(--surface-2);
+    box-shadow: 0 0 0 4px var(--accent-soft);
 }
+/* primary CTA — RB-Media's solid cyan pill */
 #enter {
     width: 100%;
-    background: transparent;
-    border: 1px solid var(--gold);
-    color: var(--gold);
-    font-family: 'Sekuya', serif;
-    font-size: 15px;
-    letter-spacing: 0.2em;
-    text-indent: 0.2em;
-    text-transform: uppercase;
-    padding: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--pill);
+    color: var(--black);
+    font-family: var(--font);
+    font-size: 16px;
+    font-weight: 700;
+    padding: 16px 24px;
     cursor: pointer;
-    transition: all 0.25s ease;
+    transition:
+        background 0.3s var(--ease),
+        transform 0.15s var(--ease),
+        box-shadow 0.3s var(--ease);
+}
+#enter::after {
+    content: '→';
+    transition: transform 0.3s var(--ease);
 }
 #enter:hover {
-    background: var(--gold);
-    color: var(--ink);
-    box-shadow: 0 0 34px rgba(216, 169, 72, 0.3);
+    background: var(--accent-hi);
+    box-shadow: 0 10px 34px rgba(0, 190, 235, 0.35);
+}
+#enter:hover::after {
+    transform: translateX(4px);
+}
+#enter:active {
+    transform: scale(0.98);
 }
 .controls {
     margin-top: 6px;
     display: flex;
     flex-wrap: wrap;
     gap: 8px 18px;
-    font-family: 'Lora', serif;
     font-size: 12px;
-    color: #8d7b58;
+    color: var(--muted);
 }
 kbd {
     display: inline-block;
-    border: 1px solid #5c4d33;
-    border-radius: 3px;
-    padding: 1px 7px;
-    margin-right: 5px;
-    background: rgba(216, 169, 72, 0.07);
-    font-family: inherit;
-    font-size: 12px;
-    color: #c5b288;
+    min-width: 22px;
+    text-align: center;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    padding: 2px 7px;
+    margin-right: 6px;
+    background: var(--surface);
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-2);
+}
+kbd + kbd {
+    margin-left: -3px;
 }
 
 /* ---- right pane ---- */
@@ -943,28 +1206,22 @@ kbd {
     flex: 1;
     position: relative;
     overflow-y: auto;
-    padding: clamp(28px, 4vh, 52px) clamp(28px, 4vw, 60px) 64px;
-    /* gold glow over a mostly-opaque base so the blurred town stays a faint
-       texture behind the dossier rather than competing with it */
+    padding: clamp(28px, 5vh, 56px) clamp(28px, 4vw, 64px) 64px;
     background:
         radial-gradient(
-            150% 85% at 50% 56%,
-            rgba(216, 169, 72, 0.12),
-            transparent 58%
+            90% 60% at 100% 0%,
+            rgba(0, 190, 235, 0.1),
+            transparent 60%
         ),
-        linear-gradient(
-            180deg,
-            rgba(20, 15, 9, 0.82) 0%,
-            rgba(13, 10, 6, 0.9) 100%
-        );
-    animation: rise 1.3s ease both;
+        rgba(10, 10, 10, 0.86);
+    animation: rise 0.9s var(--ease) both;
 }
 .fs-main > section {
     max-width: 1080px;
     margin-inline: auto;
 }
 .fs-board-sec {
-    margin-top: 46px;
+    margin-top: 40px;
 }
 
 /* ---- account panel: sign up / sign in, seated in the left rail ---- */
@@ -979,11 +1236,6 @@ kbd {
     display: none;
 }
 .auth-eyebrow {
-    font-family: 'Lora', serif;
-    font-size: 11px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
     margin-bottom: 12px;
 }
 .auth-fields {
@@ -991,50 +1243,28 @@ kbd {
     flex-direction: column;
     gap: 10px;
 }
-#authUser,
-#authPass {
-    display: block;
-    width: 100%;
-    background: rgba(216, 169, 72, 0.06);
-    border: 1px solid rgba(216, 169, 72, 0.3);
-    color: var(--parchment);
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 15px;
-    letter-spacing: 0.04em;
-    padding: 11px 14px;
-    outline: none;
-    transition: all 0.25s ease;
-}
-#authUser::placeholder,
-#authPass::placeholder {
-    color: #8d7b58;
-}
-#authUser:focus,
-#authPass:focus {
-    border-color: var(--gold);
-    background: rgba(216, 169, 72, 0.12);
-    box-shadow: 0 0 24px rgba(216, 169, 72, 0.18);
-}
+/* secondary — outlined pill, like RB-Media's bordered buttons */
 #authSubmit {
-    margin-top: 14px;
+    margin-top: 12px;
     width: 100%;
     background: transparent;
-    border: 1px solid rgba(216, 169, 72, 0.6);
-    color: var(--parchment);
-    font-family: 'Sekuya', serif;
-    font-size: 14px;
-    letter-spacing: 0.18em;
-    text-indent: 0.18em;
-    text-transform: uppercase;
-    padding: 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--pill);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 13px 24px;
     cursor: pointer;
-    transition: all 0.25s ease;
+    transition:
+        background 0.3s var(--ease),
+        border-color 0.3s var(--ease),
+        color 0.3s var(--ease);
 }
 #authSubmit:hover:not(:disabled) {
-    background: var(--gold);
-    color: var(--ink);
-    box-shadow: 0 0 28px rgba(216, 169, 72, 0.28);
+    background: var(--text);
+    border-color: var(--text);
+    color: var(--black);
 }
 #authSubmit:disabled {
     opacity: 0.5;
@@ -1045,27 +1275,25 @@ kbd {
     margin-top: 12px;
     background: none;
     border: none;
-    color: var(--gold-dim);
-    font-family: 'Lora', serif;
-    font-style: italic;
+    color: var(--accent);
+    font-family: var(--font);
     font-size: 13px;
-    letter-spacing: 0.04em;
+    font-weight: 500;
     cursor: pointer;
-    text-decoration: underline;
-    text-decoration-color: rgba(216, 169, 72, 0.3);
-    text-underline-offset: 3px;
-    transition: color 0.2s ease;
+    text-decoration: none;
+    transition: color 0.2s var(--ease);
 }
 .auth-link:hover {
-    color: var(--gold);
+    color: var(--accent-hi);
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 .auth-error {
     min-height: 1.2em;
     margin-top: 10px;
-    font-family: 'Lora', serif;
-    font-style: italic;
     font-size: 13px;
-    color: #d8746a;
+    font-weight: 500;
+    color: var(--danger);
 }
 .auth-error:empty {
     min-height: 0;
@@ -1075,45 +1303,35 @@ kbd {
     flex-direction: column;
     align-items: flex-start;
 }
-.auth-me-label {
-    font-family: 'Lora', serif;
-    font-size: 11px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-}
 .auth-me-name {
     margin-top: 8px;
-    font-family: 'Sekuya', serif;
-    font-size: clamp(28px, 3.4vw, 40px);
-    line-height: 1.04;
-    color: var(--gold);
-    text-shadow: 0 0 30px rgba(216, 169, 72, 0.28);
+    font-size: clamp(28px, 3vw, 38px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    color: var(--text);
 }
 .auth-me-note {
     margin-top: 6px;
-    font-family: 'Lora', serif;
-    font-style: italic;
     font-size: 13px;
-    color: #8d7b58;
+    color: var(--muted);
 }
 .auth-me .auth-link {
     margin-top: 18px;
-    padding: 11px 20px;
-    border: 1px solid rgba(216, 169, 72, 0.28);
-    color: #b6a884;
-    font-style: normal;
-    font-size: 12px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    text-decoration: none;
+    padding: 10px 20px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--pill);
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 600;
 }
 .auth-me .auth-link:hover {
-    border-color: var(--gold);
-    color: var(--gold);
+    border-color: var(--text);
+    color: var(--text);
+    text-decoration: none;
 }
 
-/* ---- field dossier (right pane, shown when signed in) ---- */
+/* ---- stats panel (right pane, shown when signed in) ---- */
 #intro:not(.signed-in) .fs-dossier {
     display: none;
 }
@@ -1126,132 +1344,159 @@ kbd {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
-    border-bottom: 1px solid rgba(216, 169, 72, 0.16);
-    padding-bottom: 18px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
 }
 .fs-doss-eyebrow {
-    font-family: 'Lora', serif;
-    font-size: 11px;
-    letter-spacing: 0.34em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
+    color: var(--accent);
 }
 .fs-doss-name {
-    font-family: 'Sekuya', serif;
-    font-size: clamp(30px, 4vw, 46px);
+    font-size: clamp(32px, 4vw, 52px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
     line-height: 1;
-    color: var(--gold);
-    margin-top: 8px;
-    text-shadow: 0 0 32px rgba(216, 169, 72, 0.22);
+    color: var(--text);
+    margin-top: 10px;
 }
 .fs-doss-standing {
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 15px;
-    color: #b6a884;
+    padding: 8px 16px;
+    border-radius: var(--pill);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+}
+.fs-doss-standing b {
+    color: var(--text);
+    font-weight: 700;
 }
 .fs-statgrid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    margin-top: 28px;
+    gap: 10px;
+    margin-top: 24px;
 }
 .fs-stat {
-    padding: 4px 18px;
-}
-.fs-stat + .fs-stat {
-    border-left: 1px solid rgba(233, 216, 176, 0.08);
+    padding: 18px 18px 16px;
+    background: rgba(31, 31, 31, 0.7);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 .fs-stat b {
-    font-family: 'Lora', serif;
-    font-weight: 600;
-    font-size: clamp(28px, 3vw, 40px);
+    font-size: clamp(26px, 2.6vw, 36px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
     line-height: 1;
-    color: var(--parchment);
+    color: var(--text);
     font-variant-numeric: tabular-nums;
 }
-.fs-stat.gold b {
-    color: var(--gold);
+.fs-stat.gold {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.fs-stat.gold b,
+.fs-stat.gold span {
+    color: var(--black);
 }
 .fs-stat span {
     display: block;
-    margin-top: 9px;
-    font-family: 'Lora', serif;
+    margin-top: 10px;
     font-size: 10px;
-    letter-spacing: 0.26em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--gold-dim);
+    color: var(--muted);
 }
 .fs-arms {
-    margin-top: 30px;
+    margin-top: 22px;
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
     flex-wrap: wrap;
-}
-.fs-arms-label {
-    font-family: 'Lora', serif;
-    font-size: 10.5px;
-    letter-spacing: 0.26em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
 }
 .fs-arms-list {
     display: flex;
-    gap: 24px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 .fs-arm {
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 15px;
-    color: #b6a884;
+    padding: 7px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--pill);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
 }
 .fs-arm b {
     margin: 0 2px 0 6px;
-    font-style: normal;
-    font-weight: 600;
-    color: var(--gold);
+    font-weight: 700;
+    color: var(--accent);
     font-variant-numeric: tabular-nums;
 }
 .fs-arm .hs {
     margin-left: 4px;
     font-size: 12px;
-    font-style: normal;
-    color: #8d7b58;
+    color: var(--muted);
 }
 
-/* ---- sealed dossier (right pane, shown when not signed in) ---- */
+/* ---- logged-out stats placeholder ---- */
 .fs-sealed {
-    border: 1px solid rgba(216, 169, 72, 0.16);
-    padding: clamp(36px, 6vw, 56px);
-    text-align: center;
-    background: rgba(8, 6, 4, 0.4);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: clamp(32px, 5vw, 52px);
+    text-align: left;
+    background:
+        radial-gradient(
+            80% 120% at 100% 100%,
+            rgba(0, 190, 235, 0.14),
+            transparent 60%
+        ),
+        rgba(20, 20, 20, 0.7);
 }
 .fs-sealed-orn {
-    color: rgba(216, 169, 72, 0.5);
-    font-size: 22px;
-    letter-spacing: 0.4em;
+    width: 48px;
+    height: 3px;
+    border-radius: var(--pill);
+    background: var(--accent);
 }
 .fs-sealed-title {
-    font-family: 'Sekuya', serif;
-    font-size: 26px;
-    color: #cdbb92;
-    margin-top: 14px;
+    margin-top: 20px;
+    font-size: clamp(26px, 3vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--text);
+}
+.fs-sealed-title em {
+    display: inline;
 }
 .fs-sealed-sub {
-    font-family: 'Lora', serif;
-    font-style: italic;
+    margin-top: 12px;
     font-size: 15px;
-    color: #8d7b58;
-    margin-top: 8px;
+    color: var(--muted);
+    max-width: 48ch;
+    line-height: 1.6;
 }
 
 .auth-or {
-    font-family: 'Lora', serif;
-    font-style: italic;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    color: #8d7b58;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+}
+.auth-or::before,
+.auth-or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+}
+.auth-or span {
+    color: var(--muted);
 }
 #intro.signed-in .auth-or,
 #intro.signed-in #nameInput,
@@ -1265,17 +1510,17 @@ kbd {
 }
 #intro.no-accounts .fs-aside {
     flex: 1;
-    max-width: 560px;
+    max-width: 520px;
     margin: 0 auto;
     justify-content: center;
     border-right: none;
-    box-shadow: none;
+    background: transparent;
 }
 
 /* (responsive overrides live at the very end of the file so they fall after
    the base .lb-row / .fs-board-cols rules and win the cascade) */
 
-/* ---- champions board (right pane): rank · name · kills · K/D · wins · heads ---- */
+/* ---- leaderboard (right pane): rank · name · kills · K/D · wins · heads ---- */
 #leaderboard {
     width: 100%;
     text-align: left;
@@ -1285,87 +1530,107 @@ kbd {
 }
 .fs-board-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
-    border-bottom: 1px solid rgba(216, 169, 72, 0.16);
-    padding-bottom: 14px;
+    padding-bottom: 16px;
 }
 .fs-board-head .sc-title {
     margin: 0;
-    text-align: left;
-    color: var(--gold);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-transform: none;
+    color: var(--text);
 }
 .fs-board-count {
-    font-family: 'Lora', serif;
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: #8d7b58;
+    padding: 6px 14px;
+    border-radius: var(--pill);
+    background: var(--surface);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+}
+.fs-board-count:empty {
+    display: none;
 }
 .fs-board-cols {
     display: grid;
     grid-template-columns: 56px 1fr 90px 90px 80px 90px;
-    padding: 16px 14px 8px;
-    font-family: 'Lora', serif;
+    padding: 12px 16px;
     font-size: 10px;
-    letter-spacing: 0.24em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--gold-dim);
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
 }
 .fs-board-cols .r {
     text-align: right;
+}
+.lb-rows {
+    margin-top: 6px;
 }
 .lb-row {
     display: grid;
     grid-template-columns: 56px 1fr 90px 90px 80px 90px;
     align-items: center;
-    padding: 13px 14px;
-    border-top: 1px solid rgba(233, 216, 176, 0.07);
-    font-family: 'Lora', serif;
+    padding: 13px 16px;
+    border-radius: 10px;
+    transition: background 0.2s var(--ease);
+}
+.lb-row:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.025);
+}
+.lb-row:hover {
+    background: rgba(255, 255, 255, 0.06);
 }
 .lb-row.me {
-    background: rgba(216, 169, 72, 0.1);
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
 }
 .lb-rank {
-    font-family: 'Sekuya', serif;
-    font-size: 15px;
-    color: rgba(216, 169, 72, 0.7);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+}
+.lb-row:nth-child(-n + 3) .lb-rank {
+    color: var(--accent);
 }
 .lb-name {
-    font-style: italic;
-    font-size: 17px;
-    color: #d8ccb0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-2);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     padding-right: 8px;
 }
 .lb-row.me .lb-name {
-    color: var(--gold);
-    font-weight: 600;
+    color: var(--accent);
+    font-weight: 700;
 }
 .lb-kills {
     text-align: right;
-    font-weight: 600;
-    font-size: 19px;
-    color: var(--gold);
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--text);
     font-variant-numeric: tabular-nums;
 }
 .lb-kd,
 .lb-wins,
 .lb-heads {
     text-align: right;
-    font-size: 15px;
-    color: #c8bc9e;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
     font-variant-numeric: tabular-nums;
 }
 .lb-empty {
-    font-family: 'Lora', serif;
-    font-style: italic;
     font-size: 14px;
-    color: #8d7b58;
-    padding: 18px 14px;
+    color: var(--muted);
+    padding: 18px 16px;
 }
 
 /* ============================ start-screen responsive ============================ */
@@ -1382,18 +1647,13 @@ kbd {
         max-width: none;
         min-width: 0;
         border-right: none;
-        border-bottom: 1px solid rgba(216, 169, 72, 0.16);
-        box-shadow: 0 26px 70px rgba(0, 0, 0, 0.45);
+        border-bottom: 1px solid var(--line);
     }
     .fs-main {
         flex: none;
     }
     .fs-statgrid {
         grid-template-columns: repeat(3, 1fr);
-        row-gap: 14px;
-    }
-    .fs-statgrid .fs-stat:nth-child(3n + 1) {
-        border-left: none;
     }
 }
 @media (max-width: 540px) {

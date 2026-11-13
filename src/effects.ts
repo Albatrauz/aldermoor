@@ -759,7 +759,7 @@ export function impactSurfaceOf(collider: any): Surface {
 
 /* Borderlands-style floating damage number: a chunky figure that punches in over
    the struck traveller, arcs up and out, then fades — so onlookers (and the
-   shooter) read how hard each ball landed. Headshots read bigger and gold.
+   shooter) read how hard each ball landed. Headshots read bigger and cyan.
    Textures are cached by (amount, head): a firefight reuses a handful of values,
    so we bake each once and share it. Swapping which texture a pooled sprite
    points at is free — three's program key cares whether a map exists, not which. */
@@ -771,15 +771,15 @@ function dmgTex(amount: number, head: boolean) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 128;
   const g = c.getContext('2d');
   const txt = String(amount);
-  g.font = '900 ' + (head ? 92 : 72) + 'px Georgia, "Arial Black", sans-serif';
+  g.font = '800 ' + (head ? 88 : 70) + 'px Montserrat, "Arial Black", sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.lineJoin = 'round'; g.miterLimit = 2;
   g.lineWidth = head ? 13 : 11;
-  g.strokeStyle = 'rgba(18,7,2,.95)';            // heavy dark outline so it reads on any backdrop
+  g.strokeStyle = 'rgba(0,0,0,.92)';            // heavy dark outline so it reads on any backdrop
   g.strokeText(txt, 128, 66);
   const grad = g.createLinearGradient(0, 22, 0, 108);
-  if (head) { grad.addColorStop(0, '#fff3b0'); grad.addColorStop(1, '#ff8a1e'); }  // crit gold→orange
-  else { grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#ffcf8c'); }       // warm white
+  if (head) { grad.addColorStop(0, '#9aeeff'); grad.addColorStop(1, '#00beeb'); }  // crit: RB-Media cyan
+  else { grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#dcdcdc'); }       // clean white
   g.fillStyle = grad;
   g.fillText(txt, 128, 66);
   const t = new THREE.CanvasTexture(c);

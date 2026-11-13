@@ -17,14 +17,6 @@ const esc = (s) => String(s).replace(/[&<>"']/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const kd = (k, d) => (k / Math.max(1, d)).toFixed(2);
 
-/* roman numerals for the board ranks (the algorithm repeats X, so any n works) */
-function toRoman(n) {
-  const map: [number, string][] = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
-  let out = '';
-  for (const [v, s] of map) { while (n >= v) { out += s; n -= v; } }
-  return out;
-}
-
 // the two reactive streams land independently; cache the latest of each so a
 // re-render (board → standing, session → me-highlight) always has both halves
 let lastRows = [];
@@ -35,17 +27,17 @@ function renderBoard() {
   lbEl.classList.add('show');
   if (lbCountEl) {
     lbCountEl.textContent = lastRows.length
-      ? `${lastRows.length} ${lastRows.length === 1 ? 'soul' : 'souls'} registered` : '';
+      ? `${lastRows.length} ${lastRows.length === 1 ? 'player' : 'players'}` : '';
   }
   if (!lastRows.length) {
-    lbRowsEl.innerHTML = '<div class="lb-empty">No champions yet — be the first.</div>';
+    lbRowsEl.innerHTML = '<div class="lb-empty">No players yet — be the first.</div>';
     return;
   }
   const meId = getSession()?.userId;
   lbRowsEl.innerHTML = lastRows.map((r, i) => {
     const me = meId && r.userId === meId ? ' me' : '';
     return `<div class="lb-row${me}">` +
-      `<span class="lb-rank">${toRoman(i + 1)}</span>` +
+      `<span class="lb-rank">${String(i + 1).padStart(2, '0')}</span>` +
       `<span class="lb-name">${esc(r.username)}</span>` +
       `<span class="lb-kills">${r.kills}</span>` +
       `<span class="lb-kd">${kd(r.kills, r.deaths)}</span>` +
@@ -70,8 +62,8 @@ function renderDossier() {
   // standing: our rank within the loaded board, else an unranked recruit
   const idx = lastRows.findIndex((r) => r.userId === session.userId);
   const standing = idx >= 0
-    ? `rank ${toRoman(idx + 1)} of ${lastRows.length} on the sand`
-    : (s.matchesPlayed ? 'beyond the ranked' : 'unranked recruit');
+    ? `Rank <b>#${idx + 1}</b> of ${lastRows.length}`
+    : (s.matchesPlayed ? 'Outside the top ranks' : 'Unranked');
 
   const stat = (v, label, gold?) =>
     `<div class="fs-stat${gold ? ' gold' : ''}"><b>${v}</b><span>${label}</span></div>`;
@@ -86,14 +78,14 @@ function renderDossier() {
 
   careerEl.innerHTML =
     `<div class="fs-doss-head"><div>` +
-      `<div class="fs-doss-eyebrow">Field dossier</div>` +
+      `<div class="fs-doss-eyebrow">Your stats</div>` +
       `<div class="fs-doss-name">${esc(name)}</div></div>` +
       `<div class="fs-doss-standing">${standing}</div></div>` +
     `<div class="fs-statgrid">` +
       stat(s.kills, 'Kills') + stat(s.deaths, 'Deaths') + stat(kd(s.kills, s.deaths), 'K / D', true) +
-      stat(s.wins, 'Wins') + stat(s.matchesPlayed, 'Matches') + stat(s.headshots, 'Heads') +
+      stat(s.wins, 'Wins') + stat(s.matchesPlayed, 'Matches') + stat(s.headshots, 'Headshots') +
     `</div>` +
-    `<div class="fs-arms"><span class="fs-arms-label">Arms</span>` +
+    `<div class="fs-arms"><span class="fs-arms-label">Weapons</span>` +
       `<div class="fs-arms-list">${arms}</div></div>`;
 }
 
