@@ -54,12 +54,55 @@ async function identify(token) {
   catch (e) { console.warn('token verify failed:', e.message); return null; }
 }
 
-// Persist a round's tally for every signed-in participant. Never throws.
+// Persist a round's tally for every signed-in participant. Never throws. The
+// mutation answers with one XP award per result (what the round paid out and
+// what that did to the player's level), which goes on to whoever is still here.
 function flushResults(results) {
   if (!convex || !SERVER_SECRET || !results.length) return;
   convex.mutation(convexApi.stats.recordMatch, { secret: SERVER_SECRET, results })
+    .then(deliverAwards)
     // ConvexError carries its reason on `.data`; plain errors only have `.message`.
     .catch((e) => console.warn('recordMatch failed:', e.data ?? e.message));
+}
+
+// Tell each player what the round earned them (the client shows it on the
+// round-over screen). A level-up can change the title they wear, so their look
+// is read afresh. A Convex deployment from before levels returns nothing here.
+function deliverAwards(awards) {
+  if (!Array.isArray(awards)) return;
+  for (const { userId, ...award } of awards) {
+    for (const [id, p] of players) {
+      if (p.authUserId !== userId) continue;
+      if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'xp', ...award }));
+      if (award.level !== p.level) refreshLook(id);
+    }
+  }
+}
+
+// A signed-in player's level, title and tunic colour (see progression.look), or
+// null for a guest, with Convex off, or against a deployment that predates levels.
+async function fetchLook(userId) {
+  if (!convex || !userId) return null;
+  try { return await convex.query(convexApi.progression.look, { userId }); }
+  catch (e) { console.warn('look lookup failed:', e.data ?? e.message); return null; }
+}
+
+// Wear a look. With no tunic chosen the player keeps the cloth of their seat.
+function applyLook(p, look) {
+  p.level = look ? look.level : 0;                    // 0 = no level to show (guest, bot)
+  p.title = look ? look.title : '';
+  p.color = look && look.color != null ? look.color : p.seatColor;
+}
+
+// Re-read a connected player's look and tell the field. The cloth itself is
+// only re-cut when they next take the field (the `join` carries the colour).
+async function refreshLook(id) {
+  const p = players.get(id);
+  if (!p || !p.authUserId) return;
+  const look = await fetchLook(p.authUserId);
+  if (!look || players.get(id) !== p) return;
+  applyLook(p, look);
+  broadcast({ t: 'look', id, lvl: p.level, title: p.title });
 }
 
 // Best-effort client IP from an upgrade request: prefer the proxy's forwarded
@@ -352,7 +395,7 @@ const num = (v, lo, hi, dflt) =>
 function standings() {
   return [...players.entries()]
     .filter(([, p]) => p.active)
-    .map(([id, p]) => ({ id, name: p.name, color: p.color, score: p.score, deaths: p.deaths }))
+    .map(([id, p]) => ({ id, name: p.name, color: p.color, score: p.score, deaths: p.deaths, lvl: p.level }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
@@ -379,7 +422,7 @@ function endRound(winnerId) {
     results.push({ userId: q.authUserId, username: q.username,
       roundKills: q.roundKills, roundDeaths: q.deaths, headshots: q.roundHeadshots,
       weaponKills: q.roundWeaponKills, weaponHeadshots: q.roundWeaponHeadshots,
-      won: !!winner && q.authUserId === winner.authUserId });
+      won: !!winner && q.authUserId === winner.authUserId, completed: true });
   }
   flushResults(results);
 
@@ -454,6 +497,7 @@ function spawnBots(n) {
     const id = nextId++;
     const ws = { readyState: 1, send() {} };
     const p = { ws, name: `Dummy ${k}`, color: COLORS[id % COLORS.length],
+      seatColor: COLORS[id % COLORS.length], level: 0, title: '',
       authUserId: null, username: null, active: true,   // dummies are always in the field
       x: 0, y: 1.65, z: 0, yaw: 0, m: 0, r: 0, alive: true,
       hp: MAX_HP, score: 0, deaths: 0, lastShot: 0, hitUsed: true, lastFell: 0, lastRename: 0,
@@ -574,6 +618,9 @@ function attachGame(httpServer, opts = {}) {
       console.log(`🔐 ${auth.username} (#${id}) signed in — IP ${ip || 'unknown'}`);
       recordLogin(auth.userId, ip);
     }
+    // …and learn what they have earned the right to wear.
+    const look = auth ? await fetchLook(auth.userId) : null;
+    if (ws.readyState !== 1) return;                  // bailed during the lookup
 
     // `baseName` is the bare chosen/account name; `name` is it deduped against the
     // field. We keep the base so a later spawn can re-dedupe cleanly (no suffix creep).
@@ -581,7 +628,9 @@ function attachGame(httpServer, opts = {}) {
     const p = { ws,
       baseName,
       name: uniqueName(baseName, id),
-      color: COLORS[id % COLORS.length],
+      seatColor: COLORS[id % COLORS.length],          // the cloth handed out by seat…
+      color: COLORS[id % COLORS.length],              // …worn unless a tunic is equipped
+      level: 0, title: '', lastLook: 0,               // set from `look` just below
       authUserId: auth ? auth.userId : null,          // null = guest (never scored to an account)
       username: auth ? auth.username : null,
       active: false,                                  // a fresh socket waits in the lobby, not the field
@@ -590,17 +639,20 @@ function attachGame(httpServer, opts = {}) {
       lastDamaged: 0, dmgFrom: new Map(), weapon: 0,  // dmgFrom: attackerId → {name, dmg} this life
       roundKills: 0, roundHeadshots: 0,               // per-round, for stat flush (deaths via p.deaths)
       roundWeaponKills: weaponTally(), roundWeaponHeadshots: weaponTally(), nades: NADES_PER_LIFE, lastNade: 0, diedAt: 0, flushed: false };
+    applyLook(p, look);
     players.set(id, p);
 
     // A spectator sees who's already fighting (so the field is populated the moment
     // they take it), but isn't announced to anyone and isn't yet a target.
     ws.send(JSON.stringify({
       t: 'welcome', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
+      lvl: p.level, title: p.title,
       map: activeMapName(),
       shots: shotLog,                                 // the round's damage so far, for the client to replay
       players: [...players.entries()]
         .filter(([pid, q]) => pid !== id && q.active)
-        .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, deaths: q.deaths, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
+        .map(([pid, q]) => ({ id: pid, name: q.name, color: q.color, score: q.score, deaths: q.deaths,
+          lvl: q.level, title: q.title, x: q.x, y: q.y, z: q.z, yaw: q.yaw })),
     }));
     console.log(`+ ${p.name} (#${id}) — watching from the lobby`);
 
@@ -660,7 +712,7 @@ function attachGame(httpServer, opts = {}) {
         p.m = 0; p.r = 0; p.lastShot = 0; p.hitUsed = true; p.lastFell = now; // a breath of spawn grace
         p.lastDamaged = 0; p.dmgFrom.clear(); p.nades = NADES_PER_LIFE; p.diedAt = 0;
         broadcast({ t: 'join', id, name: p.name, color: p.color, score: p.score, deaths: p.deaths,
-          x: p.x, y: p.y, z: p.z, yaw: p.yaw }, id);
+          lvl: p.level, title: p.title, x: p.x, y: p.y, z: p.z, yaw: p.yaw }, id);
         console.log(`▶ ${p.name} (#${id}) takes the field`);
       } else if (msg.t === 'spectate') {
         // Step off the field back to the lobby: no longer a target, no longer shooting.
@@ -668,6 +720,14 @@ function attachGame(httpServer, opts = {}) {
         p.active = false;
         broadcast({ t: 'leave', id, name: p.name }, id);   // others drop them from the field
         console.log(`◦ ${p.name} (#${id}) steps back to the lobby`);
+      } else if (msg.t === 'loadout') {
+        // The player changed what they wear (they did so against Convex, which
+        // checked they own it) — read their look again. Nothing is taken from the
+        // message itself, so there is nothing here to forge.
+        const now = Date.now();
+        if (!p.authUserId || now - p.lastLook < 1000) return;
+        p.lastLook = now;
+        refreshLook(id);
       } else if (msg.t === 'hit') {
         if (phase !== 'play' || !p.active) return;        // no scoring once it's over, or from the lobby
         const now = Date.now();
@@ -727,7 +787,8 @@ function attachGame(httpServer, opts = {}) {
         p.flushed = true;
         flushResults([{ userId: p.authUserId, username: p.username,
           roundKills: p.roundKills, roundDeaths: p.deaths, headshots: p.roundHeadshots,
-          weaponKills: p.roundWeaponKills, weaponHeadshots: p.roundWeaponHeadshots, won: false }]);
+          weaponKills: p.roundWeaponKills, weaponHeadshots: p.roundWeaponHeadshots,
+          won: false, completed: false }]);
       }
       players.delete(id);
       if (p.active) broadcast({ t: 'leave', id, name: p.name });  // only announce someone who was on the field

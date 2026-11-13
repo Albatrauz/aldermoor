@@ -11,13 +11,14 @@ import * as combat from './combat';
 import * as villagers from './villagers';
 import * as grenades from './grenades';
 import { updateFx } from './effects';
+import { showXpAward } from './hud';
 import { updateParticles } from './particles';
 import { updateWeather } from './weather';
 import { updateVoxels, voxelStats, voxelGrid, shotImpact, replayShots, skyAt } from './voxel';
 import * as net from './net';
 import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
 import * as visitor from './visitor';   // bird's-eye camera + top-down map plates
-import './stats';            // reactive leaderboard + career (no-op without Convex)
+import { debugDossier } from './stats';   // reactive leaderboard + dossier (inert without Convex)
 
 // Timer over Clock: Clock warns on construction from r183, and Timer takes the
 // timestamp requestAnimationFrame already hands us instead of calling
@@ -114,6 +115,8 @@ window.__town={
   get nades(){ return grenades.debugState(); },
   over: combat.handleOver,        // e.g. over({winnerName:'Wat the Cooper', cap:15, restartIn:20, standings:[...]})
   restart: combat.handleRestart,
+  dossier: debugDossier,          // dossier(prog, career?): paint the lobby dossier from data shaped like progression.mine
+  xp: showXpAward,                // with the overview up: xp({gained:450, parts:[…], levelBefore:1, level:2, into:0, need:750, unlocked:[…]})
   teleport(x,z,yaw=0,pitch=0){ controls.player.x=x; controls.player.z=z; controls.player.yaw=yaw; controls.player.pitch=pitch; controls.snapDown(); },
   respawn: controls.respawn,
   setMap: world.setMap,                   // jump to a named map (offline / debug)

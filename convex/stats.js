@@ -5,6 +5,7 @@
 // myStats are public reads (stats carry no secrets).
 import { mutation, query } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import { levelInfo, unlockedBetween, xpForRound, xpOf } from "./lib/progression";
 
 function assertServer(secret) {
   const expected = process.env.SERVER_SHARED_SECRET;
@@ -33,21 +34,38 @@ const matchResult = v.object({
   weaponKills: v.array(v.number()),
   weaponHeadshots: v.array(v.number()),
   won: v.boolean(),
+  // false for a tally flushed because the player left mid-round. Optional so a
+  // game server from before levels existed can still report.
+  completed: v.optional(v.boolean()),
 });
 
 // One call per finished (or abandoned) round, carrying every authenticated
-// participant's tally. Folds each into their lifetime `stats` and appends a
-// `matches` history row.
+// participant's tally. Folds each into their lifetime `stats`, pays out the
+// round's XP, and appends a `matches` history row. Returns one award per result
+// — what was earned and what it did to the player's level — which server.js
+// relays to that player for the round-over screen.
 export const recordMatch = mutation({
   args: { secret: v.string(), results: v.array(matchResult) },
   handler: async (ctx, { secret, results }) => {
     assertServer(secret);
     const now = Date.now();
+    const awards = [];
     for (const r of results) {
       const stat = await ctx.db
         .query("stats")
         .withIndex("by_userId", (q) => q.eq("userId", r.userId))
         .unique();
+      const earned = xpForRound(r);
+      const before = levelInfo(xpOf(stat));
+      const after = levelInfo(before.xp + earned.total);
+      awards.push({
+        userId: r.userId,
+        gained: earned.total,
+        parts: earned.parts,
+        levelBefore: before.level,
+        ...after,
+        unlocked: unlockedBetween(before.level, after.level),
+      });
       if (stat) {
         await ctx.db.patch(stat._id, {
           username: r.username, // keep the display name current
@@ -59,6 +77,7 @@ export const recordMatch = mutation({
           bestRoundKills: Math.max(stat.bestRoundKills, r.roundKills),
           weaponKills: addArr(stat.weaponKills, r.weaponKills),
           weaponHeadshots: addArr(stat.weaponHeadshots, r.weaponHeadshots),
+          xp: after.xp,
           lastSeen: now,
         });
       } else {
@@ -74,6 +93,7 @@ export const recordMatch = mutation({
           bestRoundKills: r.roundKills,
           weaponKills: addArr([], r.weaponKills),
           weaponHeadshots: addArr([], r.weaponHeadshots),
+          xp: after.xp,
           lastSeen: now,
         });
       }
@@ -86,9 +106,12 @@ export const recordMatch = mutation({
         weaponKills: r.weaponKills,
         weaponHeadshots: r.weaponHeadshots,
         won: r.won,
+        completed: r.completed ?? true,
+        xp: earned.total,
         finishedAt: now,
       });
     }
+    return awards;
   },
 });
 
@@ -104,6 +127,7 @@ export const leaderboard = query({
     return rows.map((s) => ({
       userId: s.userId,
       username: s.username,
+      level: levelInfo(xpOf(s)).level,
       kills: s.kills,
       deaths: s.deaths,
       headshots: s.headshots,

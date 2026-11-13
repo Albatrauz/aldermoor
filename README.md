@@ -90,6 +90,78 @@ player the new password yourself; they can sign in with it straight away. The
 first deploy after this change adds a `by_userId` index on `sessions`, which
 Convex builds on its own.
 
+### Levels, XP and honours
+
+Signed-in players earn **XP** for every round, rise through **50 levels**, and
+unlock **honours** — things to wear — along the way. Guests earn nothing.
+
+**What earns XP** (tallied when a round ends, by `stats:recordMatch`):
+
+| For                                   | XP   |
+|---------------------------------------|------|
+| Enemy felled                          | 100  |
+| …with a headshot                      | +50  |
+| …with a grenade                       | +50  |
+| Seeing the round through (and taking part) | 150 |
+| Winning the round                     | 300  |
+
+A winner's round is worth about 1 600 XP, an average one about 750. Leaving
+mid-round keeps the kill XP but forfeits the 150.
+
+**What a level costs.** Level *L* → *L*+1 takes `500 + 250·(L−1)` XP, so the
+total to *reach* level *L* is `125·(L−1)·(L+2)`:
+
+| Level | 2 | 5 | 10 | 20 | 30 | 40 | 50 (cap) |
+|-------|---|---|----|----|----|----|----------|
+| Total XP | 500 | 3 500 | 13 500 | 52 250 | 116 000 | 204 750 | 318 500 |
+
+That is one round to level 2, roughly an hour to 10, five to 20 and thirty to
+the cap. XP keeps counting past level 50.
+
+**Where players see it.** The lobby dossier shows the level, the bar to the
+next one, the next reward and the full honours track (click an owned item to
+wear it); the round-over screen shows what the round paid and any level-up; the
+leaderboard, the Tab tally and the final tally carry a level badge by each name.
+
+**Where it lives.** Everything tunable is in one file,
+`convex/lib/progression.js`: the XP table, the curve, and the catalog.
+
+- Only **total XP** is stored (`stats.xp`, written by the game server alone).
+  Level, progress and unlocks are derived on read, so retuning the curve or the
+  XP table needs no data change.
+- A **slot** is one place something can be worn (today: `title`, `tunic`); an
+  **item** belongs to a slot and is owned by reaching its `level`, or — with
+  `level: null` — only by being granted. To add customisation, add a slot and
+  its items to the catalog and teach the game to draw it (`publicLook` is what
+  reaches the game server and, through it, the other players). No schema change:
+  a loadout is stored as `slot → item id`.
+- What a player **chose** sits in `profiles` (loadout + grants), written by its
+  owner through `progression:equip`, which checks the session token and that
+  the item is really owned.
+
+Operator tools, from the CLI or the dashboard:
+
+```sh
+npx convex run progression:adminGrantItem '{"username":"Name","itemId":"title.old-guard"}'
+npx convex run progression:adminGrantXp   '{"username":"Name","amount":500}'
+```
+
+**Rolling it out to an existing deployment.** The schema change only adds
+optional fields, an index and a table, so it deploys over live data. Order:
+
+```sh
+npx convex deploy                              # 1. functions + schema first
+npx convex run migrations:backfillXp --prod    # 2. give existing careers their XP
+# 3. then release the game server and client
+```
+
+Step 2 credits every account from before levels with the XP its lifetime
+stats would have earned (kills, headshots, grenade kills, rounds, wins). It is
+idempotent and can be re-run. Until it has run, reads compute the same figure
+on the fly, so nothing shows wrong in between. An older game server keeps
+working against the new functions; a newer one against old functions cannot
+report rounds, hence functions first.
+
 ### Production (Convex Cloud)
 
 Deploy the functions once per release, then build/run the game as usual:
@@ -128,7 +200,7 @@ styles.css       all UI / HUD styling
 vite.config.mjs  Vite config; mounts the game's WebSocket server on the dev server
 server.js        production static (dist/) server + multiplayer WebSocket relay
 src/             the browser game, split into ES modules
-convex/          Convex backend functions: schema, auth, stats (deployed separately)
+convex/          Convex backend functions: schema, auth, stats, progression (deployed separately)
 ```
 
 `server.js` exports `attachGame(httpServer)` — the WebSocket game logic — which
@@ -159,7 +231,7 @@ dependency flow runs roughly top-to-bottom:
 | `net.js`        | WebSocket link + inbound message routing; hands the session token to the server |
 | `combat.js`     | handgonne viewmodel, firing, hit/kill handling |
 | `grenades.ts`   | grenades: cooking on G, the fuse ring and trajectory arc, bounce flights, blasts |
-| `stats.js`      | reactive leaderboard + own-career rendering on the intro screen |
+| `stats.js`      | reactive leaderboard + own dossier (career, level, honours) on the intro screen |
 | `main.js`       | entry point: wires the render loop and the `window.__town` debug hook |
 | `visitor.js`    | bird's-eye camera and the top-down capture of a map |
 
