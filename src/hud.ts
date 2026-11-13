@@ -4,6 +4,8 @@
 import { myId } from './net';
 import { introVisible } from './controls';
 import { mapLabel } from './world';
+import { getSession } from './auth';
+import { hasConvex } from './convex';
 
 const scoresEl=document.getElementById('scores');
 const scoreRowsEl=document.getElementById('scoreRows');
@@ -23,6 +25,9 @@ let hp=MAX_HP;
 /* names are player-chosen now — never let them into innerHTML raw */
 const esc=s=>String(s).replace(/[&<>"']/g,
   c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* a signed-in player's level, as a small badge before their name (guests have none) */
+const lvlBadge=lvl=>lvl>0?`<i class="lvl">${lvl|0}</i>`:'';
+const num=n=>Math.round(n||0).toLocaleString('en-US');
 
 /* set local health and repaint the bar — width plus a gold→crimson tint as it ebbs */
 export function setHp(n){
@@ -131,6 +136,7 @@ const ovCapEl=document.getElementById('ovCap');
 const ovRowsEl=document.getElementById('ovRows');
 const ovCountEl=document.getElementById('ovCount');
 const ovNextEl=document.getElementById('ovNext');
+const ovXpEl=document.getElementById('ovXp');
 let countTimer=null;
 
 function paintCount(s){
@@ -145,8 +151,13 @@ export function showOverview(m){
     const cls=(s.id===m.winnerId?' win':'')+(s.id===myId?' me':'');
     const rank=s.id===m.winnerId?'♛':i+1;
     return `<div class="ov-row${cls}"><span class="ov-rank">${rank}</span>`+
-      `<span class="ov-name">${s.name}</span><span class="ov-score">${s.score}</span></div>`;
+      `<span class="ov-name">${lvlBadge(s.lvl)}${esc(s.name)}</span><span class="ov-score">${s.score}</span></div>`;
   }).join('');
+  // the round's XP lands a moment later (showXpAward); a guest is told why none will
+  if(ovXpEl){
+    ovXpEl.innerHTML = hasConvex && !getSession()
+      ? '<div class="ov-xp-hint">Strangers earn no XP — log in to rise through the ranks.</div>' : '';
+  }
   let secs=Math.max(0, Math.round(m.restartIn ?? 20));
   paintCount(secs);
   clearInterval(countTimer);
@@ -160,6 +171,31 @@ export function showOverview(m){
 export function hideOverview(){
   clearInterval(countTimer); countTimer=null;
   overviewEl.classList.remove('show');
+}
+/* What the round paid out, on the overview: the XP and where it came from, the
+   level bar filling to its new mark, and anything the new level unlocked.
+   a: {gained, parts:[{label,count,xp}], levelBefore, level, into, need, atCap, unlocked:[{name,slot}]}
+   Says whether it was shown — the overview may already be gone. */
+export function showXpAward(a){
+  if(!ovXpEl || !overviewEl.classList.contains('show')) return false;
+  const up=a.level>a.levelBefore;
+  const pct=a.atCap ? 100 : Math.min(100, a.into/a.need*100);
+  const parts=(a.parts||[]).map(p=>
+    `<span>${esc(p.label)}${p.count>1?` ×${p.count}`:''} <b>+${num(p.xp)}</b></span>`).join('');
+  const unlocked=(a.unlocked||[]).map(u=>
+    `<div class="ov-xp-unlock">Unlocked · <b>${esc(u.name)}</b> <small>${esc(u.slot)}</small></div>`).join('');
+  ovXpEl.innerHTML=
+    `<div class="ov-xp-gain">+${num(a.gained)} XP</div>`+
+    `<div class="ov-xp-parts">${parts}</div>`+
+    `<div class="ov-xp-level"><span>Level ${a.level}</span>`+
+      `<div class="xp-bar"><i style="width:0%"></i></div>`+
+      `<span>${a.atCap?'Summit':num(a.into)+' / '+num(a.need)}</span></div>`+
+    (up?`<div class="ov-xp-up">Risen to level ${a.level}</div>`:'')+unlocked;
+  // from empty on a level-up, so the bar is seen to fill; the transition is CSS
+  const fill=ovXpEl.querySelector('.xp-bar i') as HTMLElement;
+  void fill.offsetWidth;
+  fill.style.width=pct.toFixed(1)+'%';
+  return true;
 }
 /* the death overlay: name the slayer, tally the wounds, seed the respawn countdown */
 export function showKillscreen(killerName, count, dmg, head, killerId, self=false){
@@ -201,7 +237,7 @@ function renderScoreboard(){
   const rows=[...scoresMap.entries()].sort((a,b)=>
     b[1].score-a[1].score || (a[1].deaths||0)-(b[1].deaths||0) || a[1].name.localeCompare(b[1].name));
   sbRowsEl.innerHTML=rows.map(([id,s])=>
-    `<div class="sb-row${id===myId?' me':''}"><span class="sb-name">${esc(s.name)}</span>`+
+    `<div class="sb-row${id===myId?' me':''}"><span class="sb-name">${lvlBadge(s.lvl)}${esc(s.name)}</span>`+
     `<span class="sb-num">${s.score||0}</span><span class="sb-num">${s.deaths||0}</span></div>`).join('');
 }
 /* called from renderScores so an open board stays live as kills/deaths land */
