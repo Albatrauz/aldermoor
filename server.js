@@ -130,7 +130,7 @@ const ROOT = fs.existsSync(path.join(DIST, 'index.html')) ? DIST : __dirname;
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
-  '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2',
+  '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary', '.json': 'application/json', '.woff2': 'font/woff2',
 };
 
 // Tell the page which map is live before its script runs, so it builds that map
