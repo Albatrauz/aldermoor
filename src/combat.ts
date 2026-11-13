@@ -14,6 +14,7 @@ import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
   showKillscreen, hideKillscreen, setKillCount, showOverview, hideOverview, MAX_HP } from './hud';
 import { announce, syncZone } from './zones';
 import { isCooking, resetNades } from './grenades';
+import { aim } from './aim';
 import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, showMenu, onMenuShown, player, vel, keys } from './controls';
 
 scene.add(camera); // the viewmodel rides on the camera
@@ -29,6 +30,8 @@ const DEATH_T = 4;
 // here (body cylinder tops out ~1.35, head sphere centres ~1.52). See rayPlayer.
 const HEAD_Y = 1.4;
 let fireCd=0, gunKick=0, reloadT=0, deathT=0;
+// linear raise progress 0..1 (aim.t is this, eased)
+let adsLin=0;
 // sustained-fire "heat": climbs by one per shot and bleeds off at the weapon's
 // `cool` rate, scaling each shot's bloom so a held spray walks the cone open.
 let fireHeat=0;
@@ -84,7 +87,8 @@ export function fire(){
   d.addScaledVector(right, Math.cos(aRand)*rr).addScaledVector(up, Math.sin(aRand)*rr).normalize();
   // each held shot blooms harder than the last: heat scales the per-shot growth,
   // then ticks up so the next round in a sustained spray opens the cone further
-  spread=Math.min(w.spread.max, spread+w.spread.shot*(1+fireHeat*(w.spread.ramp||0)));
+  const steady=1+(w.ads.spread-1)*aim.t;   // aiming down sights steadies the bloom too
+  spread=Math.min(w.spread.max, spread+w.spread.shot*steady*(1+fireHeat*(w.spread.ramp||0)));
   fireHeat+=1;
   let end=traceWorld(o,d,w.range).end;   // how far the world lets it fly
   let hitId=null;
@@ -121,10 +125,17 @@ export function fire(){
 
 addEventListener('mousedown',e=>{
   if(e.button===0 && !introVisible && !frozen && (locked||dragLook)){ mouseDown=true; fire(); }
+  if(e.button===2 && !introVisible && !frozen && (locked||dragLook)) aim.held=true;
 });
 addEventListener('mouseup',e=>{
   if(e.button===0) mouseDown=false;
+  if(e.button===2) aim.held=false;
 });
+// the right button is the sights, never the browser's context menu
+addEventListener('contextmenu',e=>{ if(!introVisible) e.preventDefault(); });
+// a released button the page never hears about (alt-tab, lost lock) must not leave the sights up
+addEventListener('blur',()=>{ aim.held=false; });
+document.addEventListener('pointerlockchange',()=>{ if(!document.pointerLockElement) aim.held=false; });
 addEventListener('keydown',e=>{
   if(e.code==='KeyR' && !introVisible) startReload();
   if(e.code==='Digit1' && !introVisible && deathT<=0) switchWeapon(0);
@@ -137,6 +148,7 @@ function switchWeapon(idx){
   weaponIdx=idx;
   fpModels[weaponIdx].group.visible=true;
   fireCd=Math.max(fireCd,.25); // brief draw delay
+  adsLin=0; aim.t=0;           // the new gun comes up at the hip
   mouseDown=false;             // avoid carrying a held trigger into the new weapon
   fireHeat=0;                            // a fresh arm starts cold — no carried spray heat
   spread=WEAPONS[weaponIdx].spread.base; // fresh arm draws to its own settled cone
@@ -198,6 +210,7 @@ export function handleFell(m){
     setHp(0); hurtFlash(); thudSnd();
     setDead(true);                        // freeze where we fell; respawn happens on the count
     deathT=DEATH_T;
+    adsLin=0; aim.t=0;                    // the sights drop with us
     showKillscreen(m.sname, Math.ceil(DEATH_T), m.dmg, m.head, m.shooter, m.self);
   }else if(m.self){
     announce(`${m.tname} was killed by their own grenade`);
@@ -343,16 +356,32 @@ export function update(dt){
   let floor=sp.base;
   if(!player.grounded) floor+=sp.air;
   else if(movingNow)   floor+=running?sp.run:sp.walk;
+  // aiming down sights: allowed unless reloading, sprinting, or a grenade is in
+  // hand. The raise runs linearly over the weapon's `ads.time` and is eased into
+  // aim.t, which everything else (zoom, mouse, walk, spread, gun pose) reads.
+  const ads=WEAPONS[weaponIdx].ads;
+  const wantAim=aim.held && reloadT<=0 && !(running && movingNow) && !isCooking();
+  adsLin=Math.max(0, Math.min(1, adsLin+(wantAim?1:-1)*dt/ads.time));
+  aim.t=adsLin*adsLin*(3-2*adsLin);
+  aim.fov=ads.fov; aim.speed=ads.speed;
+  floor*=1+(ads.spread-1)*aim.t;
   spread += (floor-spread)*Math.min(1,dt*sp.recover);
   spread = Math.min(spread, sp.max);
   fireHeat = Math.max(0, fireHeat-dt*(sp.cool||0));  // spray heat bleeds off between shots / once the trigger's let off
   const gapPx=Math.tan(spread)/Math.tan(camera.fov*Math.PI/360)*(renderer.domElement.clientHeight/2);
   crosshairEl.style.setProperty('--gap', gapPx.toFixed(1)+'px');
+  // the sights take over from the crosshair as the gun comes up
+  crosshairEl.style.opacity=String(Math.max(0, 1-aim.t*1.6));
   const w=WEAPONS[weaponIdx];
   const fm=fpModels[weaponIdx];
   const b=fm.base;
   const dip=reloadT>0 ? Math.sin((1-reloadT/w.reloadTime)*Math.PI) : 0;
-  fm.group.position.set(b.x, b.y+Math.sin(walkPhase)*.006-dip*.16, b.z+gunKick*.09);
-  fm.group.rotation.x=gunKick*.22-dip*.7;
-  fm.group.rotation.z=Math.sin(walkPhase*.5)*.012+dip*.25;
+  // hip pose → sight pose; at the eye the stock is in the shoulder, so the gun
+  // bobs and kicks less (the kick still reads, mostly as a jolt back)
+  const a=aim.t, p=w.ads.pos, kick=gunKick*(1+(w.ads.kick-1)*a), sway=1-a*.8;
+  fm.group.position.set(b.x+(p.x-b.x)*a,
+    b.y+(p.y-b.y)*a+Math.sin(walkPhase)*.006*sway-dip*.16,
+    b.z+(p.z-b.z)*a+kick*.09);
+  fm.group.rotation.x=kick*.22-dip*.7;
+  fm.group.rotation.z=Math.sin(walkPhase*.5)*.012*sway+dip*.25;
 }

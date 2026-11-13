@@ -190,22 +190,26 @@ function roofAndWalls(k: Kit) {
 }
 
 /* ============================ sign boards ============================ */
-// Shapes, not words — tenants change. Each panel's back sits on the wall's outer face.
+// Each panel's back sits on the wall's outer face.
 function signs(k: Kit) {
-  // the company lettering top-left of the front: a pixel logo, then a row of pale
-  // letter-like blocks that spell nothing
-  const GLYPHS = [
-    ['####', '#..#', '#..#'],
-    ['####', '.##.', '.##.'],
-    ['###.', '###.', '#.##'],
-    ['#..#', '####', '#..#'],
-    ['####', '##..', '####'],
-    ['#...', '#...', '####'],
-  ];
-  const order = [3, 0, 1, 4, 2, 5, 1, 4, 5, 5, 0, 2];
-  const logo = ['b.p', 'pbw', '.wb'];
-  const rows = logo.map((r, i) => r + '..' + order.map((g) => GLYPHS[g][i]).join('.'));
-  pixelPanel(k, -17.5, FRONT, 's', 9, VS, rows, { '#': matKWhite, w: matKWhite, b: matKBlue, p: matKPurple });
+  // the company lettering top-left of the front: the RB-Media wordmark in black,
+  // redrawn by hand from rb-media.nl's logo.svg (a straight rasterise at this size
+  // is mush). Lowercase, two rows of ascender over a five-row x-height, the hyphen
+  // joined to the m's stem and the i without a dot, as in the logo. Seven rows fit
+  // between the upper window heads (8.25) and the roof-edge cap (10.25).
+  const RB_MEDIA: Record<string, string[]> = {
+    r: ['....', '....', '#.##', '##..', '#...', '#...', '#...'],
+    b: ['#....', '#....', '#.##.', '##..#', '#...#', '##..#', '#.##.'],
+    '-': ['..', '..', '..', '..', '##', '..', '..'],
+    m: ['.........', '.........', '#.##..##.', '##..##..#', '#...#...#', '#...#...#', '#...#...#'],
+    e: ['.....', '.....', '.###.', '#...#', '#####', '#....', '.####'],
+    d: ['....#', '....#', '.##.#', '#..##', '#...#', '#..##', '.##.#'],
+    i: ['.', '.', '#', '#', '#', '#', '#'],
+    a: ['.....', '.....', '.###.', '....#', '.####', '#...#', '.####'],
+  };
+  const spell = (s: string, i: number) => [...s].map((g) => RB_MEDIA[g][i]).join('.');   // one column between letters
+  const rows = RB_MEDIA.r.map((_, i) => spell('rb-', i) + spell('media', i));         // the hyphen butts onto the m
+  pixelPanel(k, -17.5, FRONT, 's', HEAD + L1 + VS, VS, rows, { '#': matKBlack });
 
   // the poster on the south-west corner: a portrait on blue-violet, text in the lower third
   pixelPanel(k, -32.5, FRONT, 's', 5.75, VS, [

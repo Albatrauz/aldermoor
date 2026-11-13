@@ -54,11 +54,32 @@ export default defineSchema({
     // reads default to [] (see myStats / addArr).
     weaponKills: v.optional(v.array(v.number())),
     weaponHeadshots: v.optional(v.array(v.number())),
+    // Lifetime experience — the ONE stored progression number. Level, progress
+    // and unlocks are all derived from it (convex/lib/progression.js), so the
+    // curve can be retuned without touching rows. Optional because accounts
+    // predate it: reads fall back to retroXp(stat), and migrations:backfillXp
+    // writes that figure in for good.
+    xp: v.optional(v.number()),
     lastSeen: v.number(),
   })
     .index("by_userId", ["userId"])
     .index("by_username", ["username"])
-    .index("by_kills", ["kills"]),
+    .index("by_kills", ["kills"])
+    .index("by_xp", ["xp"]), // for a levels board; rows without xp sort first until backfilled
+
+  // What a player has chosen to wear, and what they own beyond their level.
+  // Kept apart from `stats` on purpose: stats are written only by the game
+  // server, a profile is written by its owner (progression.equip). Created
+  // lazily on the first equip or grant — no row simply means "all defaults".
+  profiles: defineTable({
+    userId: v.id("users"),
+    // slot id → item id (see SLOTS / ITEMS in convex/lib/progression.js). A
+    // record rather than fixed fields so a new slot needs no schema change.
+    loadout: v.record(v.string(), v.string()),
+    // item ids owned by grant rather than by level (events, feats, favours)
+    grants: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
 
   // Append-only history: one row per finished round per participant. Lets us
   // rebuild `stats` if it ever drifts, and powers a future match-history view.
@@ -71,6 +92,10 @@ export default defineSchema({
     weaponKills: v.optional(v.array(v.number())),
     weaponHeadshots: v.optional(v.array(v.number())),
     won: v.boolean(),
+    // false when the player left before the final tally. Optional: older rows
+    // (and an older game server) don't carry it.
+    completed: v.optional(v.boolean()),
+    xp: v.optional(v.number()), // XP this round paid out — the audit trail behind stats.xp
     finishedAt: v.number(),
   })
     .index("by_userId", ["userId"])

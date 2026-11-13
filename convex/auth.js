@@ -235,6 +235,7 @@ export const createUserAndSession = internalMutation({
       bestRoundKills: 0,
       weaponKills: [],
       weaponHeadshots: [],
+      xp: 0,
       lastSeen: now,
     });
   },

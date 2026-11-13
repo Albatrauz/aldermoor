@@ -18,6 +18,7 @@ import { glowTex } from './textures';
 import { setSky, bakeEnvironment } from './sky';
 import { setFogHeight } from './fog';
 import { buildVoxelWorld, onGeometryChange, voxelsTouched } from './voxel';
+import { buildDecals, refreshDecals } from './decals';
 import { skyUniforms } from './voxel/skylight';
 import { setWeather } from './weather';
 import { setLanterns } from './villagers';
@@ -70,7 +71,7 @@ sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
 sun.shadow.autoUpdate = false;
 sun.shadow.needsUpdate = true;
 scene.add(sun);
-onGeometryChange(() => { sun.shadow.needsUpdate = true; });
+onGeometryChange(() => { sun.shadow.needsUpdate = true; refreshDecals(); });
 const fill = new THREE.DirectionalLight(0xb9c9de, 0.4);
 fill.position.set(-60, 40, -45);
 fill.layers.enable(VISITOR_LAYER);
@@ -122,7 +123,12 @@ export const ZONES: Zone[] = [];
 // The lobby establishing-shot camera; mutated in place so controls keeps its ref.
 export const menuCam: MenuCam = { x: -48, y: 12, z: 2, yaw: -Math.PI / 2, pitch: -.16 };
 
-export let currentMapName = MAP_ORDER[0];
+// The server tags the page with the map that is live right now (see
+// injectLiveMap in server.js), so the first build is already the right one. A
+// page without the tag, or with a name this build doesn't know, starts on the
+// first map and swaps when `welcome` names the live one.
+const liveMap = document.querySelector<HTMLMetaElement>('meta[name="aldermoor-map"]')?.content;
+export let currentMapName = liveMap && MAPS[liveMap] ? liveMap : MAP_ORDER[0];
 let currentGroup: THREE.Group | null = null;
 
 const changeListeners = new Set<(name: string) => void>();
@@ -161,6 +167,8 @@ export function setMap(name: string, fresh = false) {
   // occlusion needs no separate bake any more: the voxel mesher shades every
   // crease as it builds, and keeps doing so as the map is shot to pieces.
   currentGroup = buildVoxelWorld(built, def.env.groundSurface);
+  // Logos and signs too fine for the voxels ride on top of them, as pictures.
+  currentGroup.add(buildDecals(built.decals ?? []));
   disposeGroup(built.group);
   scene.add(currentGroup);
   markVisitorLayer();

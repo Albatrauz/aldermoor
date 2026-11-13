@@ -4,24 +4,28 @@
 // combat layers. `net`/`myId`/`myName` are exported as live bindings.
 import { EYE } from './core';
 import { addRemote, dropRemote, renameRemote, remotes, setRemoteWeapon } from './villagers';
-import { scoresMap, setHp, renderScores, MAX_HP } from './hud';
+import { scoresMap, setHp, renderScores, showXpAward, MAX_HP } from './hud';
 import { announce } from './zones';
 
 import { remoteShoot, handleHitFx, handleFell, handleOver, handleRestart, enterField, handleLobby, resetFieldState, weaponIdx } from './combat';
 
 import { player, vel, keys, introVisible } from './controls';
 import { getToken, getSession, onAuthChange } from './auth';
-import { setMap, mapLabel, mapBlurb, onMapChange } from './world';
+import { setMap, mapLabel, mapBlurb, onMapChange, currentMapName } from './world';
 import { replayShots } from './voxel';
 import { handleNade, handleBoom } from './grenades';
 
 // Keep the lobby's map nameplate in step with whatever map is live.
 const introTitleEl=document.getElementById('introMapTitle');
 const introSubEl=document.getElementById('introMapSub');
-onMapChange(name=>{
+function showMapPlate(name){
   if(introTitleEl) introTitleEl.textContent=mapLabel(name);
   if(introSubEl) introSubEl.textContent=mapBlurb(name);
-});
+}
+onMapChange(showMapPlate);
+// The first map was built before this listener existed (and may not be the one
+// index.html's static plate describes), so fill the plate in once now.
+showMapPlate(currentMapName);
 
 const presenceEl=document.getElementById('presence');
 export let net=null, myId=null, myName=null;
@@ -96,8 +100,8 @@ function connect(){
       if(Array.isArray(m.shots)) replayShots(m.shots);
       resetFieldState();                 // a fresh socket starts as a lobby spectator
       scoresMap.clear();
-      scoresMap.set(myId,{name:myName, score:m.score||0, deaths:m.deaths||0});
-      for(const p of m.players){ addRemote(p); scoresMap.set(p.id,{name:p.name, score:p.score||0, deaths:p.deaths||0}); }
+      scoresMap.set(myId,{name:myName, score:m.score||0, deaths:m.deaths||0, lvl:m.lvl||0});
+      for(const p of m.players){ addRemote(p); scoresMap.set(p.id,{name:p.name, score:p.score||0, deaths:p.deaths||0, lvl:p.lvl||0}); }
       setHp(MAX_HP); renderScores();
       updatePresence();
       announce(`Welcome, ${myName}`);
@@ -118,10 +122,18 @@ function connect(){
       updatePresence();
     }else if(m.t==='join'){
       addRemote(m);
-      scoresMap.set(m.id,{name:m.name, score:m.score||0, deaths:m.deaths||0});
+      scoresMap.set(m.id,{name:m.name, score:m.score||0, deaths:m.deaths||0, lvl:m.lvl||0});
       renderScores();
       updatePresence();
       announce(`${m.name} joined the game`);
+    }else if(m.t==='look'){
+      // someone's level (or title) changed — us included; keep the tally's badge current
+      const s=scoresMap.get(m.id);
+      if(s){ s.lvl=m.lvl||0; renderScores(); }
+    }else if(m.t==='xp'){
+      // what the round just paid us: onto the round-over screen if it is still
+      // up, else a passing word (the dossier in the lobby has the full account)
+      if(!showXpAward(m)) announce(m.level>m.levelBefore ? `Level up — you reached level ${m.level}` : `+${m.gained} XP`);
     }else if(m.t==='leave'){
       dropRemote(m.id);
       scoresMap.delete(m.id);
