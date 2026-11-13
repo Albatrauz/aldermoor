@@ -69,14 +69,14 @@ export function sendNet(obj){
 }
 
 function updatePresence(){
-  if(!net){ presenceEl.textContent='⚜ the road is quiet — rejoining…'; return; }
-  const n=remotes.size;
-  presenceEl.textContent=`⚜ ${myName} · `+
-    (n===0?'alone in town':n===1?'one fellow traveller':`${n} fellow travellers`);
+  presenceEl.classList.toggle('offline', !net);
+  if(!net){ presenceEl.textContent='Reconnecting…'; return; }
+  const n=remotes.size+1;
+  presenceEl.textContent=`${myName} · ${n} ${n===1?'player':'players'} online`;
 }
 
 function connect(){
-  if(location.protocol==='file:'){ presenceEl.textContent='⚜ offline — wandering alone'; return; }
+  if(location.protocol==='file:'){ presenceEl.classList.add('offline'); presenceEl.textContent='Offline — playing solo'; return; }
   let ws;
   // A signed-in player hands the server their session token, which the server
   // trades for a trusted, fixed username. A guest hands their remembered free
@@ -86,7 +86,7 @@ function connect(){
   const q = tok ? '?token='+encodeURIComponent(tok)
                 : (desiredName ? '?name='+encodeURIComponent(desiredName) : '');
   try{ ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'+q); }
-  catch{ presenceEl.textContent='⚜ offline — wandering alone'; return; }
+  catch{ presenceEl.classList.add('offline'); presenceEl.textContent='Offline — playing solo'; return; }
   curWs=ws;
   ws.onopen=()=>{ netRetry=1000; };
   ws.onmessage=e=>{
@@ -125,7 +125,7 @@ function connect(){
       scoresMap.set(m.id,{name:m.name, score:m.score||0, deaths:m.deaths||0, lvl:m.lvl||0});
       renderScores();
       updatePresence();
-      announce(`${m.name} enters the gates`);
+      announce(`${m.name} joined the game`);
     }else if(m.t==='look'){
       // someone's level (or title) changed — us included; keep the tally's badge current
       const s=scoresMap.get(m.id);
@@ -133,13 +133,13 @@ function connect(){
     }else if(m.t==='xp'){
       // what the round just paid us: onto the round-over screen if it is still
       // up, else a passing word (the dossier in the lobby has the full account)
-      if(!showXpAward(m)) announce(m.level>m.levelBefore ? `Risen to level ${m.level}` : `+${m.gained} XP`);
+      if(!showXpAward(m)) announce(m.level>m.levelBefore ? `Level up — you reached level ${m.level}` : `+${m.gained} XP`);
     }else if(m.t==='leave'){
       dropRemote(m.id);
       scoresMap.delete(m.id);
       renderScores();
       updatePresence();
-      announce(`${m.name} departs`);
+      announce(`${m.name} left the game`);
     }else if(m.t==='shoot'){
       remoteShoot(m);
     }else if(m.t==='nade'){
@@ -162,7 +162,7 @@ function connect(){
     }else if(m.t==='denied'){
       // tried to take the field while a contest was wrapping up — bounce to the menu
       handleLobby();
-      announce(m.restartIn>0 ? `A contest is finishing — try again in ${m.restartIn}s` : 'A contest is finishing — one moment…');
+      announce(m.restartIn>0 ? `A round is finishing — try again in ${m.restartIn}s` : 'A round is finishing — one moment…');
     }else if(m.t==='snap'){
       for(const id of Object.keys(m.p)){
         if(+id===myId) continue;

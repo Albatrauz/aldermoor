@@ -59,8 +59,8 @@ function paint(){
 /* swap the form between logging in and forging a new name */
 function setMode(m){
   mode = m;
-  if(submitEl) submitEl.textContent = m==='signup' ? 'Take an oath' : 'Return to arms';
-  if(toggleEl) toggleEl.textContent = m==='signup' ? 'Already sworn? Log in' : 'New here? Forge a name';
+  if(submitEl) submitEl.textContent = m==='signup' ? 'Create account' : 'Log in';
+  if(toggleEl) toggleEl.textContent = m==='signup' ? 'Already have an account? Log in' : 'New here? Create an account';
   if(passEl) passEl.autocomplete = m==='signup' ? 'new-password' : 'current-password';
   showError('');
 }

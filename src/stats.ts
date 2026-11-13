@@ -22,14 +22,6 @@ const kd = (k, d) => (k / Math.max(1, d)).toFixed(2);
 const num = (n) => Math.round(n || 0).toLocaleString('en-US');
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
-/* roman numerals for the board ranks (the algorithm repeats X, so any n works) */
-function toRoman(n) {
-  const map: [number, string][] = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
-  let out = '';
-  for (const [v, s] of map) { while (n >= v) { out += s; n -= v; } }
-  return out;
-}
-
 // the two reactive streams land independently; cache the latest of each so a
 // re-render (board → standing, session → me-highlight) always has both halves
 let lastRows = [];
@@ -43,17 +35,17 @@ function renderBoard() {
   lbEl.classList.add('show');
   if (lbCountEl) {
     lbCountEl.textContent = lastRows.length
-      ? `${lastRows.length} ${lastRows.length === 1 ? 'soul' : 'souls'} registered` : '';
+      ? `${lastRows.length} ${lastRows.length === 1 ? 'player' : 'players'}` : '';
   }
   if (!lastRows.length) {
-    lbRowsEl.innerHTML = '<div class="lb-empty">No champions yet — be the first.</div>';
+    lbRowsEl.innerHTML = '<div class="lb-empty">No players yet — be the first.</div>';
     return;
   }
   const meId = getSession()?.userId;
   lbRowsEl.innerHTML = lastRows.map((r, i) => {
     const me = meId && r.userId === meId ? ' me' : '';
     return `<div class="lb-row${me}">` +
-      `<span class="lb-rank">${toRoman(i + 1)}</span>` +
+      `<span class="lb-rank">${String(i + 1).padStart(2, '0')}</span>` +
       `<span class="lb-name">${r.level ? `<i class="lvl">${r.level}</i>` : ''}${esc(r.username)}</span>` +
       `<span class="lb-kills">${r.kills}</span>` +
       `<span class="lb-kd">${kd(r.kills, r.deaths)}</span>` +
@@ -78,8 +70,8 @@ function renderDossier() {
   // standing: our rank within the loaded board, else an unranked recruit
   const idx = lastRows.findIndex((r) => r.userId === session.userId);
   const standing = idx >= 0
-    ? `rank ${toRoman(idx + 1)} of ${lastRows.length} on the sand`
-    : (s.matchesPlayed ? 'beyond the ranked' : 'unranked recruit');
+    ? `Rank <b>#${idx + 1}</b> of ${lastRows.length}`
+    : (s.matchesPlayed ? 'Outside the top ranks' : 'Unranked');
 
   const stat = (v, label, gold?) =>
     `<div class="fs-stat${gold ? ' gold' : ''}"><b>${v}</b><span>${label}</span></div>`;
@@ -96,15 +88,15 @@ function renderDossier() {
   careerEl.innerHTML =
     `<div class="fs-doss-head"><div class="fs-doss-id">` +
       (p ? `<div class="fs-lvl" aria-label="Level ${p.level}"><span>Level</span><b>${p.level}</b></div>` : '') +
-      `<div><div class="fs-doss-eyebrow">Field dossier${p?.title ? ` · ${esc(p.title)}` : ''}</div>` +
+      `<div><div class="fs-doss-eyebrow">Your stats${p?.title ? ` · ${esc(p.title)}` : ''}</div>` +
       `<div class="fs-doss-name">${esc(name)}</div></div></div>` +
       `<div class="fs-doss-standing">${standing}</div></div>` +
     (p ? xpBlock(p) : '') +
     `<div class="fs-statgrid">` +
       stat(s.kills, 'Kills') + stat(s.deaths, 'Deaths') + stat(kd(s.kills, s.deaths), 'K / D', true) +
-      stat(s.wins, 'Wins') + stat(s.matchesPlayed, 'Matches') + stat(s.headshots, 'Heads') +
+      stat(s.wins, 'Wins') + stat(s.matchesPlayed, 'Matches') + stat(s.headshots, 'Headshots') +
     `</div>` +
-    `<div class="fs-arms"><span class="fs-arms-label">Arms</span>` +
+    `<div class="fs-arms"><span class="fs-arms-label">Weapons</span>` +
       `<div class="fs-arms-list">${arms}</div></div>` +
     (p ? honoursBlock(p) : '');
 
@@ -118,10 +110,10 @@ function xpBlock(p) {
   const pct = p.atCap ? 100 : Math.min(100, (p.into / p.need) * 100);
   const next = p.next
     ? `Next reward · <b>${esc(p.next.name)}</b> at level ${p.next.level}`
-    : 'Every honour is yours';
+    : 'All rewards unlocked';
   return `<div class="fs-xp">` +
     `<div class="fs-xp-line"><span>Level ${p.level}</span>` +
-      `<span class="fs-xp-num">${p.atCap ? 'The summit — level ' + p.maxLevel
+      `<span class="fs-xp-num">${p.atCap ? 'Max level — ' + p.maxLevel
         : `<b>${num(p.into)}</b> / ${num(p.need)} XP`}</span>` +
       `<span>${p.atCap ? '' : 'Level ' + (p.level + 1)}</span></div>` +
     `<div class="xp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" ` +
@@ -146,7 +138,7 @@ function honoursBlock(p) {
   }).join('');
   const earn = p.sources.map((src) =>
     `<li><span>${esc(src.label)}</span><b>+${num(src.xp)}</b></li>`).join('');
-  return `<div class="fs-honours"><div class="fs-honours-title">Honours</div>${slots}` +
+  return `<div class="fs-honours"><div class="fs-honours-title">Rewards</div>${slots}` +
     `<div class="fs-gear-err" role="alert">${esc(gearError)}</div>` +
     `<details class="fs-earn"${earnOpen ? ' open' : ''}><summary>How XP is earned</summary>` +
       `<ul>${earn}</ul><p>XP is tallied when a round ends, for signed-in players only.</p></details></div>`;

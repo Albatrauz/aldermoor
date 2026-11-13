@@ -213,14 +213,14 @@ export function handleFell(m){
     adsLin=0; aim.t=0;                    // the sights drop with us
     showKillscreen(m.sname, Math.ceil(DEATH_T), m.dmg, m.head, m.shooter, m.self);
   }else if(m.self){
-    announce(`${m.tname} was undone by their own grenade`);
+    announce(`${m.tname} was killed by their own grenade`);
   }else if(m.shooter===myId){
-    announce(m.w===2 ? `Your grenade felled ${m.tname}!`
-      : m.head ? `You felled ${m.tname} with a ball to the head!` : `You felled ${m.tname}!`);
+    announce(m.w===2 ? `Your grenade killed ${m.tname}`
+      : m.head ? `Headshot — you killed ${m.tname}` : `You killed ${m.tname}`);
     ding();
   }else{
-    announce(m.w===2 ? `${m.sname}'s grenade felled ${m.tname}`
-      : m.head ? `${m.sname} felled ${m.tname} with a headshot` : `${m.sname} felled ${m.tname}`);
+    announce(m.w===2 ? `${m.sname}'s grenade killed ${m.tname}`
+      : m.head ? `${m.sname} killed ${m.tname} · headshot` : `${m.sname} killed ${m.tname}`);
   }
 }
 export function handleOver(m){
@@ -241,7 +241,7 @@ export function handleRestart(_msg?: unknown){
   syncZone();
   refillAll();
   mouseDown=false;
-  announce('A new contest begins!');
+  announce('New round — go!');
 }
 
 // true while the live socket has us as an active combatant (between a spawn and

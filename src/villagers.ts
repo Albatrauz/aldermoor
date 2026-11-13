@@ -63,13 +63,13 @@ let lanternsOn = false;
 function makeNameTag(text){
   const c=document.createElement('canvas'); c.width=512; c.height=96;
   const g=c.getContext('2d');
-  g.font='italic 42px Georgia, serif';
+  g.font='600 40px Montserrat, "Helvetica Neue", Arial, sans-serif';   // RB-Media type
   g.textAlign='center'; g.textBaseline='middle';
   const w=Math.min(500, g.measureText(text).width+44);
-  g.fillStyle='rgba(10,7,4,.55)';
-  if(g.roundRect){ g.beginPath(); g.roundRect(256-w/2,16,w,64,14); g.fill(); }
+  g.fillStyle='rgba(10,10,10,.68)';
+  if(g.roundRect){ g.beginPath(); g.roundRect(256-w/2,16,w,64,32); g.fill(); }
   else g.fillRect(256-w/2,16,w,64);
-  g.fillStyle='#e9d8b0';
+  g.fillStyle='#ffffff';
   g.fillText(text,256,48);
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t, transparent:true, depthWrite:false}));
