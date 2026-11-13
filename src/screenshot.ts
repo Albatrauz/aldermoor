@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { renderer, scene, camera, canvas } from './core';
 import { currentMapName } from './world';
-import { introVisible } from './controls';
+import { introVisible, chatOpen } from './controls';
 
 export interface ScreenshotOptions {
   /** Keep the gun (and a cooking grenade) in the frame. Default false. */
@@ -90,7 +90,7 @@ function note(text: string) {
 }
 
 addEventListener('keydown', (e) => {
-  if (e.code !== 'KeyP' || e.repeat || introVisible) return;
+  if (e.code !== 'KeyP' || e.repeat || introVisible || chatOpen) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;   // leave ⌘P / Ctrl+P to the browser
   takeScreenshot();
 });
