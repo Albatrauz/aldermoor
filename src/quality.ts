@@ -9,6 +9,7 @@
 // `__town.perf()`. Nothing here runs any GPU work of its own; `renderer.info`
 // is bookkeeping the renderer maintains regardless.
 import { renderer } from './core';
+import { chatOpen } from './controls';
 
 const N = 120;                       // ~2s of history at 60fps
 const times = new Float32Array(N);
@@ -80,5 +81,5 @@ export function showPerf(on = true) {
 export function togglePerf() { return showPerf(!overlay); }
 
 addEventListener('keydown', (e) => {
-  if (e.code === 'Backquote') togglePerf();
+  if (e.code === 'Backquote' && !chatOpen) togglePerf();
 });

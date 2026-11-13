@@ -36,7 +36,21 @@
       <span><kbd>Shift</kbd>run</span>
       <span><kbd>Space</kbd>jump</span>
       <span><kbd>Tab</kbd>scores</span>
+      <span><kbd>T</kbd>chat</span>
       <span><kbd>Esc</kbd>menu</span>
+    </div>
+    <div id="chatLog" aria-live="polite"></div>
+    <div id="chatBox" aria-hidden="true">
+      <label class="chat-label" for="chatInput">Chat</label>
+      <input
+        id="chatInput"
+        maxlength="200"
+        autocomplete="off"
+        spellcheck="false"
+        enterkeyhint="send"
+        placeholder="Say something…"
+      />
+      <div class="chat-hint">Enter to send · Esc to close</div>
     </div>
     <div id="presence"></div>
     <div id="scores">

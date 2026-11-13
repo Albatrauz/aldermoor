@@ -939,6 +939,108 @@ canvas#scene {
     }
 }
 
+/* ---- chat: composer on the right, received lines on the left ---- */
+#chatLog {
+    position: fixed;
+    left: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 8;
+    width: min(360px, 34vw);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    pointer-events: none;
+}
+#chatLog.away {
+    visibility: hidden;
+}
+.chat-line {
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: #fff;
+    overflow-wrap: anywhere;
+    text-shadow:
+        0 0 2px #000,
+        0 1px 1px #000,
+        -1px 0 1px #000,
+        1px 0 1px #000,
+        0 -1px 1px #000,
+        0 1px 2px #000,
+        0 2px 12px rgba(0, 0, 0, 0.95),
+        0 0 18px rgba(0, 0, 0, 0.85);
+    animation: chat-in 180ms var(--ease);
+}
+.chat-line .who {
+    color: var(--accent-hi);
+}
+.chat-line.self .who {
+    color: #fff;
+}
+@keyframes chat-in {
+    from {
+        transform: translateX(-10px);
+    }
+    to {
+        transform: none;
+    }
+}
+#chatBox {
+    position: fixed;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 12;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    width: min(320px, 32vw);
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+#chatBox.open {
+    display: flex;
+}
+.chat-label {
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+#chatInput {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    color: #fff;
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 500;
+    padding: 12px 14px;
+    outline: none;
+}
+#chatInput::placeholder {
+    color: rgba(255, 255, 255, 0.38);
+}
+#chatInput:focus {
+    border-color: rgba(255, 255, 255, 0.4);
+}
+.chat-hint {
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.42);
+}
+
 /* ---- presence pill, top-right ---- */
 #presence {
     position: fixed;

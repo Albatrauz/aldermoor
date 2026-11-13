@@ -19,7 +19,7 @@ import { spawnExplosion } from './effects';
 import { blast, pinSnd, fuseTick } from './audio';
 import { setNades, setNadeRing, concuss } from './hud';
 import { matIron, matGoldTrim } from './materials';
-import { introVisible, frozen, dead, locked, dragLook, player } from './controls';
+import { introVisible, frozen, dead, locked, dragLook, player, chatOpen } from './controls';
 import { onMapChange } from './world';
 
 export const NADES_PER_LIFE = 2;
@@ -195,7 +195,7 @@ function stopCooking() {
 }
 
 function canCook() {
-  return !introVisible && !frozen && !dead && (locked || dragLook) && nades > 0 && !cookStart;
+  return !introVisible && !frozen && !dead && !chatOpen && (locked || dragLook) && nades > 0 && !cookStart;
 }
 
 addEventListener('keydown', e => {
@@ -425,7 +425,7 @@ function drawArc(left: number) {
 export function update(dt: number) {
   const now = performance.now();
   if (cookStart) {
-    if (dead || frozen) stopCooking();
+    if (dead || frozen || chatOpen) stopCooking();
     else if (introVisible) release(false);
     else {
       const t = (now - cookStart) / 1000;

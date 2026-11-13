@@ -2,7 +2,7 @@
 // The on-screen tally of scores, the heart pips, and the brief hit/hurt flourishes.
 // Holds the local player's health and the shared score table.
 import { myId } from './net';
-import { introVisible } from './controls';
+import { introVisible, chatOpen } from './controls';
 import { mapLabel } from './world';
 import { getSession } from './auth';
 import { hasConvex } from './convex';
@@ -264,7 +264,7 @@ function closeScoreboard(){
 // fight (so the menu keeps its normal focus-walk), and preventDefault stops a held
 // Tab from tabbing focus off the canvas while the board is up.
 addEventListener('keydown',e=>{
-  if(e.code!=='Tab' || myId===null || introVisible) return;
+  if(e.code!=='Tab' || myId===null || introVisible || chatOpen) return;
   e.preventDefault();
   openScoreboard();
 });
