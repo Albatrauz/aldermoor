@@ -976,8 +976,12 @@ canvas#scene {
 }
 .chat-line .who {
     color: var(--accent-hi);
+    font-weight: 700;
 }
 .chat-line.self .who {
+    color: #ffc94d;
+}
+.chat-line .what {
     color: #fff;
 }
 @keyframes chat-in {
