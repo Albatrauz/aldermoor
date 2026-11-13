@@ -26,13 +26,26 @@ const FP_VOX = .011, TP_VOX = .013;
 // The crosshair draws this same cone, so its tick gap is an honest hit-area gauge.
 // The AK starts tight, but each held round blooms harder than the last, so a long
 // spray walks wide open while a tap or short burst stays honest.
+//
+// `ads` is aiming down sights (right mouse held; see aim.ts):
+//   pos    — where the first-person gun sits at full raise (camera space). For a
+//            gun with iron sights this puts the sight line on the screen centre.
+//   fov    — the view angle at full raise (hip is 70°; 60° ≈ 1.2× zoom)
+//   time   — seconds from hip to eye
+//   spread — multiplier on the cone's floor and on each shot's bloom
+//   speed  — walk-speed multiplier
+//   kick   — multiplier on the gun's visual recoil (the stock is in the shoulder)
+// The handgonne has no sights: it only comes up to the shoulder, nearer the
+// centre, with a lighter zoom.
 export const WEAPONS = [
   { id:'handgonne', name:'Handgonne', fireCd:.9, mag:5,  spareMax:Infinity, reloadTime:2.2,
     full:false, range:70, kick:1,  reloadLabel:'ramming powder…',
-    spread:{ base:.007, walk:.028, run:.045, air:.08, shot:.022, ramp:.12, cool:5, max:.12, recover:5 } },
+    spread:{ base:.007, walk:.028, run:.045, air:.08, shot:.022, ramp:.12, cool:5, max:.12, recover:5 },
+    ads:{ pos:{x:.14, y:-.2, z:-.42}, fov:65, time:.3, spread:.6, speed:.75, kick:.7 } },
   { id:'ak47',      name:'AK-47',     fireCd:.1, mag:30, spareMax:160,      reloadTime:1.3,
     full:true,  range:70, kick:.6, reloadLabel:'reloading…',
-    spread:{ base:.005, walk:.03,  run:.05,  air:.09, shot:.016, ramp:.25, cool:5, max:.16, recover:4 } },
+    spread:{ base:.005, walk:.03,  run:.05,  air:.09, shot:.016, ramp:.25, cool:5, max:.16, recover:4 },
+    ads:{ pos:{x:0, y:-.09, z:.04}, fov:60, time:.22, spread:.4, speed:.7, kick:.4 } },
 ];
 
 

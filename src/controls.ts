@@ -6,6 +6,7 @@
 // are actually still standing — so a breach shot through a wall is a doorway.
 // `walkPhase` and `introVisible` are exported as live bindings so the gun
 // viewmodel (combat) and zone/toast logic can read them without owning them.
+import { aim, aimFov, aimSens, HIP_FOV } from './aim';
 import { canvas, camera, EYE } from './core';
 import { SPAWNS, menuCam } from './world';
 import { floorUnder, standHeight, resolveCircle, confine, solidAt } from './voxel';
@@ -93,8 +94,9 @@ addEventListener('mouseup',()=>dragging=false);
 addEventListener('mousemove',e=>{
   if(introVisible || frozen || dead) return;
   if(locked || (dragLook&&dragging)){
-    player.yaw   -= e.movementX*0.0023;
-    player.pitch -= e.movementY*0.0023;
+    const k=0.0023*aimSens();   // slower to match the zoom while aiming down sights
+    player.yaw   -= e.movementX*k;
+    player.pitch -= e.movementY*k;
     player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
   }
 });
@@ -157,7 +159,8 @@ export function update(dt, time){
   }
   if(!introVisible && !frozen){
     const run=keys.has('ShiftLeft')||keys.has('ShiftRight');
-    const speed=run?7.4:4.62;   // default walk bumped 10% (4.2 → 4.62); sprint unchanged
+    // default walk bumped 10% (4.2 → 4.62); sprint unchanged; aiming down sights slows the walk
+    const speed=(run?7.4:4.62)*(1+(aim.speed-1)*aim.t);
     let ix=0,iz=0;
     if(keys.has('KeyW')||keys.has('ArrowUp')) iz-=1;
     if(keys.has('KeyS')||keys.has('ArrowDown')) iz+=1;
@@ -206,8 +209,10 @@ export function update(dt, time){
     else eyeY=player.y;
     camera.position.set(player.x, eyeY+bob, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
-    const targetFov=run&&moving?75:70;
-    camera.fov += (targetFov-camera.fov)*Math.min(1,dt*5);
+    // sprint widens the view; aiming down sights narrows it. The sights follow
+    // the raise closely (it already has its own easing), the sprint eases slowly.
+    const targetFov=aim.t>0 ? aimFov() : run&&moving ? 75 : HIP_FOV;
+    camera.fov += (targetFov-camera.fov)*Math.min(1,dt*(aim.t>0?20:5));
     camera.updateProjectionMatrix();
   }else{
     // gentle establishing drift behind the menu — the active map sets the vantage
