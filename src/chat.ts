@@ -1,6 +1,7 @@
 /* ============================ in-game chat ============================ */
-// T opens a composer on the right. Typed keys go into that field: Enter sends,
-// Esc puts the gun back in your hands. Lines the server relays — yours included —
+// T opens a composer on the right. Typed keys go into that field: Enter sends
+// and closes it, Esc closes it without sending. The mouse stays captured the
+// whole time, so closing the box hands the gun straight back. Lines the server relays — yours included —
 // arrive on the left, centred as a stack, and fade once the fight needs the
 // screen back. A heavy shadow keeps them readable on sand and in the tunnels.
 
@@ -36,7 +37,7 @@ export function showChatMessage(m: { name?: string; text?: string; self?: boolea
   row.className = 'chat-line' + (m.self ? ' self' : '');
   const who = document.createElement('span');
   who.className = 'who';
-  who.textContent = String(m.name || 'Player');
+  who.textContent = String(m.name || 'Player') + ':';
   const what = document.createElement('span');
   what.className = 'what';
   what.textContent = text;
@@ -69,45 +70,48 @@ function openChat() {
   keys.clear();
   box.classList.add('open');
   box.setAttribute('aria-hidden', 'false');
-  // pointer lock would keep the mouse steering while typing, and Escape would
-  // mean "leave the game" instead of "close the box"
-  try { document.exitPointerLock(); } catch { /* already free */ }
+  // pointer lock stays: keys reach the focused field regardless, and the look
+  // handler already stands down while chatOpen
   setTimeout(() => { if (chatOpen) input.focus({ preventScroll: true }); }, 0);
 }
 
-function closeChat(relock: boolean) {
+function closeChat() {
   if (!chatOpen) return;
   setChatOpen(false);
   input.value = '';
   input.blur();
   box.classList.remove('open');
   box.setAttribute('aria-hidden', 'true');
-  if (relock && !introVisible && !dragLook) {
-    const pending = canvas.requestPointerLock?.();
-    if (pending && typeof pending.catch === 'function') pending.catch(() => {});
-  }
-  // the unlock Escape just caused (or the one from opening the box) must land
-  // before the menu is allowed to notice a missing pointer lock
+  // Escape may have cost us the pointer lock; that unlock must land before the
+  // menu is allowed to notice it. A click on the canvas takes the lock back.
   setTimeout(releaseMenuSuppress, 400);
 }
 
-function send() {
+/* true when the box may close: sent, or nothing worth sending */
+function send(): boolean {
   const text = clean(input.value);
-  if (!text) return;
+  if (!text) return true;
   const now = performance.now();
-  if (now - lastSent < SEND_GAP) return;
+  if (now - lastSent < SEND_GAP) return false;
   lastSent = now;
   input.value = '';
   // no socket (solo file, or still reconnecting): show it locally so Enter did something
   if (!deliver(text)) showChatMessage({ name: 'You', text, self: true });
+  return true;
 }
 
 addEventListener('keydown', e => {
   if (!chatOpen || e.code !== 'Escape') return;
   e.preventDefault();
   e.stopPropagation();
-  closeChat(true);
+  closeChat();
 }, true);
+
+// Most browsers swallow the Escape that breaks pointer lock, so the keydown
+// above never fires. Losing the lock while typing closes the box instead.
+document.addEventListener('pointerlockchange', () => {
+  if (chatOpen && !dragLook && document.pointerLockElement !== canvas) closeChat();
+});
 
 addEventListener('keydown', e => {
   if (chatOpen || e.code !== 'KeyT' || e.repeat) return;
@@ -123,10 +127,14 @@ input.addEventListener('keydown', e => {
   e.stopPropagation();
   if (e.key === 'Enter') {
     e.preventDefault();
-    send();
+    if (send()) closeChat();
   } else if (e.code === 'Tab') {
     e.preventDefault();
   }
+});
+// a click while locked lands on the canvas and would steal focus from the field
+input.addEventListener('blur', () => {
+  if (chatOpen) setTimeout(() => { if (chatOpen) input.focus({ preventScroll: true }); }, 0);
 });
 box.addEventListener('mousedown', e => e.stopPropagation());
 box.addEventListener('mouseup', e => e.stopPropagation());
@@ -135,7 +143,7 @@ box.addEventListener('pointerdown', e => e.stopPropagation());
 function syncMenu() {
   const menu = !intro.classList.contains('hidden');
   log.classList.toggle('away', menu);
-  if (menu) closeChat(false);
+  if (menu) closeChat();
 }
 new MutationObserver(syncMenu).observe(intro, { attributes: true, attributeFilter: ['class'] });
 syncMenu();
