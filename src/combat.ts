@@ -35,6 +35,8 @@ let adsLin=0;
 // sustained-fire "heat": climbs by one per shot and bleeds off at the weapon's
 // `cool` rate, scaling each shot's bloom so a held spray walks the cone open.
 let fireHeat=0;
+// seconds since the last shot left; recovery waits for the weapon's `settle`
+let sinceShot=Infinity;
 let mouseDown=false;
 // renderer.info.render.frame when the last shot left (only main.ts renders, so
 // that counter is the drawn-frame count); full-auto fires once per frame at most
@@ -50,7 +52,7 @@ const crosshairEl=document.getElementById('crosshair');
 
 function refillAll(){
   for(let i=0;i<WEAPONS.length;i++){ ammo[i]=WEAPONS[i].mag; spare[i]=WEAPONS[i].spareMax; }
-  reloadT=0; fireCd=0; gunKick=0; fireHeat=0; spread=WEAPONS[weaponIdx].spread.base;
+  reloadT=0; fireCd=0; gunKick=0; fireHeat=0; sinceShot=Infinity; spread=WEAPONS[weaponIdx].spread.base;
   const w=WEAPONS[weaponIdx];
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
   resetNades();
@@ -76,6 +78,7 @@ export function fire(){
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
   fireCd=w.fireCd; gunKick=Math.max(gunKick, w.kick);
   shotFrame=renderer.info.render.frame;
+  sinceShot=0;
   camera.updateMatrixWorld(true);
   const o=camera.position.clone();
   const d=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
@@ -87,8 +90,10 @@ export function fire(){
   d.addScaledVector(right, Math.cos(aRand)*rr).addScaledVector(up, Math.sin(aRand)*rr).normalize();
   // each held shot blooms harder than the last: heat scales the per-shot growth,
   // then ticks up so the next round in a sustained spray opens the cone further
-  const steady=1+(w.ads.spread-1)*aim.t;   // aiming down sights steadies the bloom too
-  spread=Math.min(w.spread.max, spread+w.spread.shot*steady*(1+fireHeat*(w.spread.ramp||0)));
+  // aiming down sights steadies a cold shot's bloom, but not the heat on top:
+  // holding the trigger walks the cone open through the sights as well
+  const steady=1+(w.ads.spread-1)*aim.t;
+  spread=Math.min(w.spread.max, spread+w.spread.shot*(steady+fireHeat*(w.spread.ramp||0)));
   fireHeat+=1;
   let end=traceWorld(o,d,w.range).end;   // how far the world lets it fly
   let hitId=null;
@@ -150,7 +155,7 @@ function switchWeapon(idx){
   fireCd=Math.max(fireCd,.25); // brief draw delay
   adsLin=0; aim.t=0;           // the new gun comes up at the hip
   mouseDown=false;             // avoid carrying a held trigger into the new weapon
-  fireHeat=0;                            // a fresh arm starts cold — no carried spray heat
+  fireHeat=0; sinceShot=Infinity;        // a fresh arm starts cold — no carried spray heat
   spread=WEAPONS[weaponIdx].spread.base; // fresh arm draws to its own settled cone
   const w=WEAPONS[weaponIdx];
   setAmmo(ammo[weaponIdx], w.mag, false, spare[weaponIdx], w);
@@ -365,9 +370,14 @@ export function update(dt){
   aim.t=adsLin*adsLin*(3-2*adsLin);
   aim.fov=ads.fov; aim.speed=ads.speed;
   floor*=1+(ads.spread-1)*aim.t;
-  spread += (floor-spread)*Math.min(1,dt*sp.recover);
+  // A held spray gets no relief: until `settle` has passed since the last shot the
+  // cone only grows (it still rises to a higher floor if you start moving), and
+  // heat keeps counting rounds. Once off the trigger, both recover.
+  sinceShot+=dt;
+  const settled=sinceShot>=(sp.settle||0);
+  if(spread<floor || settled) spread += (floor-spread)*Math.min(1,dt*sp.recover);
   spread = Math.min(spread, sp.max);
-  fireHeat = Math.max(0, fireHeat-dt*(sp.cool||0));  // spray heat bleeds off between shots / once the trigger's let off
+  if(settled) fireHeat = Math.max(0, fireHeat-dt*(sp.cool||0));  // spray heat bleeds off once the trigger's let off
   const gapPx=Math.tan(spread)/Math.tan(camera.fov*Math.PI/360)*(renderer.domElement.clientHeight/2);
   crosshairEl.style.setProperty('--gap', gapPx.toFixed(1)+'px');
   // the sights take over from the crosshair as the gun comes up
