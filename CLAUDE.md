@@ -8,7 +8,7 @@ Issues live in GitHub Issues on Albatrauz/aldermoor (via `gh`). See `docs/agents
 
 ### Triage labels
 
-Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+Default label vocabulary. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
