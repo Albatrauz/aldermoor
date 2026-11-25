@@ -18,6 +18,7 @@ import { myId, sendNet } from './net';
 import { spawnExplosion } from './effects';
 import { blast, pinSnd, fuseTick } from './audio';
 import { setNades, setNadeRing, concuss } from './hud';
+import { pingMinimap } from './minimap';
 import { matIron, matGoldTrim } from './materials';
 import { introVisible, frozen, dead, locked, dragLook, player, chatOpen } from './controls';
 import { onMapChange } from './world';
@@ -269,6 +270,7 @@ function explode(ex: number[], reportAs: number | null) {
   const d = _p.distanceTo(camera.position);
   const seen = inSight(ex);
   blastImpact(ex[0], ex[1], ex[2]);
+  pingMinimap(ex[0], ex[2], 'boom');
   spawnExplosion(_p);
   blast(Math.min(1, 14 / Math.max(4, d)), d);
   feel(_p, d, seen);

@@ -18,6 +18,7 @@ import { updateVoxels, voxelStats, voxelGrid, shotImpact, replayShots, skyAt } f
 import * as net from './net';
 import * as quality from './quality';   // dev frame-time monitor (backquote toggles it)
 import * as visitor from './visitor';   // bird's-eye camera + top-down map plates
+import { updateMinimap, toggleTacticalMap, minimapState, pingMinimap } from './minimap';
 import { debugDossier } from './stats';   // reactive leaderboard + dossier (inert without Convex)
 
 // Timer over Clock: Clock warns on construction from r183, and Timer takes the
@@ -63,6 +64,7 @@ function frame(dt){
   updateWeather(dt);           // snow / dust, box snapped to the camera
   world.updateAmbient(time);   // ambient animation (a no-op at high noon)
   villagers.updateRemotes(dt); // interpolate fellow travellers
+  updateMinimap(dt);           // live radar + tactical map (bakes plate before eye draw)
   renderer.render(scene,camera);
   quality.sample(dt);          // after the render: info.render resets on each render()
 }
@@ -137,6 +139,9 @@ window.__town={
   },
   frameVisitor: visitor.frameVisitor,     // aim the bird's-eye camera, no render
   visitor: visitor.visitorCam,
+  toggleMap: toggleTacticalMap,           // toggle the full tactical map overlay (M)
+  minimap: minimapState,
+  pingMap: pingMinimap,
   get pos(){ return [controls.player.x, controls.player.z]; },
   get player(){ return controls.player; },
   step(n=1,dt=1/60){ for(let i=0;i<n;i++) frame(dt); }, // drive frames headlessly

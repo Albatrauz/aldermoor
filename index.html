@@ -36,6 +36,7 @@
       <span><kbd>Shift</kbd>run</span>
       <span><kbd>Space</kbd>jump</span>
       <span><kbd>Tab</kbd>scores</span>
+      <span><kbd>M</kbd>map</span>
       <span><kbd>T</kbd>chat</span>
       <span><kbd>Esc</kbd>menu</span>
     </div>
@@ -53,6 +54,36 @@
       <div class="chat-hint">Enter to send · Esc to close</div>
     </div>
     <div id="presence"></div>
+    <div id="minimap" aria-label="Minimap">
+      <div class="mm-head">
+        <span id="minimapZone" class="mm-zone"></span>
+        <span id="minimapFloor" class="mm-floor" hidden></span>
+      </div>
+      <div class="mm-body">
+        <canvas id="minimapCanvas"></canvas>
+        <span class="mm-key"><kbd>M</kbd></span>
+      </div>
+    </div>
+    <div id="tacticalMap" aria-label="Tactical map">
+      <div class="tm-inner">
+        <div class="tm-head">
+          <div class="tm-title-wrap">
+            <span id="tacticalTitle" class="tm-title">Map</span>
+            <span id="tacticalZone" class="tm-zone"></span>
+            <span id="tacticalFloor" class="tm-floor" hidden></span>
+          </div>
+          <div class="tm-hint"><kbd>M</kbd> close</div>
+        </div>
+        <div class="tm-stage">
+          <canvas id="tacticalCanvas"></canvas>
+        </div>
+        <div class="tm-legend">
+          <span><i class="tm-dot me"></i>You</span>
+          <span><i class="tm-dot shot"></i>Gunfire</span>
+          <span><i class="tm-dot boom"></i>Explosion</span>
+        </div>
+      </div>
+    </div>
     <div id="scores">
       <div class="sc-title">Scores</div>
       <div id="scoreRows"></div>
