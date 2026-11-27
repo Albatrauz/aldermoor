@@ -1082,6 +1082,241 @@ canvas#scene {
     box-shadow: 0 0 0 3px rgba(153, 153, 153, 0.18);
 }
 
+/* ---- corner live radar, top-right beneath #presence ---- */
+#minimap {
+    position: fixed;
+    top: 72px;
+    right: 24px;
+    z-index: 7;
+    pointer-events: none;
+    display: none;
+    flex-direction: column;
+    width: 192px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+#minimap.show {
+    display: flex;
+}
+.mm-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+}
+.mm-zone {
+    font-family: var(--font);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mm-floor {
+    flex: none;
+    font-family: var(--font);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--pill);
+    padding: 1px 7px;
+}
+.mm-floor[hidden] {
+    display: none;
+}
+.mm-body {
+    position: relative;
+    width: 190px;
+    height: 190px;
+}
+#minimapCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.mm-key {
+    position: absolute;
+    right: 7px;
+    bottom: 7px;
+    opacity: 0.85;
+}
+.mm-key kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    font-family: var(--font);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text);
+    background: rgba(10, 10, 10, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 5px;
+}
+@media (max-width: 720px) {
+    #minimap {
+        width: 148px;
+    }
+    .mm-body {
+        width: 146px;
+        height: 146px;
+    }
+}
+
+/* ---- full tactical map overlay (M) ---- */
+#tacticalMap {
+    position: fixed;
+    inset: 0;
+    z-index: 8;
+    display: none;
+    place-items: center;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.58);
+}
+#tacticalMap.show {
+    display: grid;
+}
+.tm-inner {
+    width: min(760px, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px 22px 16px;
+    background: rgba(10, 10, 10, 0.92);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65);
+    animation: rise 0.18s var(--ease) both;
+}
+.tm-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+.tm-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.tm-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.tm-title::before {
+    content: '';
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+.tm-zone {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tm-floor {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--pill);
+    padding: 2px 10px;
+}
+.tm-floor[hidden] {
+    display: none;
+}
+.tm-hint {
+    flex: none;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.tm-hint kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-right: 4px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--line-strong);
+    border-radius: 5px;
+}
+.tm-stage {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #090c10;
+}
+#tacticalCanvas {
+    display: block;
+}
+.tm-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.tm-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.tm-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.tm-dot.me {
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(0, 190, 235, 0.7);
+}
+.tm-dot.shot {
+    background: var(--danger);
+}
+.tm-dot.boom {
+    background: var(--warn);
+}
+
 /* ============================ start screen (two-pane) ============================ */
 /* Left rail = identity + sign-in; right pane = stats + leaderboard. It's a
    translucent overlay, so the blurred map still shows faintly behind it. */

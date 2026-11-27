@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { renderer, scene, camera as eyeCam, REVERSED_DEPTH, VISITOR_LAYER } from './core';
 import { sun, currentMapName, mapLabel, MAP_ORDER, setMap, markVisitorLayer } from './world';
-import { worldSpan, flushMeshes, type WorldSpan } from './voxel';
+import { worldSpan, playableSpan, flushMeshes, type WorldSpan } from './voxel';
 
 const PLATE = 2048;   // default plate, px. ~6 px/m across the wider map
 const LIFT = 4;       // metres of air between the tallest voxel and the camera
@@ -246,4 +246,100 @@ export function savePlate(plate: MapPlate) {
   document.body.appendChild(a);
   a.click();
   a.remove();
+}
+
+/* ============================ live minimap plate ============================ */
+// Renders a fast, un-mirrored top-down view of the playable arena directly into
+// an offscreen 2D canvas (no PNG encode, no shadow-map re-bake). Orientation is
+// true top-down (+X right, −Z up), matching the 3D world's handedness so radar
+// rotation and turns never mirror. Optional `sliceY` clips roofs/ceilings above
+// that height for multi-storey indoor maps like mp_kantoor.
+export interface TopDownOptions {
+  size?: number;
+  pad?: number;
+  sliceY?: number;
+  playableOnly?: boolean;
+}
+
+let topPixels = new Uint8Array(0);
+let topImg: ImageData | null = null;
+
+export function renderTopDown(target: HTMLCanvasElement, opts: TopDownOptions = {}): VisitorFrame | null {
+  markVisitorLayer();
+  const span = opts.playableOnly === false ? worldSpan() : playableSpan();
+  if (!span) return null;
+  syncDepth();
+
+  const maxDim = Math.max(64, Math.floor(opts.size ?? 512));
+  const pad = opts.pad ?? 0;
+  const rawX = Math.max(1, (span.maxX - span.minX) * (1 + pad));
+  const rawZ = Math.max(1, (span.maxZ - span.minZ) * (1 + pad));
+  const width = rawX >= rawZ ? maxDim : Math.max(64, Math.round(maxDim * (rawX / rawZ)));
+  const height = rawZ >= rawX ? maxDim : Math.max(64, Math.round(maxDim * (rawZ / rawX)));
+
+  const cx = (span.minX + span.maxX) / 2;
+  const cz = (span.minZ + span.maxZ) / 2;
+  let spanX = rawX, spanZ = rawZ;
+  const aspect = width / height;
+  if (spanX / spanZ > aspect) spanZ = spanX / aspect;
+  else spanX = spanZ * aspect;
+
+  const camY = opts.sliceY !== undefined ? opts.sliceY + 0.5 : span.maxY + LIFT;
+  const near = 0.5;
+  const far = Math.max(4, (camY - span.minY) + 2);
+
+  const savedFog = scene.fog;
+  const savedUp = visitorCam.up.clone();
+  try {
+    // True top-down: −Z up, +X right — matches 3D handedness with zero horizontal flip.
+    visitorCam.position.set(cx, camY, cz);
+    visitorCam.up.set(0, 0, -1);
+    visitorCam.lookAt(cx, span.minY, cz);
+    const halfW = spanX / 2, halfH = spanZ / 2;
+    visitorCam.left = -halfW;
+    visitorCam.right = halfW;
+    visitorCam.top = halfH;
+    visitorCam.bottom = -halfH;
+    visitorCam.near = near;
+    visitorCam.far = far;
+    visitorCam.updateProjectionMatrix();
+    visitorCam.updateMatrixWorld();
+
+    // Drop atmospheric fog while rendering from altitude so indoor/distant colours stay crisp.
+    scene.fog = null;
+
+    withPlateBuffer(width, height, () => {
+      renderer.setClearColor(0x0b0e12, 1);
+      renderer.setRenderTarget(null);
+      renderer.render(scene, visitorCam);
+
+      const gl = renderer.getContext();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+      const n = w * h * 4;
+      if (topPixels.length !== n) topPixels = new Uint8Array(n);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, topPixels);
+
+      if (target.width !== w || target.height !== h) {
+        target.width = w;
+        target.height = h;
+        topImg = null;
+      }
+      const ctx = target.getContext('2d');
+      if (!ctx) return;
+      if (!topImg || topImg.width !== w || topImg.height !== h) topImg = ctx.createImageData(w, h);
+      const dst = topImg.data;
+      const row = w * 4;
+      // Flip WebGL bottom-up rows to 2D top-down; keep X unflipped (+X stays right).
+      for (let y = 0; y < h; y++) {
+        dst.set(topPixels.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+      }
+      ctx.putImageData(topImg, 0, 0);
+    });
+  } finally {
+    scene.fog = savedFog;
+    visitorCam.up.copy(savedUp);
+  }
+
+  return { ...span, cx, cz, spanX, spanZ };
 }

@@ -15,6 +15,7 @@ import { scoresMap, setHp, setAmmo, renderScores, hurtFlash, hitmark,
 import { announce, syncZone } from './zones';
 import { isCooking, resetNades } from './grenades';
 import { aim } from './aim';
+import { pingMinimap } from './minimap';
 import { introVisible, locked, dragLook, walkPhase, respawn, setDead, frozen, setFrozen, showMenu, onMenuShown, player, vel, keys, chatOpen } from './controls';
 
 scene.add(camera); // the viewmodel rides on the camera
@@ -170,6 +171,7 @@ export function remoteShoot(m){
   // as go there.
   shotImpact(m.o, m.d, len, rw);
   if(m.id===myId) return;   // our own shot coming back: flash, tracer and bang already happened
+  pingMinimap(m.o[0], m.o[2], 'shot');
   const v=remotes.get(m.id);
   const o=new THREE.Vector3(m.o[0],m.o[1],m.o[2]);
   const d=new THREE.Vector3(m.d[0],m.d[1],m.d[2]).normalize();

@@ -40,9 +40,15 @@ export const voxelsTouched = () => touched;
 // the cost the bake exists to avoid. So changes are coalesced: at most one
 // re-bake every SHADOW_GAP seconds while the shooting lasts, plus a final one.
 const SHADOW_GAP = .12;
-let onChange: (() => void) | null = null;
+const changeListeners = new Set<() => void>();
 let shadowStale = false, sinceBake = 0;
-export function onGeometryChange(fn: () => void) { onChange = fn; }
+export function onGeometryChange(fn: () => void) {
+  changeListeners.add(fn);
+  return () => { changeListeners.delete(fn); };
+}
+function notifyGeometryChange() {
+  for (const fn of changeListeners) { try { fn(); } catch { /* ignore */ } }
+}
 
 /* ============================ build ============================ */
 export function buildVoxelWorld(built: BuiltMap, ground: Surface): THREE.Group {
@@ -82,7 +88,7 @@ export function updateVoxels(dt: number) {
   sky?.flush();
   if (chunks.flush(6) > 0) shadowStale = true;
   sinceBake += dt;
-  if (shadowStale && sinceBake >= SHADOW_GAP) { shadowStale = false; sinceBake = 0; onChange?.(); }
+  if (shadowStale && sinceBake >= SHADOW_GAP) { shadowStale = false; sinceBake = 0; notifyGeometryChange(); }
 }
 
 /* ============================ player queries ============================ */
@@ -246,7 +252,7 @@ export function replayShots(log: ArrayLike<number>[]) {
     }
   } finally { silent = false; setQuiet(false); }
   chunks.flush(Infinity);
-  onChange?.(); shadowStale = false; sinceBake = 0;
+  notifyGeometryChange(); shadowStale = false; sinceBake = 0;
   console.info(`voxel world: replayed ${log.length} shots in ${(performance.now() - t0).toFixed(0)}ms`);
 }
 
@@ -273,6 +279,19 @@ function spanOf(g: VoxelGrid): WorldSpan {
   };
 }
 
+/** Axis-aligned extent of the playable fine voxel block (excluding the coarse
+    backdrop outside the boundary walls). Null until a map has been built. */
+export function playableSpan(): WorldSpan | null {
+  if (!chunks) return null;
+  const g = chunks.grid;
+  const vs = g.vs;
+  const minX = Math.max(g.ox, g.ox + g.lockI0 * vs);
+  const maxX = Math.min(g.ox + g.nx * vs, g.ox + g.lockI1 * vs);
+  const minZ = Math.max(g.oz, g.oz + g.lockK0 * vs);
+  const maxZ = Math.min(g.oz + g.nz * vs, g.oz + g.lockK1 * vs);
+  return { minX, minY: g.oy, minZ, maxX, maxY: g.oy + g.ny * vs, maxZ };
+}
+
 /** Axis-aligned extent of everything the voxel world draws — the playable block
     and the coarse backdrop past the walls. Null until a map has been built. */
 export function worldSpan(): WorldSpan | null {
@@ -290,7 +309,7 @@ export function worldSpan(): WorldSpan | null {
     have already been carved rather than the mesh from a few frames ago. */
 export function flushMeshes() {
   if (!chunks || chunks.flush(1e9) === 0) return;
-  onChange?.();
+  notifyGeometryChange();
   shadowStale = false; sinceBake = 0;
 }
 /* Sky light (0–255) at a world position — what the shader would look up there. */
